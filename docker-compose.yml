@@ -1,0 +1,31 @@
+services:
+  backend:
+    build: ./backend
+    container_name: pironman-deluxe-backend
+    ports:
+      - "8071:8071"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - pironman-data:/app/data
+      - /:/host:ro
+      - /mnt:/mnt:ro
+    environment:
+      - LOG_LEVEL=INFO
+      - HW_PROXY_URL=http://host.docker.internal:8072
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: pironman-deluxe-frontend
+    ports:
+      - "8070:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pironman-data:

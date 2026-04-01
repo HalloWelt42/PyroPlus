@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+*.so
+*.whl
+venv/
+.venv/
+
+# Node.js
+node_modules/
+dist/
+.svelte-kit/
+.vite/
+package-lock.json
+
+# Umgebung und Secrets
+.env
+.env.*
+*.pem
+api_token.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+.nfs*
+
+# Laufzeitdaten
+data/
+hardware-proxy/data/
+
+# Logs
+*.log
+
+# Docker
+docker-compose.override.yml

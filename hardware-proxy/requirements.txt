@@ -1,0 +1,7 @@
+fastapi==0.115.6
+uvicorn==0.34.0
+Pillow==11.1.0
+luma.oled==3.13.0
+gpiozero==2.0.1
+adafruit-circuitpython-neopixel-spi==1.0.14
+adafruit-blinka==8.52.0
