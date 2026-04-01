@@ -1,5 +1,5 @@
 """
-PironMan Deluxe v2.5.4 — Hardware-Proxy
+PyroPlus v3.0.0 — Hardware-Proxy
 © HalloWelt42 - Nur für private Nutzung
 
 Nativer systemd-Service mit integrierter LED-Engine.
@@ -31,7 +31,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("hw-proxy")
 
-VERSION = "2.5.4"
+VERSION = "3.0.0"
 PORT = 8072
 
 # ─── Hardware State ─────────────────────────────────────────
@@ -197,7 +197,7 @@ async def lifespan(app: FastAPI):
     _cleanup_hardware()
     logger.info("=== Hardware-Proxy gestoppt ===")
 
-app = FastAPI(title="PironMan HW-Proxy", version=VERSION, lifespan=lifespan)
+app = FastAPI(title="PyroPlus HW-Proxy", version=VERSION, lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 

@@ -1,5 +1,5 @@
 """
-PironMan Deluxe v2.5.4 — FastAPI Backend
+PyroPlus v3.0.0 — FastAPI Backend
 © HalloWelt42 - Nur für private Nutzung
 
 Swagger-UI: http://host:8071/docs

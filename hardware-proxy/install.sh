@@ -1,13 +1,13 @@
 #!/bin/bash
-# PironMan Deluxe — Hardware-Proxy Installer
+# PyroPlus — Hardware-Proxy Installer
 # Muss als root ausgeführt werden: sudo bash install.sh
 set -e
 
-INSTALL_DIR="/opt/pironman-deluxe-hw"
-SERVICE_NAME="pironman-deluxe-hw"
+INSTALL_DIR="/opt/pyroplus-hw"
+SERVICE_NAME="pyroplus-hw"
 
 echo "╔══════════════════════════════════════════╗"
-echo "║  PironMan Deluxe Hardware-Proxy Install  ║"
+echo "║    PyroPlus Hardware-Proxy Install       ║"
 echo "╚══════════════════════════════════════════╝"
 
 if [ "$EUID" -ne 0 ]; then
@@ -55,7 +55,7 @@ fi
 
 # systemd Service
 echo "→ Installiere systemd Service..."
-cp pironman-deluxe-hw.service /etc/systemd/system/
+cp pyroplus-hw.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 systemctl start "$SERVICE_NAME"

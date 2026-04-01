@@ -1,14 +1,14 @@
 services:
   backend:
     build: ./backend
-    container_name: pironman-deluxe-backend
+    container_name: pyroplus-backend
     ports:
       - "8071:8071"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - pironman-data:/app/data
+      - pyroplus-data:/app/data
       - /:/host:ro
       - /mnt:/mnt:ro
     environment:
@@ -18,7 +18,7 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: pironman-deluxe-frontend
+    container_name: pyroplus-frontend
     ports:
       - "8070:80"
     extra_hosts:
@@ -28,4 +28,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  pironman-data:
+  pyroplus-data:
+    external: true
+    name: pironman-deluxe_pironman-data

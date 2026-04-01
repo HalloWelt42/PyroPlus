@@ -1,4 +1,4 @@
-/* PironMan Deluxe — API Client v2.5.4 */
+/* PyroPlus — API Client v3.0.0 */
 
 let _token = '';
 
@@ -33,13 +33,6 @@ const get = (p) => request(p);
 const post = (p, b) => request(p, { method: 'POST', body: b ? JSON.stringify(b) : undefined });
 const put = (p, b) => request(p, { method: 'PUT', body: JSON.stringify(b) });
 const del = (p) => request(p, { method: 'DELETE' });
-
-/* WeatherCache API — proxied through nginx to avoid CORS */
-const WEATHER = '/weather-api';
-async function weatherGet(path) {
-  try { const r = await fetch(`${WEATHER}${path}`); return await r.json(); }
-  catch { return null; }
-}
 
 export const api = {
   fetchToken,
@@ -97,24 +90,6 @@ export const api = {
     oledOn: () => post('/quick/oled-on'),
     fanAuto: () => post('/quick/fan-auto'),
     fanOff: () => post('/quick/fan-off'),
-  },
-
-  custom: {
-    list: () => get('/custom'),
-    set: (k, d) => put(`/custom/${k}`, d),
-    del: (k) => del(`/custom/${k}`),
-  },
-
-  disks: {
-    all: () => get('/disks/all'),
-    config: () => get('/disks/config'),
-    setConfig: (mounts) => post('/disks/config', { monitored_mounts: mounts }),
-  },
-
-  weather: {
-    locations: () => weatherGet('/locations'),
-    complete: (id) => weatherGet(`/weather/complete/${id}`),
-    search: (q) => weatherGet(`/locations/search?q=${encodeURIComponent(q)}&limit=10`),
   },
 };
 

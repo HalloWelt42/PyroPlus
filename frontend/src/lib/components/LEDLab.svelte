@@ -10,9 +10,10 @@
   let frameCount = 0;
   let fpsTimer = 0;
   const N = 4;
-  const catNames = { basis: 'Basis', advanced: 'Advanced', audio: 'Audio', party: 'Party', mood: 'Stimmung' };
+  const catNames = { basis: 'Basis', advanced: 'Erweitert', audio: 'Audio', party: 'Party', mood: 'Stimmung' };
+  const catIcons = { basis: 'fa-circle', advanced: 'fa-wand-magic-sparkles', audio: 'fa-music', party: 'fa-champagne-glasses', mood: 'fa-heart' };
 
-  /* ── Farb-Hilfsfunktionen (identisch zum Backend hsv_to_rgb) ── */
+  /* ── Farb-Hilfsfunktionen ── */
   function hsv(h,sat,v) {
     h=((h%360)+360)%360;
     const c=v*sat, x=c*(1-Math.abs((h/60)%2-1)), m=v-c;
@@ -39,13 +40,11 @@
     const c2 = s.leds?.color2||{r:255,g:0,b:0};
     const targetFps = getTargetFps(fx);
 
-    /* Hardware-States bevorzugen (kommen via WebSocket) */
+    /* Hardware-States bevorzugen */
     const hw = s.leds?.led_states;
     if (hw && Array.isArray(hw) && hw.length === N && hw.some(l=>l.r||l.g||l.b) && fx !== 'off') {
       simLeds = hw.map(l => ({
-        r: Math.round((l.r||0)*br),
-        g: Math.round((l.g||0)*br),
-        b: Math.round((l.b||0)*br)
+        r: Math.round((l.r||0)*br), g: Math.round((l.g||0)*br), b: Math.round((l.b||0)*br)
       }));
       simSource = 'Live HW';
       countFps();
@@ -53,7 +52,7 @@
       return;
     }
 
-    /* Lokale Simulation — Backend-identische Formeln */
+    /* Lokale Simulation */
     let L = Array.from({length:N}, ()=>({r:0,g:0,b:0}));
     simSource = fx === 'off' ? '—' : 'Simulation';
 
@@ -172,11 +171,18 @@
   function toHex(c){return c?'#'+[c.r,c.g,c.b].map(v=>(v||0).toString(16).padStart(2,'0')).join(''):'#0064ff';}
   function fromHex(h){return{r:parseInt(h.slice(1,3),16),g:parseInt(h.slice(3,5),16),b:parseInt(h.slice(5,7),16)};}
   function spdLabel(v){if(v<=5)return v+' (Minimal)';if(v<=20)return v+' (Sehr langsam)';if(v<=50)return v+' (Langsam)';if(v<=100)return v+' (Gemächlich)';if(v<=250)return v+' (Normal)';if(v<=500)return v+' (Schnell)';if(v<=750)return v+' (Sehr schnell)';return v+' (Ultra)';}
+
+  /* Reaktive Effekte erkennen */
+  const isReactive = $derived(['temp_reactive','load_reactive'].includes(s.leds?.effect));
 </script>
 
 <div class="page">
-  <div class="page-head"><h1>LED Lab</h1><p class="sub">4x WS2812B · SPI · neopixel_spi</p></div>
+  <div class="page-head">
+    <h1><i class="fa-solid fa-lightbulb"></i> LED Lab</h1>
+    <p class="sub">4x WS2812B · SPI · neopixel_spi</p>
+  </div>
 
+  <!-- LED-Visualisierung -->
   <div class="card sim-card">
     <div class="strip-housing">
       {#each simLeds as led, i}
@@ -192,45 +198,93 @@
     <div class="sim-info">
       <span class="badge" class:badge-ok={s.ledsActive}>{s.leds?.effect||'off'}</span>
       <span class="sim-src">{simSource} · {simFps} FPS</span>
-      <button class="btn" onclick={()=>s.toggleLeds()}>{s.ledsActive?'Ausschalten':'Einschalten'}</button>
+      <button class="btn btn-sm" onclick={()=>s.toggleLeds()}>
+        <i class="fa-solid {s.ledsActive ? 'fa-toggle-on' : 'fa-toggle-off'}"></i>
+        {s.ledsActive ? 'Aus' : 'Ein'}
+      </button>
     </div>
+
+    <!-- CPU-Info bei reaktiven Effekten -->
+    {#if isReactive}
+      <div class="reactive-info">
+        <div class="reactive-badge">
+          <i class="fa-solid fa-temperature-half"></i>
+          <span>{(s.stats?.cpu?.temp||0).toFixed(1)}°C</span>
+        </div>
+        <div class="reactive-badge">
+          <i class="fa-solid fa-microchip"></i>
+          <span>{(s.stats?.cpu?.percent||0).toFixed(0)}% CPU</span>
+        </div>
+      </div>
+    {/if}
   </div>
 
-  <div class="section"><div class="section-title">Steuerung</div>
+  <!-- Steuerung -->
+  <div class="section"><div class="section-title"><i class="fa-solid fa-sliders"></i> Steuerung</div>
     <div class="grid-3">
-      <div class="card"><div class="card-header"><h3>Primärfarbe</h3></div>
-        <div class="color-row"><input type="color" value={toHex(s.leds?.color)} oninput={(e)=>{const c=fromHex(e.target.value);s.setLedColor(c.r,c.g,c.b);}}><span class="color-hex">{toHex(s.leds?.color)}</span><div class="color-swatch" style="background:{toHex(s.leds?.color)}"></div></div>
+      <div class="card">
+        <div class="card-header"><h3>Primärfarbe</h3></div>
+        <div class="color-row">
+          <input type="color" value={toHex(s.leds?.color)} oninput={(e)=>{const c=fromHex(e.target.value);s.setLedColor(c.r,c.g,c.b);}}>
+          <span class="color-hex">{toHex(s.leds?.color)}</span>
+          <div class="color-swatch" style="background:{toHex(s.leds?.color)}"></div>
+        </div>
       </div>
-      <div class="card"><div class="card-header"><h3>Sekundärfarbe</h3></div>
-        <div class="color-row"><input type="color" value={toHex(s.leds?.color2)} oninput={(e)=>{const c=fromHex(e.target.value);s.setLedColor2(c.r,c.g,c.b);}}><span class="color-hex">{toHex(s.leds?.color2)}</span><div class="color-swatch" style="background:{toHex(s.leds?.color2)}"></div></div>
+      <div class="card">
+        <div class="card-header"><h3>Sekundärfarbe</h3></div>
+        <div class="color-row">
+          <input type="color" value={toHex(s.leds?.color2)} oninput={(e)=>{const c=fromHex(e.target.value);s.setLedColor2(c.r,c.g,c.b);}}>
+          <span class="color-hex">{toHex(s.leds?.color2)}</span>
+          <div class="color-swatch" style="background:{toHex(s.leds?.color2)}"></div>
+        </div>
       </div>
-      <div class="card"><div class="card-header"><h3>Parameter</h3></div>
-        <div class="slider-row"><label>Helligkeit</label><input type="range" min="1" max="1000" value={s.leds?.brightness||500} oninput={(e)=>s.setLedBrightness(+e.target.value)}><span class="slider-val">{s.leds?.brightness||0}</span></div>
-        <div class="slider-row"><label>Speed</label><input type="range" min="1" max="1000" value={s.leds?.speed||50} oninput={(e)=>s.setLedSpeed(+e.target.value)}><span class="slider-val">{spdLabel(s.leds?.speed||0)}</span></div>
+      <div class="card">
+        <div class="card-header"><h3>Parameter</h3></div>
+        <div class="slider-row">
+          <label><i class="fa-solid fa-sun"></i> Helligkeit</label>
+          <input type="range" min="1" max="1000" value={s.leds?.brightness||500} oninput={(e)=>s.setLedBrightness(+e.target.value)}>
+          <span class="slider-val">{s.leds?.brightness||0}</span>
+        </div>
+        <div class="slider-row">
+          <label><i class="fa-solid fa-gauge-high"></i> Speed</label>
+          <input type="range" min="1" max="1000" value={s.leds?.speed||50} oninput={(e)=>s.setLedSpeed(+e.target.value)}>
+          <span class="slider-val">{spdLabel(s.leds?.speed||0)}</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="section"><div class="section-title">Effekte</div>
+  <!-- Effekte -->
+  <div class="section"><div class="section-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Effekte</div>
     {#each Object.entries(s.leds?.effects_by_category||{}) as [cat, effects]}
-      <div class="effect-cat"><span class="cat-name">{catNames[cat]||cat}</span>
+      <div class="effect-cat">
+        <span class="cat-name"><i class="fa-solid {catIcons[cat]||'fa-circle'}"></i> {catNames[cat]||cat}</span>
         <div class="effect-grid">
           {#each effects as fx}
-            <button class="fx-btn" class:act={s.leds?.effect===fx} onclick={()=>s.setLedEffect(fx)}>{fx.replace(/_/g,' ')}</button>
+            <button class="fx-btn" class:active={s.leds?.effect===fx} onclick={()=>s.setLedEffect(fx)}>
+              {fx.replace(/_/g,' ')}
+            </button>
           {/each}
         </div>
       </div>
     {/each}
   </div>
 
+  <!-- Individuelle LEDs -->
   {#if s.leds?.individual_mode !== undefined}
-  <div class="section"><div class="section-title">Individuell</div>
+  <div class="section"><div class="section-title"><i class="fa-solid fa-palette"></i> Individuell</div>
     <div class="card">
-      <label class="toggle-row"><input type="checkbox" checked={s.leds?.individual_mode} onchange={(e)=>s.setLedIndividual(e.target.checked)}><span>Individuelle LEDs</span></label>
+      <label class="toggle-row">
+        <input type="checkbox" checked={s.leds?.individual_mode} onchange={(e)=>s.setLedIndividual(e.target.checked)}>
+        <span>Individuelle LEDs</span>
+      </label>
       {#if s.leds?.individual_mode}
         <div class="individual-grid">
           {#each s.leds?.individual_colors||[] as ic, i}
-            <div class="ind-led"><span class="ind-num">LED {i+1}</span><input type="color" value={toHex(ic)} oninput={(e)=>{const c=fromHex(e.target.value);s.setLedIndColor(i,c.r,c.g,c.b);}}></div>
+            <div class="ind-led">
+              <span class="ind-num">LED {i+1}</span>
+              <input type="color" value={toHex(ic)} oninput={(e)=>{const c=fromHex(e.target.value);s.setLedIndColor(i,c.r,c.g,c.b);}}>
+            </div>
           {/each}
         </div>
       {/if}
@@ -240,40 +294,58 @@
 </div>
 
 <style>
-  .page{display:flex;flex-direction:column;gap:20px}
-  .page-head h1{margin:0;font-size:1.3rem} .sub{color:var(--text-muted);font-size:.8rem;margin:2px 0 0}
-  .section-title{font-size:.9rem;font-weight:600;margin-bottom:10px;color:var(--text-secondary)}
-  .card{background:var(--bg-surface,#111827);border:1px solid var(--border);border-radius:12px;padding:16px}
-  .card-header h3{margin:0 0 10px;font-size:.9rem}
-  .grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
-  .sim-card{padding:20px;text-align:center}
-  .strip-housing{display:flex;justify-content:center;gap:24px;padding:24px 16px;background:linear-gradient(180deg,#0a0a0a,#1a1a1a);border-radius:10px;border:1px solid #333;position:relative}
-  .led-mount{position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center}
-  .led-glow{position:absolute;width:80px;height:80px;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
-  .led-chip{width:28px;height:28px;border-radius:6px;border:2px solid #555;display:flex;align-items:center;justify-content:center;position:relative;z-index:1;transition:box-shadow .15s}
-  .led-num{font-size:9px;color:rgba(255,255,255,0.5);font-weight:700}
-  .strip-base{height:4px;background:linear-gradient(90deg,#222,#444,#222);border-radius:0 0 6px 6px;margin:0 20px}
-  .sim-info{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:12px;font-size:.8rem}
-  .badge{padding:3px 10px;border-radius:20px;background:var(--bg-elevated);border:1px solid var(--border);font-size:.75rem}
-  .badge-ok{border-color:var(--accent);color:var(--accent)}
-  .sim-src{color:var(--text-muted);font-size:.7rem;font-family:var(--mono,monospace)}
-  .btn{padding:5px 14px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:.8rem}
-  .color-row{display:flex;align-items:center;gap:8px}
-  .color-row input[type=color]{width:40px;height:32px;border:none;cursor:pointer;background:none}
-  .color-hex{font-family:var(--mono,monospace);font-size:.8rem;color:var(--text-muted)}
-  .color-swatch{width:24px;height:24px;border-radius:6px;border:1px solid var(--border)}
-  .slider-row{display:flex;align-items:center;gap:8px;margin:6px 0}
-  .slider-row label{min-width:90px;font-size:.8rem;color:var(--text-secondary)}
-  .slider-row input[type=range]{flex:1}
-  .slider-val{min-width:70px;text-align:right;font-size:.75rem;font-family:var(--mono,monospace);color:var(--text-muted)}
-  .effect-cat{margin-bottom:14px}
-  .cat-name{font-size:.75rem;text-transform:uppercase;color:var(--text-muted);letter-spacing:.05em;margin-bottom:6px;display:block}
-  .effect-grid{display:flex;flex-wrap:wrap;gap:6px}
-  .fx-btn{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-surface,#111827);color:var(--text);cursor:pointer;font-size:.78rem;transition:all .15s;text-transform:capitalize}
-  .fx-btn:hover{border-color:var(--accent)}
-  .fx-btn.act{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .toggle-row{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.85rem}
-  .individual-grid{display:flex;gap:12px;margin-top:12px;flex-wrap:wrap}
-  .ind-led{display:flex;flex-direction:column;align-items:center;gap:4px}
-  .ind-num{font-size:.7rem;color:var(--text-muted)}
+  .page { display: flex; flex-direction: column; gap: 20px; }
+  .page-head h1 { display: flex; align-items: center; gap: 10px; font-size: 22px; }
+  .page-head h1 i { color: var(--accent); }
+  .sub { color: var(--text-muted); font-size: 13px; margin-top: 2px; }
+  .section { display: flex; flex-direction: column; gap: 10px; }
+  .section-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+  .section-title i { color: var(--accent); font-size: 11px; }
+
+  .sim-card { padding: 20px; text-align: center; }
+  .strip-housing { display: flex; justify-content: center; gap: 24px; padding: 24px 16px; background: linear-gradient(180deg,#0a0a0a,#1a1a1a); border-radius: 10px; border: 1px solid #333; position: relative; }
+  .led-mount { position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+  .led-glow { position: absolute; width: 80px; height: 80px; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%,-50%); pointer-events: none; }
+  .led-chip { width: 28px; height: 28px; border-radius: 6px; border: 2px solid #555; display: flex; align-items: center; justify-content: center; position: relative; z-index: 1; transition: box-shadow .15s; }
+  .led-num { font-size: 9px; color: rgba(255,255,255,0.5); font-weight: 700; }
+  .strip-base { height: 4px; background: linear-gradient(90deg,#222,#444,#222); border-radius: 0 0 6px 6px; margin: 0 20px; }
+  .sim-info { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; font-size: 13px; }
+  .sim-src { color: var(--text-muted); font-size: 11px; font-family: var(--mono); }
+
+  /* Reaktive Effekte: CPU-Info */
+  .reactive-info { display: flex; justify-content: center; gap: 12px; margin-top: 12px; }
+  .reactive-badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 20px;
+    background: rgba(0,180,255,0.08); border: 1px solid var(--border-accent);
+    font: 500 12px var(--mono); color: var(--accent);
+  }
+  .reactive-badge i { font-size: 11px; }
+
+  .color-row { display: flex; align-items: center; gap: 8px; }
+  .color-row input[type=color] { width: 40px; height: 32px; border: none; cursor: pointer; background: none; }
+  .color-hex { font-family: var(--mono); font-size: 12px; color: var(--text-muted); }
+  .color-swatch { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border); }
+  .slider-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .slider-row label { min-width: 100px; font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+  .slider-row label i { color: var(--accent); font-size: 11px; }
+  .slider-row input[type=range] { flex: 1; }
+  .slider-val { min-width: 70px; text-align: right; font-size: 11px; font-family: var(--mono); color: var(--text-muted); }
+
+  .effect-cat { margin-bottom: 14px; }
+  .cat-name { font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .cat-name i { font-size: 10px; }
+  .effect-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fx-btn { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; font: 500 12px var(--font); transition: all .15s; text-transform: capitalize; }
+  .fx-btn:hover { border-color: var(--accent); }
+  .fx-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .toggle-row { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
+  .individual-grid { display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  .ind-led { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .ind-num { font-size: 11px; color: var(--text-muted); }
+
+  @media (max-width: 768px) {
+    .grid-3 { grid-template-columns: 1fr !important; }
+  }
 </style>

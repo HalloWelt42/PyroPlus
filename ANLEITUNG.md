@@ -1,10 +1,10 @@
-# PironMan Deluxe v2.3.0 — Installationsanleitung
+# PyroPlus v3.0.0 — Installationsanleitung
 
 © HalloWelt42 — Nur für private Nutzung
 
 ## Übersicht
 
-PironMan Deluxe ist ein umfassendes Steuerungs- und Monitoring-System für den
+PyroPlus ist ein umfassendes Steuerungs- und Monitoring-System für den
 SunFounder PironMan 5 Case auf dem Raspberry Pi 5. Es besteht aus drei Komponenten:
 
 | Komponente | Typ | Port | Funktion |
@@ -47,7 +47,7 @@ sudo usermod -aG docker $USER
 
 ## Schritt 1: SunFounder-Service deaktivieren
 
-Der offizielle pironman5-Service muss gestoppt werden, da PironMan Deluxe
+Der offizielle pironman5-Service muss gestoppt werden, da PyroPlus
 die Hardware selbst steuert. Die beiden Services kollidieren sonst.
 
 ```bash
@@ -74,15 +74,15 @@ sudo systemctl start pironman5.service
 Vom Entwicklungsrechner (Mac/PC):
 
 ```bash
-scp ~/Downloads/pironman-deluxe-v2.3.0.zip pi@192.168.178.49:/tmp/
+scp ~/Downloads/pyroplus-v3.0.0.zip pi@192.168.178.49:/tmp/
 ```
 
 Auf dem Pi:
 
 ```bash
-cd ~ && rm -rf pironman-deluxe
-unzip /tmp/pironman-deluxe-v2.3.0.zip
-rm /tmp/pironman-deluxe-v2.3.0.zip
+cd ~ && rm -rf PyroPlus
+unzip /tmp/pyroplus-v3.0.0.zip
+rm /tmp/pyroplus-v3.0.0.zip
 ```
 
 ---
@@ -93,13 +93,13 @@ Der Hardware-Proxy läuft als nativer systemd-Service, weil Docker keinen
 direkten Zugriff auf GPIO, SPI und I²C hat.
 
 ```bash
-cd ~/pironman-deluxe/hardware-proxy
+cd ~/PyroPlus/hardware-proxy
 sudo bash install.sh
 ```
 
 Das Install-Script:
 - Installiert Systemabhängigkeiten (python3-venv, libgpiod2)
-- Erstellt ein Python-venv unter `/opt/pironman-deluxe-hw/`
+- Erstellt ein Python-venv unter `/opt/pyroplus-hw/`
 - Installiert die Python-Bibliotheken (gpiozero, neopixel_spi, luma.oled)
 - Richtet den systemd-Service ein und startet ihn
 - Stoppt den pironman5-Service (falls aktiv)
@@ -117,7 +117,7 @@ Erwartete Ausgabe:
 
 **Logs anschauen:**
 ```bash
-sudo journalctl -u pironman-deluxe-hw -f
+sudo journalctl -u pyroplus-hw -f
 ```
 
 ---
@@ -125,13 +125,13 @@ sudo journalctl -u pironman-deluxe-hw -f
 ## Schritt 4: Docker-Services starten
 
 ```bash
-cd ~/pironman-deluxe
+cd ~/PyroPlus
 docker compose up -d --build
 ```
 
 Beim ersten Start:
 - Backend erzeugt automatisch einen API-Token
-- Token wird in `/app/data/api_token.txt` gespeichert (Docker-Volume `pironman-data`)
+- Token wird in `/app/data/api_token.txt` gespeichert (Docker-Volume `pyroplus-data`)
 
 **Prüfen:**
 
@@ -164,7 +164,7 @@ Jede API-Anfrage (außer `/api/token` und `/health`) erfordert den Token.
 ### Token auslesen
 
 ```bash
-docker exec pironman-deluxe-backend cat /app/data/api_token.txt
+docker exec pyroplus-backend cat /app/data/api_token.txt
 ```
 
 Oder im Frontend unter **Einstellungen → API-Zugang**.
@@ -172,7 +172,7 @@ Oder im Frontend unter **Einstellungen → API-Zugang**.
 ### Token in Anfragen verwenden
 
 ```bash
-TOKEN=$(docker exec pironman-deluxe-backend cat /app/data/api_token.txt)
+TOKEN=$(docker exec pyroplus-backend cat /app/data/api_token.txt)
 
 curl -H "X-API-Token: $TOKEN" http://localhost:8071/api/state
 ```
@@ -180,7 +180,7 @@ curl -H "X-API-Token: $TOKEN" http://localhost:8071/api/state
 ### Token zurücksetzen
 
 ```bash
-docker exec pironman-deluxe-backend rm /app/data/api_token.txt
+docker exec pyroplus-backend rm /app/data/api_token.txt
 docker compose restart backend
 # Neuer Token wird generiert
 ```
@@ -196,7 +196,7 @@ Die Daten werden per PUT registriert und im Frontend angezeigt.
 
 ```bash
 #!/bin/bash
-TOKEN=$(docker exec pironman-deluxe-backend cat /app/data/api_token.txt)
+TOKEN=$(docker exec pyroplus-backend cat /app/data/api_token.txt)
 TEMP=$(cat /sys/class/thermal/thermal_zone0/temp)
 TEMP_C=$(echo "scale=1; $TEMP / 1000" | bc)
 
@@ -210,7 +210,7 @@ curl -s -X PUT http://localhost:8071/api/custom/cpu_temp_ext \
 
 ```bash
 #!/bin/bash
-TOKEN=$(docker exec pironman-deluxe-backend cat /app/data/api_token.txt)
+TOKEN=$(docker exec pyroplus-backend cat /app/data/api_token.txt)
 BLOCKED=$(curl -s http://localhost/admin/api.php | python3 -c "import sys,json;print(json.load(sys.stdin)['ads_blocked_today'])")
 
 curl -s -X PUT http://localhost:8071/api/custom/pihole \
@@ -311,19 +311,19 @@ Vollständige Dokumentation: `http://PI_IP:8071/docs` (Swagger-UI)
 
 ```bash
 # ZIP hochladen und entpacken
-cd ~/pironman-deluxe
+cd ~/PyroPlus
 docker compose down
 # Neue Dateien entpacken...
 docker compose up -d --build
 ```
 
-**Achtung:** Das `pironman-data` Docker-Volume bleibt erhalten (Einstellungen,
+**Achtung:** Das `pyroplus-data` Docker-Volume bleibt erhalten (Einstellungen,
 API-Token, Profile). Es wird NICHT gelöscht.
 
 ### Hardware-Proxy aktualisieren
 
 ```bash
-cd ~/pironman-deluxe/hardware-proxy
+cd ~/PyroPlus/hardware-proxy
 sudo bash install.sh
 ```
 
@@ -334,7 +334,7 @@ sudo bash install.sh
 ### Hardware-Proxy startet nicht
 
 ```bash
-sudo journalctl -u pironman-deluxe-hw -n 50
+sudo journalctl -u pyroplus-hw -n 50
 ```
 
 Häufige Ursachen:
@@ -356,7 +356,7 @@ Häufige Ursachen:
 ### Backend kann Hardware-Proxy nicht erreichen
 
 ```bash
-docker exec pironman-deluxe-backend python3 -c "
+docker exec pyroplus-backend python3 -c "
 import httpx
 print(httpx.get('http://host.docker.internal:8072/health').json())
 "
@@ -365,7 +365,7 @@ print(httpx.get('http://host.docker.internal:8072/health').json())
 Falls "Connection refused": Hardware-Proxy muss auf `0.0.0.0` hören (nicht `127.0.0.1`).
 
 ```bash
-grep "host=" /opt/pironman-deluxe-hw/main.py
+grep "host=" /opt/pyroplus-hw/main.py
 # Muss sein: host="0.0.0.0"
 ```
 
@@ -382,21 +382,21 @@ docker compose logs -f frontend
 
 ```bash
 # Docker-Services stoppen
-cd ~/pironman-deluxe
+cd ~/PyroPlus
 docker compose down -v  # -v löscht auch das Volume!
 
 # Hardware-Proxy entfernen
-sudo systemctl stop pironman-deluxe-hw
-sudo systemctl disable pironman-deluxe-hw
-sudo rm /etc/systemd/system/pironman-deluxe-hw.service
-sudo rm -rf /opt/pironman-deluxe-hw
+sudo systemctl stop pyroplus-hw
+sudo systemctl disable pyroplus-hw
+sudo rm /etc/systemd/system/pyroplus-hw.service
+sudo rm -rf /opt/pyroplus-hw
 
 # Optional: SunFounder-Service wieder aktivieren
 sudo systemctl enable pironman5.service
 sudo systemctl start pironman5.service
 
 # Projektordner entfernen
-rm -rf ~/pironman-deluxe
+rm -rf ~/PyroPlus
 ```
 
 ---

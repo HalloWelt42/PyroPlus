@@ -1,5 +1,5 @@
 """
-PironMan Deluxe v2.5.4 — OLED Display Engine
+PyroPlus v3.0.0 — OLED Display Engine
 © HalloWelt42 - Nur für private Nutzung
 
 Vollständiges Rendering für SSD1306 128×64 OLED:
@@ -794,7 +794,7 @@ class OLEDEngine:
     #  MARQUEE (LAUFSCHRIFT)
     # ═══════════════════════════════════════════════════════
     def _render_marquee(self, draw, screen):
-        text = screen.get("text", "PironMan Deluxe")
+        text = screen.get("text", "PyroPlus")
         speed = screen.get("speed", 3)  # 1-10
         font_scale = screen.get("font_scale", 2)  # 1=klein, 2=gross
         font = F_MD if font_scale == 1 else F_LG

@@ -1,5 +1,5 @@
 """
-PironMan Deluxe v2.5.4 — Konfiguration
+PyroPlus v3.0.0 — Konfiguration
 © HalloWelt42 - Nur für private Nutzung
 """
 
@@ -8,8 +8,8 @@ import secrets
 import logging
 from pathlib import Path
 
-VERSION = "2.5.4"
-APP_NAME = "PironMan Deluxe"
+VERSION = "3.0.0"
+APP_NAME = "PyroPlus"
 
 # ─── Pfade ──────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent

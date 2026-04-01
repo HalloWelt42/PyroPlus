@@ -1,5 +1,5 @@
 """
-PironMan Deluxe — OLED Pixel-Art Icons
+PyroPlus — OLED Pixel-Art Icons
 © HalloWelt42 - Nur für private Nutzung
 
 8×8 und 16×16 Monochrom-Icons für SSD1306 OLED.

@@ -1,5 +1,5 @@
 """
-PironMan Deluxe v2.5.4 — System-Statistiken
+PyroPlus v3.0.0 — System-Statistiken
 © HalloWelt42 - Nur für private Nutzung
 
 Sammelt CPU, RAM, Disk, Netzwerk, Docker, Fan-State.

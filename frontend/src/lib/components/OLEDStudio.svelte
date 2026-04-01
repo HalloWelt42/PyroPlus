@@ -78,6 +78,14 @@
     '↓':'00100,00100,00100,10101,01110,00100,00000',
     '↑':'00100,01110,10101,00100,00100,00100,00000',
     'Q':'01110,10001,10001,10001,10101,10010,01101',
+    /* ── Deutsche Umlaute und Sonderzeichen ── */
+    'Ä':'10001,00000,01110,10001,11111,10001,10001',
+    'Ö':'10001,00000,01110,10001,10001,10001,01110',
+    'Ü':'10001,00000,10001,10001,10001,10001,01110',
+    'ä':'01010,00000,01110,00001,01111,10001,01111',
+    'ö':'01010,00000,01110,10001,10001,10001,01110',
+    'ü':'01010,00000,10001,10001,10001,10011,01101',
+    'ß':'01110,10001,10010,10100,10010,10001,10110',
   };
 
   function drawText(ctx, str, x, y, scale = 1) {
@@ -191,11 +199,11 @@
   };
 
   const CATS = [
-    { id:'zeit',  name:'Zeit',     icon:'⏱' },
-    { id:'sys',   name:'System',   icon:'💻' },
-    { id:'net',   name:'Netzwerk', icon:'🌐' },
-    { id:'wetter',name:'Wetter',   icon:'🌤' },
-    { id:'deko',  name:'Deko',     icon:'✏️' },
+    { id:'zeit',  name:'Zeit',     icon:'fa-clock' },
+    { id:'sys',   name:'System',   icon:'fa-microchip' },
+    { id:'net',   name:'Netzwerk', icon:'fa-network-wired' },
+    { id:'wetter',name:'Wetter',   icon:'fa-cloud-sun' },
+    { id:'deko',  name:'Deko',     icon:'fa-pen' },
   ];
 
   const PRESETS = {
@@ -261,7 +269,7 @@
   let _commitTimer = 0;
   let _sliderTimers = {};
 
-  /* ═══ SYNC: Store → Local (nur bei Screen-Wechsel) ═══ */
+  /* ═══ SYNC: Store → Local ═══ */
   let _syncedIdx = -1;
   $effect(() => {
     const idx = s.oled?.current_screen ?? 0;
@@ -283,7 +291,6 @@
   let selWidget = $derived(sel >= 0 && sel < localWidgets.length ? localWidgets[sel] : null);
   let selAtom = $derived(selWidget ? ATOMS[selWidget.type] : null);
 
-  /* Atom-Liste pro Kategorie */
   function atomsForCat(catId) {
     return Object.entries(ATOMS).filter(([_, a]) => a.cat === catId);
   }
@@ -303,9 +310,7 @@
     threshold(ctx, 128, 64);
   }
 
-  /* Re-render bei Widget-Änderungen */
   $effect(() => {
-    // Dependency: localWidgets (tiefe Änderungen via Neuzuweisung)
     const _ = JSON.stringify(localWidgets);
     renderOLED();
   });
@@ -457,49 +462,61 @@
 <svelte:window onkeydown={onKeyDown} />
 
 <div class="page">
+  <!-- Header -->
   <div class="head">
-    <div><h1>OLED Studio</h1><span class="sub">128×64 · SSD1306 · 1-Bit Monochrom</span></div>
-    <div class="hc">
+    <div>
+      <h1><i class="fa-solid fa-display"></i> OLED Studio</h1>
+      <span class="sub">128×64 · SSD1306 · 1-Bit Monochrom</span>
+    </div>
+    <div class="head-controls">
       <div class="mode-btns">
-        {#each [['auto','⟳ Auto'],['manual','✋ Manuell'],['off','⏸ Aus']] as [m, lbl]}
-          <button class="mbtn" class:act={s.oled?.mode===m} onclick={()=>s.setOledMode(m)}>{lbl}</button>
+        {#each [['auto','fa-rotate','Auto'],['manual','fa-hand','Manuell'],['off','fa-power-off','Aus']] as [m, icon, lbl]}
+          <button class="mode-btn" class:active={s.oled?.mode===m} onclick={()=>s.setOledMode(m)}>
+            <i class="fa-solid {icon}"></i> {lbl}
+          </button>
         {/each}
       </div>
-      <label class="sl"><span class="sl-l">Hell.</span>
+      <label class="slider-compact">
+        <span class="slider-label"><i class="fa-solid fa-sun"></i> Hell.</span>
         <input type="range" min="0" max="255" value={s.oled?.brightness??200} oninput={onBrightness}>
-        <span class="sl-v">{s.oled?.brightness??200}</span>
+        <span class="slider-val">{s.oled?.brightness??200}</span>
       </label>
-      <label class="sl"><span class="sl-l">Rotation</span>
+      <label class="slider-compact">
+        <span class="slider-label"><i class="fa-solid fa-arrows-rotate"></i> Rotation</span>
         <input type="range" min="3" max="60" value={s.oled?.rotation_interval??10} oninput={onRotation}>
-        <span class="sl-v">{s.oled?.rotation_interval??10}s</span>
+        <span class="slider-val">{s.oled?.rotation_interval??10}s</span>
       </label>
     </div>
   </div>
 
+  <!-- Screen-Tabs -->
   <div class="tabs">
     {#each s.oled?.screens || [] as scr, i}
-      <button class="tab" class:act={i===screenIdx} onclick={()=>s.selectOledScreen(i)}>
+      <button class="tab" class:active={i===screenIdx} onclick={()=>s.selectOledScreen(i)}>
         {scr.name || scr.type}
       </button>
     {/each}
-    <button class="tab tab-add" onclick={addBlankScreen}>+</button>
+    <button class="tab tab-add" onclick={addBlankScreen}><i class="fa-solid fa-plus"></i></button>
     {#if (s.oled?.screens||[]).length > 1}
-      <button class="tab tab-del" onclick={()=>s.removeOledScreen(screenIdx)}>🗑</button>
+      <button class="tab tab-del" onclick={()=>s.removeOledScreen(screenIdx)}><i class="fa-solid fa-trash-can"></i></button>
     {/if}
   </div>
 
+  <!-- Editor -->
   <div class="editor">
     <!-- PALETTE -->
     <div class="palette">
-      <div class="pt">Widgets</div>
+      <div class="palette-title"><i class="fa-solid fa-puzzle-piece"></i> Widgets</div>
       {#each CATS as cat}
-        <button class="ch" onclick={()=>{ openCats[cat.id] = !openCats[cat.id]; }}>
-          {openCats[cat.id]?'▾':'▸'} {cat.icon} {cat.name}
+        <button class="cat-head" onclick={()=>{ openCats[cat.id] = !openCats[cat.id]; }}>
+          <i class="fa-solid {openCats[cat.id]?'fa-chevron-down':'fa-chevron-right'}" style="width:12px;font-size:9px"></i>
+          <i class="fa-solid {cat.icon}" style="width:16px;font-size:11px;color:var(--accent)"></i>
+          {cat.name}
         </button>
         {#if openCats[cat.id]}
-          <div class="ci">
+          <div class="cat-items">
             {#each atomsForCat(cat.id) as [type, atom]}
-              <button class="atom" onclick={()=>addWidget(type)} disabled={!isEditable}
+              <button class="atom-btn" onclick={()=>addWidget(type)} disabled={!isEditable}
                       title="{atom.label} ({atom.w}×{atom.h}px)">
                 <div class="atom-mini">
                   <img src={getMiniDataUrl(type)} alt="" width="48" height="24" />
@@ -513,21 +530,24 @@
           </div>
         {/if}
       {/each}
-      <div class="pd"></div>
-      <div class="pt">Vorlagen</div>
+      <div class="palette-divider"></div>
+      <div class="palette-title"><i class="fa-solid fa-layer-group"></i> Vorlagen</div>
       {#each Object.entries(PRESETS) as [key, p]}
-        <button class="pb" onclick={()=>addPresetScreen(key)}>
-          <span class="pi-plus">+</span> {p.name} <span class="pc">{p.widgets.length}w</span>
+        <button class="preset-btn" onclick={()=>addPresetScreen(key)}>
+          <i class="fa-solid fa-plus" style="color:var(--accent)"></i>
+          {p.name}
+          <span class="preset-count">{p.widgets.length}w</span>
         </button>
       {/each}
     </div>
 
     <!-- CANVAS -->
-    <div class="cc">
+    <div class="canvas-col">
       {#if !isEditable && currentScreen.type}
-        <div class="cvt">
+        <div class="convert-banner">
+          <i class="fa-solid fa-circle-info"></i>
           <span>«{currentScreen.type}» — nicht widget-editierbar</span>
-          <button class="btn-sm" onclick={convertToSystem}>Konvertieren</button>
+          <button class="btn btn-accent btn-sm" onclick={convertToSystem}>Konvertieren</button>
         </div>
       {/if}
       <div class="bezel">
@@ -543,179 +563,191 @@
           {/if}
 
           {#if showGrid && isEditable}
-            <svg class="grid" viewBox="0 0 128 64" preserveAspectRatio="none">
-              {#each Array(8) as _, i}<line x1={i*16} y1="0" x2={i*16} y2="64" stroke="rgba(100,200,255,0.08)" stroke-width="0.25"/>{/each}
-              {#each Array(4) as _, i}<line x1="0" y1={i*16} x2="128" y2={i*16} stroke="rgba(100,200,255,0.08)" stroke-width="0.25"/>{/each}
+            <svg class="grid-overlay" viewBox="0 0 128 64" preserveAspectRatio="none">
+              {#each Array(8) as _, i}<line x1={i*16} y1="0" x2={i*16} y2="64" stroke="rgba(0,180,255,0.08)" stroke-width="0.25"/>{/each}
+              {#each Array(4) as _, i}<line x1="0" y1={i*16} x2="128" y2={i*16} stroke="rgba(0,180,255,0.08)" stroke-width="0.25"/>{/each}
             </svg>
           {/if}
 
           {#if isEditable}
             {#each localWidgets as w, i}
               {@const atom = ATOMS[w.type] || { w:20, h:10 }}
-              <div class="wh" class:ws={sel===i} class:wd={isDragging&&sel===i}
+              <div class="widget-handle" class:selected={sel===i} class:dragging={isDragging&&sel===i}
                    style="left:{w.x*S}px;top:{w.y*S}px;width:{(w.w||atom.w)*S}px;height:{(w.h||atom.h)*S}px"
                    onpointerdown={(e)=>onWidgetDown(e,i)}>
-                {#if sel===i}<span class="wl">{atom.label||w.type}</span>{/if}
+                {#if sel===i}<span class="widget-label">{atom.label||w.type}</span>{/if}
               </div>
             {/each}
           {/if}
         </div>
       </div>
-      <div class="cbar">
-        <label class="cchk"><input type="checkbox" bind:checked={showGrid}><span>Raster</span></label>
-        <span class="cinfo">{localWidgets.length} Widgets</span>
-        {#if saving}<span class="csave">●</span>{/if}
-        {#if selWidget}<span class="cpos">({selWidget.x}, {selWidget.y})</span>{/if}
+      <div class="canvas-bar">
+        <label class="canvas-check"><input type="checkbox" bind:checked={showGrid}><span>Raster</span></label>
+        <span class="canvas-info">{localWidgets.length} Widgets</span>
+        {#if saving}<span class="canvas-saving"><i class="fa-solid fa-circle-notch fa-spin"></i></span>{/if}
+        {#if selWidget}<span class="canvas-pos">({selWidget.x}, {selWidget.y})</span>{/if}
       </div>
     </div>
 
     <!-- PROPERTIES -->
     <div class="props">
       {#if selWidget && isEditable}
-        <div class="ph">
-          <span class="ptitle">{selAtom?.label||selWidget.type}</span>
-          <button class="pdel" onclick={removeWidget}>🗑</button>
+        <div class="prop-header">
+          <span class="prop-title">{selAtom?.label||selWidget.type}</span>
+          <button class="prop-delete" onclick={removeWidget}><i class="fa-solid fa-trash-can"></i></button>
         </div>
-        <div class="ps">Position</div>
-        <div class="pg2">
-          <label class="pl">X<input type="number" min="0" max="127" value={selWidget.x}
+        <div class="prop-section">Position</div>
+        <div class="prop-grid">
+          <label class="prop-label">X<input type="number" min="0" max="127" value={selWidget.x}
             oninput={e=>updateProp('x',Math.max(0,Math.min(127,+e.target.value)))}></label>
-          <label class="pl">Y<input type="number" min="0" max="63" value={selWidget.y}
+          <label class="prop-label">Y<input type="number" min="0" max="63" value={selWidget.y}
             oninput={e=>updateProp('y',Math.max(0,Math.min(63,+e.target.value)))}></label>
         </div>
         {#if selAtom?.font}
-          <div class="ps">Schrift</div>
-          <div class="fr">
+          <div class="prop-section">Schrift</div>
+          <div class="font-row">
             {#each [['sm','S'],['md','M'],['lg','L'],['xl','XL']] as [f,lbl]}
-              <button class="fb" class:act={selWidget.font===f} onclick={()=>updateProp('font',f)}>{lbl}</button>
+              <button class="font-btn" class:active={selWidget.font===f} onclick={()=>updateProp('font',f)}>{lbl}</button>
             {/each}
           </div>
         {/if}
         {#if ['line_h','cpu_bar','ram_bar_gfx','disk_bar','rect'].includes(selWidget.type)}
-          <div class="ps">Breite</div>
-          <input class="pi" type="number" min="4" max="128" value={selWidget.w||60}
+          <div class="prop-section">Breite</div>
+          <input class="prop-input" type="number" min="4" max="128" value={selWidget.w||60}
             oninput={e=>updateProp('w',Math.max(4,Math.min(128,+e.target.value)))}>
         {/if}
         {#if ['line_v','rect'].includes(selWidget.type)}
-          <div class="ps">Höhe</div>
-          <input class="pi" type="number" min="2" max="64" value={selWidget.h||20}
+          <div class="prop-section">Höhe</div>
+          <input class="prop-input" type="number" min="2" max="64" value={selWidget.h||20}
             oninput={e=>updateProp('h',Math.max(2,Math.min(64,+e.target.value)))}>
         {/if}
         {#if selWidget.type==='label'}
-          <div class="ps">Text</div>
-          <input class="pi" type="text" value={selWidget.text||''} maxlength="20"
+          <div class="prop-section">Text</div>
+          <input class="prop-input" type="text" value={selWidget.text||''} maxlength="20"
             oninput={e=>updateProp('text',e.target.value)}>
         {/if}
 
         <!-- LAYERS -->
         <div class="layers">
-          <div class="lt">Layer ({localWidgets.length})</div>
+          <div class="layer-title"><i class="fa-solid fa-layer-group"></i> Layer ({localWidgets.length})</div>
           {#each localWidgets as lw, i}
             {@const la = ATOMS[lw.type] || {}}
-            <button class="li" class:lis={i===sel} onclick={()=>{sel=i}}>
-              <span class="ld"></span>
-              <span class="ln">{la.label||lw.type}</span>
-              <span class="lp">{lw.x},{lw.y}</span>
+            <button class="layer-item" class:selected={i===sel} onclick={()=>{sel=i}}>
+              <span class="layer-dot"></span>
+              <span class="layer-name">{la.label||lw.type}</span>
+              <span class="layer-pos">{lw.x},{lw.y}</span>
             </button>
           {/each}
         </div>
-        <div class="pk">↑↓←→ ±2px · Entf · Esc</div>
+        <div class="prop-keys"><i class="fa-solid fa-keyboard"></i> Pfeiltasten ±2px · Entf · Esc</div>
 
       {:else if !s.oled?.screens?.length}
-        <div class="pe">Erstelle einen Screen oder wähle eine Vorlage.</div>
+        <div class="prop-empty"><i class="fa-solid fa-plus-circle"></i> Erstelle einen Screen oder wähle eine Vorlage.</div>
       {:else if !isEditable}
-        <div class="pe">Konvertiere den Screen um Widgets frei zu platzieren.</div>
+        <div class="prop-empty"><i class="fa-solid fa-arrows-rotate"></i> Konvertiere den Screen um Widgets frei zu platzieren.</div>
       {:else}
-        <div class="pe">Klicke ein Widget links oder auf der Leinwand.</div>
+        <div class="prop-empty"><i class="fa-solid fa-hand-pointer"></i> Klicke ein Widget links oder auf der Leinwand.</div>
       {/if}
     </div>
   </div>
 </div>
 
 <style>
-  .page{display:flex;flex-direction:column;gap:12px}
-  .head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px}
-  .head h1{margin:0;font-size:1.15rem;font-weight:700} .sub{color:var(--text-muted);font-size:.68rem;font-family:var(--mono)}
-  .hc{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  .mode-btns{display:flex;gap:2px}
-  .mbtn{padding:4px 10px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text-muted);border-radius:6px;cursor:pointer;font-size:.7rem;font-weight:600;transition:all .15s}
-  .mbtn.act{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .sl{display:flex;align-items:center;gap:5px;font-size:.7rem;color:var(--text-secondary)}
-  .sl-l{min-width:42px} .sl-v{min-width:26px;text-align:right;font-family:var(--mono);font-size:.65rem;color:var(--text-muted)}
+  .page { display: flex; flex-direction: column; gap: 12px; }
 
-  .tabs{display:flex;gap:3px;flex-wrap:wrap;padding-bottom:6px;border-bottom:1px solid var(--border)}
-  .tab{padding:5px 10px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text-muted);border-radius:8px 8px 0 0;cursor:pointer;font-size:.7rem;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:all .15s}
-  .tab.act{background:var(--accent-dim,rgba(99,102,241,0.1));color:var(--accent);border-color:var(--accent);border-bottom-color:transparent}
-  .tab-add{font-size:1rem;padding:4px 14px} .tab-del{font-size:.7rem;padding:5px 8px;opacity:.4} .tab-del:hover{opacity:1}
+  /* Header */
+  .head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; }
+  .head h1 { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .head h1 i { color: var(--accent); }
+  .sub { color: var(--text-muted); font-size: 11px; font-family: var(--mono); }
+  .head-controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .mode-btns { display: flex; gap: 2px; }
+  .mode-btn { padding: 4px 10px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); border-radius: 6px; cursor: pointer; font: 600 11px var(--font); transition: all .15s; display: flex; align-items: center; gap: 4px; }
+  .mode-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .slider-compact { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary); }
+  .slider-label { min-width: 60px; display: flex; align-items: center; gap: 4px; }
+  .slider-label i { color: var(--accent); font-size: 10px; }
+  .slider-val { min-width: 26px; text-align: right; font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
 
-  .editor{display:grid;grid-template-columns:200px 1fr 200px;gap:14px;min-height:300px}
-  @media(max-width:900px){.editor{grid-template-columns:1fr} .palette,.props{max-height:200px;overflow-y:auto}}
+  /* Tabs */
+  .tabs { display: flex; gap: 3px; flex-wrap: wrap; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 5px 10px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); border-radius: 8px 8px 0 0; cursor: pointer; font: 500 11px var(--font); max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: all .15s; }
+  .tab.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); border-bottom-color: transparent; }
+  .tab-add { font-size: 12px; padding: 4px 14px; }
+  .tab-del { font-size: 10px; padding: 5px 8px; opacity: .4; } .tab-del:hover { opacity: 1; }
 
-  /* PALETTE */
-  .palette{overflow-y:auto;max-height:520px;display:flex;flex-direction:column;gap:1px}
-  .palette::-webkit-scrollbar{width:3px} .palette::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-  .pt{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);padding:10px 6px 4px;font-family:var(--mono)}
-  .ch{display:flex;align-items:center;gap:4px;padding:5px 6px;border:none;background:none;color:var(--text-secondary);cursor:pointer;font-size:.75rem;font-weight:600;width:100%;text-align:left}
-  .ch:hover{color:var(--text)}
-  .ci{display:flex;flex-direction:column;gap:2px;padding:2px 0 4px 4px}
+  /* Editor Layout */
+  .editor { display: grid; grid-template-columns: 200px 1fr 200px; gap: 14px; min-height: 300px; }
+  @media (max-width: 900px) { .editor { grid-template-columns: 1fr; } .palette, .props { max-height: 200px; overflow-y: auto; } }
 
-  .atom{display:flex;align-items:center;gap:8px;padding:5px 7px;border:1px solid transparent;background:rgba(255,255,255,0.015);border-radius:6px;cursor:pointer;width:100%;text-align:left;transition:all .12s}
-  .atom:hover:not(:disabled){border-color:var(--accent);background:var(--accent-dim,rgba(99,102,241,0.06))}
-  .atom:disabled{opacity:.2;cursor:not-allowed}
-  .atom-mini{width:48px;height:24px;background:#000;border:1px solid #1a1a1a;border-radius:3px;flex-shrink:0;overflow:hidden}
-  .atom-mini img{display:block;width:48px;height:24px;image-rendering:pixelated}
-  .atom-info{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0}
-  .atom-name{font-size:.7rem;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .atom-meta{font-size:.6rem;font-family:var(--mono);color:var(--text-muted)}
+  /* Palette */
+  .palette { overflow-y: auto; max-height: 520px; display: flex; flex-direction: column; gap: 1px; }
+  .palette::-webkit-scrollbar { width: 3px; } .palette::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .palette-title { font: 700 10px var(--mono); text-transform: uppercase; letter-spacing: .8px; color: var(--text-muted); padding: 10px 6px 4px; display: flex; align-items: center; gap: 6px; }
+  .palette-title i { color: var(--accent); font-size: 10px; }
+  .cat-head { display: flex; align-items: center; gap: 4px; padding: 5px 6px; border: none; background: none; color: var(--text-secondary); cursor: pointer; font: 600 12px var(--font); width: 100%; text-align: left; }
+  .cat-head:hover { color: var(--text-primary); }
+  .cat-items { display: flex; flex-direction: column; gap: 2px; padding: 2px 0 4px 4px; }
 
-  .pd{height:1px;background:var(--border);margin:8px 0}
-  .pb{display:flex;align-items:center;gap:6px;width:100%;padding:5px 8px;border:1px dashed var(--border);background:none;color:var(--text-secondary);border-radius:6px;cursor:pointer;font-size:.7rem;text-align:left;transition:all .12s}
-  .pb:hover{border-color:var(--accent);color:var(--accent)}
-  .pi-plus{font-weight:700;color:var(--accent);font-size:.9rem}
-  .pc{margin-left:auto;font-size:.58rem;font-family:var(--mono);color:var(--text-muted);background:var(--bg-surface);padding:1px 5px;border-radius:3px}
+  .atom-btn { display: flex; align-items: center; gap: 8px; padding: 5px 7px; border: 1px solid transparent; background: rgba(255,255,255,0.015); border-radius: 6px; cursor: pointer; width: 100%; text-align: left; transition: all .12s; font-family: var(--font); }
+  .atom-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-dim); }
+  .atom-btn:disabled { opacity: .2; cursor: not-allowed; }
+  .atom-mini { width: 48px; height: 24px; background: #000; border: 1px solid #1a1a1a; border-radius: 3px; flex-shrink: 0; overflow: hidden; }
+  .atom-mini img { display: block; width: 48px; height: 24px; image-rendering: pixelated; }
+  .atom-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+  .atom-name { font-size: 11px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .atom-meta { font: 10px var(--mono); color: var(--text-muted); }
 
-  /* CANVAS */
-  .cc{display:flex;flex-direction:column;align-items:center;gap:8px}
-  .cvt{display:flex;align-items:center;gap:8px;padding:5px 10px;background:rgba(251,191,36,0.05);border:1px solid rgba(251,191,36,0.12);border-radius:6px;font-size:.68rem;color:var(--text-secondary);width:100%;box-sizing:border-box}
-  .btn-sm{padding:3px 8px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:4px;cursor:pointer;font-size:.62rem;white-space:nowrap}
-  .bezel{background:#050505;padding:6px;border-radius:8px;border:2px solid #222;box-shadow:0 4px 20px rgba(0,0,0,.5)}
-  .canvas{position:relative;background:#000;overflow:hidden;cursor:crosshair;touch-action:none}
-  .oled{display:block;width:100%;height:100%;image-rendering:pixelated;pointer-events:none}
-  .canvas-empty{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#333;font-size:11px}
-  .grid{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-  .wh{position:absolute;border:1px dashed rgba(100,180,255,.3);cursor:move;box-sizing:border-box;z-index:2;transition:border-color .1s}
-  .wh:hover{border-color:rgba(100,180,255,.6);background:rgba(100,180,255,.04)}
-  .ws{border:1.5px solid var(--accent)!important;background:rgba(99,102,241,.1);z-index:3}
-  .wd{border-style:solid!important;opacity:.8}
-  .wl{position:absolute;top:-12px;left:0;font-size:7px;color:var(--accent);white-space:nowrap;pointer-events:none;background:rgba(0,0,0,.7);padding:1px 3px;border-radius:2px;font-family:var(--mono)}
-  .cbar{display:flex;gap:10px;align-items:center;font-size:.62rem;color:var(--text-muted);width:100%;font-family:var(--mono)}
-  .cchk{display:flex;align-items:center;gap:3px;cursor:pointer;font-size:.62rem}
-  .cinfo{} .csave{color:var(--accent);animation:pulse 1s infinite} @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-  .cpos{margin-left:auto;color:var(--accent)}
+  .palette-divider { height: 1px; background: var(--border); margin: 8px 0; }
+  .preset-btn { display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 8px; border: 1px dashed var(--border); background: none; color: var(--text-secondary); border-radius: 6px; cursor: pointer; font: 500 11px var(--font); text-align: left; transition: all .12s; }
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .preset-count { margin-left: auto; font: 10px var(--mono); color: var(--text-muted); background: var(--bg-surface); padding: 1px 5px; border-radius: 3px; }
 
-  /* PROPERTIES */
-  .props{display:flex;flex-direction:column;gap:5px;padding:10px;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px}
-  .ph{display:flex;justify-content:space-between;align-items:center;padding-bottom:5px;border-bottom:1px solid var(--border)}
-  .ptitle{font-size:.82rem;font-weight:700} .pdel{background:none;border:none;cursor:pointer;font-size:.85rem;padding:2px 4px;opacity:.4} .pdel:hover{opacity:1}
-  .pe{font-size:.68rem;color:var(--text-muted);padding:10px 2px;line-height:1.5}
-  .ps{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);margin-top:5px;font-family:var(--mono)}
-  .pg2{display:grid;grid-template-columns:1fr 1fr;gap:5px}
-  .pl{display:flex;flex-direction:column;gap:2px;font-size:.6rem;color:var(--text-secondary)}
-  .pl input,.pi{padding:4px 5px;border:1px solid var(--border);background:var(--bg-elevated,#1e293b);color:var(--text);border-radius:4px;font-size:.72rem;font-family:var(--mono);width:100%;box-sizing:border-box}
-  .pi{margin-top:2px}
-  .fr{display:flex;gap:3px}
-  .fb{padding:3px 8px;border:1px solid var(--border);background:var(--bg-elevated,#1e293b);color:var(--text-muted);border-radius:4px;cursor:pointer;font-size:.65rem;font-weight:700;transition:all .1s;font-family:var(--mono)}
-  .fb.act{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .pk{font-size:.55rem;color:var(--text-muted);margin-top:8px;opacity:.5;font-family:var(--mono)}
+  /* Canvas */
+  .canvas-col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .convert-banner { display: flex; align-items: center; gap: 8px; padding: 5px 10px; background: rgba(255,176,32,0.05); border: 1px solid rgba(255,176,32,0.12); border-radius: 6px; font-size: 11px; color: var(--text-secondary); width: 100%; }
+  .convert-banner i { color: var(--amber); }
+  .bezel { background: #050505; padding: 6px; border-radius: 8px; border: 2px solid #222; box-shadow: 0 4px 20px rgba(0,0,0,.5); }
+  .canvas { position: relative; background: #000; overflow: hidden; cursor: crosshair; touch-action: none; }
+  .oled { display: block; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+  .canvas-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #333; font-size: 11px; }
+  .grid-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .widget-handle { position: absolute; border: 1px dashed rgba(0,180,255,.3); cursor: move; box-sizing: border-box; z-index: 2; transition: border-color .1s; }
+  .widget-handle:hover { border-color: rgba(0,180,255,.6); background: rgba(0,180,255,.04); }
+  .widget-handle.selected { border: 1.5px solid var(--accent) !important; background: rgba(0,180,255,.1); z-index: 3; }
+  .widget-handle.dragging { border-style: solid !important; opacity: .8; }
+  .widget-label { position: absolute; top: -12px; left: 0; font: 7px var(--mono); color: var(--accent); white-space: nowrap; pointer-events: none; background: rgba(0,0,0,.7); padding: 1px 3px; border-radius: 2px; }
+  .canvas-bar { display: flex; gap: 10px; align-items: center; font: 10px var(--mono); color: var(--text-muted); width: 100%; }
+  .canvas-check { display: flex; align-items: center; gap: 3px; cursor: pointer; font-size: 10px; }
+  .canvas-saving { color: var(--accent); }
+  .canvas-pos { margin-left: auto; color: var(--accent); }
 
-  /* LAYERS */
-  .layers{margin-top:8px;border-top:1px solid var(--border);padding-top:6px;display:flex;flex-direction:column;gap:1px}
-  .lt{font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted);margin-bottom:3px;font-family:var(--mono)}
-  .li{display:flex;align-items:center;gap:4px;padding:3px 5px;border:none;background:none;border-radius:4px;cursor:pointer;font-size:.6rem;color:var(--text-muted);text-align:left;width:100%;transition:all .1s;font-family:var(--mono)}
-  .li:hover{background:rgba(255,255,255,.03)}
-  .lis{background:var(--accent-dim,rgba(99,102,241,0.08));color:var(--accent)}
-  .ld{width:5px;height:5px;border-radius:1px;background:var(--text-muted);flex-shrink:0}
-  .lis .ld{background:var(--accent)}
-  .ln{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .lp{color:var(--text-muted);font-size:.55rem}
+  /* Properties */
+  .props { display: flex; flex-direction: column; gap: 5px; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); }
+  .prop-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 5px; border-bottom: 1px solid var(--border); }
+  .prop-title { font-size: 13px; font-weight: 700; }
+  .prop-delete { background: none; border: none; cursor: pointer; font-size: 12px; padding: 2px 4px; opacity: .4; color: var(--text-muted); } .prop-delete:hover { opacity: 1; color: var(--red); }
+  .prop-empty { font-size: 11px; color: var(--text-muted); padding: 10px 2px; line-height: 1.5; display: flex; align-items: flex-start; gap: 6px; }
+  .prop-empty i { color: var(--accent); margin-top: 2px; }
+  .prop-section { font: 700 9px var(--mono); text-transform: uppercase; letter-spacing: .4px; color: var(--text-muted); margin-top: 5px; }
+  .prop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .prop-label { display: flex; flex-direction: column; gap: 2px; font: 10px var(--font); color: var(--text-secondary); }
+  .prop-label input, .prop-input { padding: 4px 5px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-primary); border-radius: 4px; font: 11px var(--mono); width: 100%; box-sizing: border-box; }
+  .prop-input { margin-top: 2px; }
+  .font-row { display: flex; gap: 3px; }
+  .font-btn { padding: 3px 8px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); border-radius: 4px; cursor: pointer; font: 700 10px var(--mono); transition: all .1s; }
+  .font-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .prop-keys { font: 9px var(--mono); color: var(--text-muted); margin-top: 8px; opacity: .5; display: flex; align-items: center; gap: 4px; }
+
+  /* Layers */
+  .layers { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; display: flex; flex-direction: column; gap: 1px; }
+  .layer-title { font: 700 9px var(--mono); text-transform: uppercase; letter-spacing: .4px; color: var(--text-muted); margin-bottom: 3px; display: flex; align-items: center; gap: 4px; }
+  .layer-title i { font-size: 9px; color: var(--accent); }
+  .layer-item { display: flex; align-items: center; gap: 4px; padding: 3px 5px; border: none; background: none; border-radius: 4px; cursor: pointer; font: 10px var(--mono); color: var(--text-muted); text-align: left; width: 100%; transition: all .1s; }
+  .layer-item:hover { background: rgba(255,255,255,.03); }
+  .layer-item.selected { background: var(--accent-dim); color: var(--accent); }
+  .layer-dot { width: 5px; height: 5px; border-radius: 1px; background: var(--text-muted); flex-shrink: 0; }
+  .layer-item.selected .layer-dot { background: var(--accent); }
+  .layer-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .layer-pos { color: var(--text-muted); font-size: 9px; }
 </style>

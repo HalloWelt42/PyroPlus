@@ -1,4 +1,4 @@
-/* PironMan Deluxe — State Store v2.5.4 (Svelte 5 Runes) */
+/* PyroPlus — State Store v3.0.0 (Svelte 5 Runes) */
 import { api, createWebSocket } from '../api/client.js';
 
 let connected = $state(false);
@@ -9,26 +9,18 @@ let oled = $state({});
 let hwProxy = $state({});
 let version = $state('');
 let effectsCatalog = $state({});
-let weather = $state(null);
-let weatherLocations = $state([]);
-let selectedLocation = $state('');
 let customData = $state({});
 let toasts = $state([]);
-let currentView = $state('dashboard');
-let kioskMode = $state(false);
-let kioskInterval = $state(10);
+let currentView = $state('fan');
 let apiToken = $state('');
 let ws = null;
-let _weatherTimer = null;
 
 function handleWs(msg) {
   if (msg.type === 'stats') {
     connected = true;
     stats = msg.data.stats || stats;
     fan = { ...fan, ...msg.data.fan };
-    /* Vollständigen LED-State übernehmen (inkl. led_states, effect, color, brightness etc.) */
     if (msg.data.leds) leds = { ...leds, ...msg.data.leds };
-    /* Vollständigen OLED-State übernehmen (screens, preview, clock_settings etc.) */
     if (msg.data.oled) oled = { ...oled, ...msg.data.oled };
     if (msg.data.custom_data) customData = msg.data.custom_data;
   }
@@ -49,32 +41,7 @@ async function init() {
   }
   const fx = await api.leds.effects();
   if (!fx?.error) effectsCatalog = fx;
-  loadWeather();
-  /* Wetter alle 5 Minuten aktualisieren */
-  _weatherTimer = setInterval(loadWeather, 300_000);
   ws = createWebSocket(handleWs);
-}
-
-async function loadWeather() {
-  try {
-    const loc = await api.weather.locations();
-    if (loc?.locations) {
-      weatherLocations = loc.locations;
-      const saved = localStorage.getItem('pm-weather-loc');
-      selectedLocation = (saved && loc.locations.find(l => l.id === saved)) ? saved : loc.locations[0]?.id || '';
-      if (selectedLocation) {
-        const w = await api.weather.complete(selectedLocation);
-        if (w) weather = w;
-      }
-    }
-  } catch {}
-}
-
-async function changeWeatherLocation(id) {
-  selectedLocation = id;
-  localStorage.setItem('pm-weather-loc', id);
-  const w = await api.weather.complete(id);
-  if (w) weather = w;
 }
 
 let _tid = 0;
@@ -84,7 +51,7 @@ function toast(msg, type = 'info') {
   setTimeout(() => { toasts = toasts.filter(t => t.id !== id); }, 3000);
 }
 
-function destroy() { ws?.close(); if (_weatherTimer) clearInterval(_weatherTimer); }
+function destroy() { ws?.close(); }
 
 export function getState() {
   return {
@@ -96,26 +63,19 @@ export function getState() {
     get hwProxy() { return hwProxy; },
     get version() { return version; },
     get effectsCatalog() { return effectsCatalog; },
-    get weather() { return weather; },
-    get weatherLocations() { return weatherLocations; },
-    get selectedLocation() { return selectedLocation; },
     get customData() { return customData; },
     get toasts() { return toasts; },
     get currentView() { return currentView; },
-    get kioskMode() { return kioskMode; },
-    get kioskInterval() { return kioskInterval; },
     get apiToken() { return apiToken; },
     set currentView(v) { currentView = v; },
-    set kioskMode(v) { kioskMode = v; },
-    set kioskInterval(v) { kioskInterval = v; },
 
-    init, destroy, toast, loadWeather, changeWeatherLocation,
+    init, destroy, toast,
 
     get ledsActive() { return leds?.effect && leds.effect !== 'off'; },
     get oledActive() { return oled?.mode && oled.mode !== 'off'; },
     get fanActive() { return fan?.mode && fan.mode !== 'off'; },
 
-    /* Internal updaters for components */
+    /* Interne Updater für Komponenten */
     updateOled(patch) { oled = { ...oled, ...patch }; },
     updateLeds(patch) { leds = { ...leds, ...patch }; },
     updateFan(patch) { fan = { ...fan, ...patch }; },
@@ -159,7 +119,7 @@ export function getState() {
     async setOledBrightness(v) { await api.oled.brightness(v); oled = { ...oled, brightness: v }; },
     async setOledRotation(s) { await api.oled.rotation(s); oled = { ...oled, rotation_interval: s }; },
 
-    /* OLED Screen Management */
+    /* OLED Screen-Verwaltung */
     async selectOledScreen(i) {
       const r = await api.oled.screen(i);
       oled = { ...oled, current_screen: i, ...(r?.preview ? { preview: r.preview } : {}) };
@@ -187,7 +147,7 @@ export function getState() {
       if (r?.screens) oled = { ...oled, screens: r.screens };
     },
 
-    /* OLED Clock */
+    /* OLED Uhreinstellungen */
     async setClockSettings(settings) {
       const r = await api.oled.clockSettings(settings);
       if (r?.clock_settings) oled = { ...oled, clock_settings: r.clock_settings };

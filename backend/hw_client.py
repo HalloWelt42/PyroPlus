@@ -1,5 +1,5 @@
 """
-PironMan Deluxe v2.5.4 — Hardware-Proxy Client
+PyroPlus v3.0.0 — Hardware-Proxy Client
 © HalloWelt42 - Nur für private Nutzung
 
 Config-basierte Kommunikation mit dem HW-Proxy.

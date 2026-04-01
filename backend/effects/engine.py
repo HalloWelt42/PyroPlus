@@ -1,5 +1,5 @@
 """
-PironMan Deluxe v2.5.4 — LED Config Manager
+PyroPlus v3.0.0 — LED Config Manager
 © HalloWelt42 - Nur für private Nutzung
 
 Dünner Config-Wrapper. Animationen laufen im HW-Proxy (nativ).

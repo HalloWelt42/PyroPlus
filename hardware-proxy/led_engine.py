@@ -1,5 +1,5 @@
 """
-PironMan Deluxe v2.5.4 — LED Effekt-Engine (nativ)
+PyroPlus v3.0.0 — LED Effekt-Engine (nativ)
 © HalloWelt42 - Nur für private Nutzung
 
 Läuft direkt auf dem Pi im HW-Proxy. Kein HTTP pro Frame.
@@ -18,7 +18,7 @@ from pathlib import Path
 logger = logging.getLogger("led-engine")
 
 LED_COUNT = 4
-DATA_DIR = Path("/opt/pironman-deluxe-hw/data")
+DATA_DIR = Path("/opt/pyroplus-hw/data")
 
 
 class LEDEffectEngine:

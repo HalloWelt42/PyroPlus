@@ -1,5 +1,5 @@
 """
-PironMan Deluxe v2.1.0 — Lüfter-Controller
+PyroPlus v3.0.0 — Lüfter-Controller
 © HalloWelt42 - Nur für private Nutzung
 
 Präzisions-PWM-Steuerung über Hardware-Proxy.
