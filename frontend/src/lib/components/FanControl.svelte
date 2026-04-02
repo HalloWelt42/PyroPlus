@@ -146,17 +146,17 @@
         <div class="fan-badge" class:on={currentRpm > 0}><i class="fa-solid fa-fan" style="animation-duration:{fanSpinDuration}" class:spinning={currentRpm > 0}></i> {currentRpm > 0 ? `${currentRpm} RPM` : 'Aus'}</div>
       </div>
 
-      <!-- LED-Leiste -->
-      <div class="led-strip">
-        {#each [0,1,2,3] as i}
-          <div class="led-h"><div class="led-glow" class:blink={isBlinking} style="background:radial-gradient(circle, {ledGlows()[i]}, transparent 70%)"></div><div class="led-px" class:blink={isBlinking} style="background:{ledColors()[i]};box-shadow:0 0 10px {ledGlows()[i]}, 0 0 25px {ledGlows()[i]}"></div></div>
-        {/each}
-      </div>
-
-      <!-- Kurveneditor mit Profilen oben -->
+      <!-- Kurveneditor mit Profilen und LEDs oben -->
       <div class="chart chart-with-profiles">
-        <div class="chart-profiles">
-          {#each profiles as p}<button class="pill" class:active={profile===p} onclick={()=>s.setFanProfile(p)}><i class="fa-solid {profIcons[p]||'fa-circle'}"></i> {profLabels[p]||p}</button>{/each}
+        <div class="chart-topbar">
+          <div class="chart-profiles">
+            {#each profiles as p}<button class="pill" class:active={profile===p} onclick={()=>s.setFanProfile(p)}><i class="fa-solid {profIcons[p]||'fa-circle'}"></i> {profLabels[p]||p}</button>{/each}
+          </div>
+          <div class="chart-leds">
+            {#each [0,1,2,3] as i}
+              <div class="led-sm" class:blink={isBlinking} style="background:{ledColors()[i]};box-shadow:0 0 6px {ledGlows()[i]}"></div>
+            {/each}
+          </div>
         </div>
         <svg bind:this={curveEl} viewBox="0 0 {CURVE.w} {CURVE.h}">
           <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity="0.2"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
@@ -197,7 +197,11 @@
 <style>
   .layout { display: flex; flex-direction: column; height: 100%; }
   .content { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-height: 0; }
-  .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+  .panel {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px; display: grid; gap: 10px; overflow: hidden;
+    grid-template-rows: auto 1fr auto auto;
+  }
 
   /* Lüfter-Header */
   .fan-header { display: flex; align-items: center; gap: 10px; }
@@ -210,12 +214,6 @@
   .spinning { animation: spin 1s linear infinite; animation-duration: inherit; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-  /* LEDs */
-  .led-strip { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 14px 20px; background: #000; border-radius: var(--radius); border: 1px solid #222; }
-  .led-h { position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
-  .led-glow { position: absolute; width: 64px; height: 64px; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%,-50%); pointer-events: none; }
-  .led-px { width: 20px; height: 20px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.12); position: relative; z-index: 1; transition: background 1s, box-shadow 1s; }
-  .led-px.blink, .led-glow.blink { animation: blink 0.33s steps(1) infinite; }
   @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } }
 
   /* Diagramm */
@@ -227,12 +225,16 @@
   .ax-now { font: 600 10px var(--mono); fill: var(--text-primary); }
   .ax-pt { font: 600 9px var(--mono); fill: var(--text-muted); }
 
-  /* Profile (im Chart-Bereich) */
+  /* Profile + LEDs (im Chart-Bereich) */
   .chart-with-profiles { position: relative; }
-  .chart-profiles {
+  .chart-topbar {
     position: absolute; top: 6px; left: 6px; right: 6px; z-index: 2;
-    display: flex; gap: 4px; flex-wrap: wrap;
+    display: flex; align-items: center; justify-content: space-between;
   }
+  .chart-profiles { display: flex; gap: 4px; flex-wrap: wrap; }
+  .chart-leds { display: flex; gap: 6px; align-items: center; }
+  .led-sm { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.1); transition: background 1s, box-shadow 1s; }
+  .led-sm.blink { animation: blink 0.33s steps(1) infinite; }
   .pill { padding: 4px 10px; background: rgba(10,14,24,0.85); backdrop-filter: blur(4px); border: 1px solid var(--border); border-radius: 99px; font: 500 var(--fs-xs) var(--font); cursor: pointer; color: var(--text-muted); transition: all 150ms; display: flex; align-items: center; gap: 4px; }
   .pill:hover { border-color: var(--text-muted); }
   .pill.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
