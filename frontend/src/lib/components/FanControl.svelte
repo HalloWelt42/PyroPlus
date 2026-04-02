@@ -241,87 +241,122 @@
       </div>
     </div>
 
-    <!-- ═══ RECHTS: Kurveneditor ═══ -->
-    <div class="panel panel-right">
-      <div class="panel-title">Lüfterkurve</div>
+    <!-- ═══ RECHTS: Zwei Lüfter-Steuerungen ═══ -->
+    <div class="panel-stack">
 
-      <!-- Profile -->
-      <div class="profile-bar">
-        {#each profiles as p}
-          <button class="profile-pill" class:active={profile===p} onclick={() => selectProfile(p)}>
-            <i class="fa-solid {profIcons[p] || 'fa-circle'}"></i>
-            <span>{profLabels[p] || p}</span>
-          </button>
-        {/each}
-      </div>
-
-      <!-- Kurven-SVG -->
-      <div class="curve-wrap">
-        <svg bind:this={curveEl} viewBox="0 0 {CURVE.w} {CURVE.h}" class="curve-svg">
-          <defs>
-            <linearGradient id="curve-grad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.2"/>
-              <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <!-- Gitternetz -->
-          {#each [0, 25, 50, 75, 100] as sp}
-            <line x1={CURVE.pl} y1={ksy(sp)} x2={CURVE.pl + KW} y2={ksy(sp)} stroke="rgba(255,255,255,0.04)" stroke-dasharray="4"/>
-            <text x={CURVE.pl - 6} y={ksy(sp) + 4} text-anchor="end" class="curve-label">{sp}%</text>
-          {/each}
-          {#each [30, 40, 50, 60, 70, 80] as t}
-            <line x1={ktx(t)} y1={CURVE.pt} x2={ktx(t)} y2={CURVE.pt + KH} stroke="rgba(255,255,255,0.03)" stroke-dasharray="2"/>
-            <text x={ktx(t)} y={CURVE.pt + KH + 16} text-anchor="middle" class="curve-label">{t}°</text>
-          {/each}
-          <line x1={CURVE.pl} y1={CURVE.pt} x2={CURVE.pl} y2={CURVE.pt + KH} stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
-          <line x1={CURVE.pl} y1={CURVE.pt + KH} x2={CURVE.pl + KW} y2={CURVE.pt + KH} stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
-          <!-- Sicherheitslinie -->
-          <line x1={ktx(safetyTemp)} y1={CURVE.pt} x2={ktx(safetyTemp)} y2={CURVE.pt + KH} stroke="var(--red)" stroke-width="1" stroke-dasharray="4 3" opacity="0.4"/>
-          <text x={ktx(safetyTemp)} y={CURVE.pt - 4} text-anchor="middle" class="curve-safety">Notfall</text>
-          <!-- Aktuelle Temperaturlinie -->
-          {#if currentTemp > TMIN}
-            <line x1={ktx(currentTemp)} y1={CURVE.pt} x2={ktx(currentTemp)} y2={CURVE.pt + KH} stroke={tempColorStr} stroke-width="1.5" stroke-dasharray="6 4" opacity="0.6"/>
-            <text x={ktx(currentTemp)} y={CURVE.pt - 4} text-anchor="middle" class="curve-temp">{currentTemp.toFixed(1)}°</text>
-          {/if}
-          <!-- Kurve -->
-          <path d={curveFill(curve)} fill="url(#curve-grad)"/>
-          <path d={curveLine(curve)} fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="drop-shadow(0 0 4px rgba(0,180,255,0.3))"/>
-          <!-- Punkte -->
-          {#each curve as pt, i}
-            <circle cx={ktx(pt.temp)} cy={ksy(pt.speed)} r={dragging===i?10:7} class="curve-pt" class:draggable={profile==='custom'} class:active={dragging===i}
-              onmousedown={(e) => startDrag(i,e)} ontouchstart={(e) => startDrag(i,e)}/>
-            <text x={ktx(pt.temp)} y={ksy(pt.speed)-12} text-anchor="middle" class="curve-pt-label">{pt.temp}° / {pt.speed}%</text>
-          {/each}
-        </svg>
-      </div>
-
-      <!-- Hysterese -->
-      <div class="setting-row">
-        <span>Hysterese</span>
-        <input type="range" min="1" max="10" step="0.5" value={hysteresis} onchange={(e) => s.setFanSettings({ hysteresis: parseFloat(e.target.value) })}>
-        <span class="setting-val">{hysteresis}°C</span>
-      </div>
-
-      <!-- Modus -->
-      <div class="mode-row">
-        <button class="mode-btn" class:active={mode==='auto'} onclick={() => s.setFanMode('auto')}>
-          <i class="fa-solid fa-wand-magic-sparkles"></i> Automatik
-        </button>
-        <button class="mode-btn" class:active={mode==='manual'} onclick={() => s.setFanMode('manual')}>
-          <i class="fa-solid fa-hand"></i> Manuell
-        </button>
-        <button class="mode-btn" class:active={mode==='off'} onclick={() => s.setFanMode('off')}>
-          <i class="fa-solid fa-power-off"></i> Aus
-        </button>
-      </div>
-
-      {#if mode === 'manual'}
-        <div class="manual-row">
-          <span>Geschwindigkeit</span>
-          <input type="range" min="0" max="100" step="5" value={s.fan?.manual_speed||50} oninput={(e) => s.setFanManualSpeed(parseInt(e.target.value))}>
-          <span class="setting-val">{s.fan?.manual_speed||50}%</span>
+      <!-- ─── Gehäuselüfter (GPIO An/Aus) ─── -->
+      <div class="panel fan-section">
+        <div class="fan-header">
+          <i class="fa-solid fa-hard-drive fan-type-icon"></i>
+          <div>
+            <div class="fan-type-title">Gehäuselüfter</div>
+            <div class="fan-type-sub">GPIO Pin 6 · An/Aus</div>
+          </div>
+          <div class="fan-status" class:on={caseFanOn}>
+            <i class="fa-solid fa-fan" class:spinning={caseFanOn}></i>
+            {caseFanOn ? 'Läuft' : 'Aus'}
+          </div>
         </div>
-      {/if}
+        <div class="threshold-controls">
+          <div class="threshold-row">
+            <span><i class="fa-solid fa-arrow-up" style="color:var(--red)"></i> Einschalten bei</span>
+            <input type="range" min="35" max="75" step="1" value={thresholdOn} oninput={onThresholdOnInput} onchange={commitCaseFan}>
+            <span class="threshold-val">{thresholdOn}°C</span>
+          </div>
+          <div class="threshold-row">
+            <span><i class="fa-solid fa-arrow-down" style="color:var(--green)"></i> Ausschalten bei</span>
+            <input type="range" min="30" max="70" step="1" value={thresholdOff} oninput={onThresholdOffInput} onchange={commitCaseFan}>
+            <span class="threshold-val">{thresholdOff}°C</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── PWM-Lüfter (Temperaturkurve) ─── -->
+      <div class="panel fan-section fan-section-grow">
+        <div class="fan-header">
+          <i class="fa-solid fa-microchip fan-type-icon"></i>
+          <div>
+            <div class="fan-type-title">PWM-Lüfter</div>
+            <div class="fan-type-sub">Kernel PWM · 0-100% stufenlos</div>
+          </div>
+          <div class="fan-status" class:on={currentRpm > 0}>
+            <i class="fa-solid fa-fan" style="animation-duration:{fanSpinDuration}" class:spinning={currentRpm > 0}></i>
+            {currentRpm > 0 ? `${currentRpm} RPM` : 'Aus'}
+          </div>
+        </div>
+
+        <!-- Profile -->
+        <div class="profile-bar">
+          {#each profiles as p}
+            <button class="profile-pill" class:active={profile===p} onclick={() => selectProfile(p)}>
+              <i class="fa-solid {profIcons[p] || 'fa-circle'}"></i>
+              <span>{profLabels[p] || p}</span>
+            </button>
+          {/each}
+        </div>
+
+        <!-- Kurven-SVG -->
+        <div class="curve-wrap">
+          <svg bind:this={curveEl} viewBox="0 0 {CURVE.w} {CURVE.h}" class="curve-svg">
+            <defs>
+              <linearGradient id="curve-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.2"/>
+                <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            {#each [0, 25, 50, 75, 100] as sp}
+              <line x1={CURVE.pl} y1={ksy(sp)} x2={CURVE.pl + KW} y2={ksy(sp)} stroke="rgba(255,255,255,0.04)" stroke-dasharray="4"/>
+              <text x={CURVE.pl - 6} y={ksy(sp) + 4} text-anchor="end" class="curve-label">{sp}%</text>
+            {/each}
+            {#each [30, 40, 50, 60, 70, 80] as t}
+              <line x1={ktx(t)} y1={CURVE.pt} x2={ktx(t)} y2={CURVE.pt + KH} stroke="rgba(255,255,255,0.03)" stroke-dasharray="2"/>
+              <text x={ktx(t)} y={CURVE.pt + KH + 16} text-anchor="middle" class="curve-label">{t}°</text>
+            {/each}
+            <line x1={CURVE.pl} y1={CURVE.pt} x2={CURVE.pl} y2={CURVE.pt + KH} stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+            <line x1={CURVE.pl} y1={CURVE.pt + KH} x2={CURVE.pl + KW} y2={CURVE.pt + KH} stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+            <line x1={ktx(safetyTemp)} y1={CURVE.pt} x2={ktx(safetyTemp)} y2={CURVE.pt + KH} stroke="var(--red)" stroke-width="1" stroke-dasharray="4 3" opacity="0.4"/>
+            <text x={ktx(safetyTemp)} y={CURVE.pt - 4} text-anchor="middle" class="curve-safety">Notfall</text>
+            {#if currentTemp > TMIN}
+              <line x1={ktx(currentTemp)} y1={CURVE.pt} x2={ktx(currentTemp)} y2={CURVE.pt + KH} stroke={tempColorStr} stroke-width="1.5" stroke-dasharray="6 4" opacity="0.6"/>
+              <text x={ktx(currentTemp)} y={CURVE.pt - 4} text-anchor="middle" class="curve-temp">{currentTemp.toFixed(1)}°</text>
+            {/if}
+            <path d={curveFill(curve)} fill="url(#curve-grad)"/>
+            <path d={curveLine(curve)} fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="drop-shadow(0 0 4px rgba(0,180,255,0.3))"/>
+            {#each curve as pt, i}
+              <circle cx={ktx(pt.temp)} cy={ksy(pt.speed)} r={dragging===i?10:7} class="curve-pt" class:draggable={profile==='custom'} class:active={dragging===i}
+                onmousedown={(e) => startDrag(i,e)} ontouchstart={(e) => startDrag(i,e)}/>
+              <text x={ktx(pt.temp)} y={ksy(pt.speed)-12} text-anchor="middle" class="curve-pt-label">{pt.temp}° / {pt.speed}%</text>
+            {/each}
+          </svg>
+        </div>
+
+        <!-- PWM Einstellungen -->
+        <div class="pwm-controls">
+          <div class="setting-row">
+            <span>Hysterese</span>
+            <input type="range" min="1" max="10" step="0.5" value={hysteresis} onchange={(e) => s.setFanSettings({ hysteresis: parseFloat(e.target.value) })}>
+            <span class="setting-val">{hysteresis}°C</span>
+          </div>
+          <div class="mode-row">
+            <button class="mode-btn" class:active={mode==='auto'} onclick={() => s.setFanMode('auto')}>
+              <i class="fa-solid fa-wand-magic-sparkles"></i> Automatik
+            </button>
+            <button class="mode-btn" class:active={mode==='manual'} onclick={() => s.setFanMode('manual')}>
+              <i class="fa-solid fa-hand"></i> Manuell
+            </button>
+            <button class="mode-btn" class:active={mode==='off'} onclick={() => s.setFanMode('off')}>
+              <i class="fa-solid fa-power-off"></i> Aus
+            </button>
+          </div>
+          {#if mode === 'manual'}
+            <div class="setting-row">
+              <span>Geschwindigkeit</span>
+              <input type="range" min="0" max="100" step="5" value={s.fan?.manual_speed||50} oninput={(e) => s.setFanManualSpeed(parseInt(e.target.value))}>
+              <span class="setting-val">{s.fan?.manual_speed||50}%</span>
+            </div>
+          {/if}
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -338,6 +373,32 @@
   .content { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-height: 0; }
   .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; overflow: hidden; }
   .panel-title { font: 600 var(--fs-sm) var(--font); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+  .panel-stack { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; }
+  .fan-section-grow { flex: 1; min-height: 0; }
+
+  /* ─── Lüfter-Header ─── */
+  .fan-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .fan-type-icon { font-size: var(--fs-lg); color: var(--accent); }
+  .fan-type-title { font: 600 var(--fs-sm) var(--font); color: var(--text-primary); }
+  .fan-type-sub { font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
+  .fan-status {
+    margin-left: auto; display: flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 99px;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+    font: 500 var(--fs-xs) var(--mono); color: var(--text-muted);
+  }
+  .fan-status.on { color: var(--green); border-color: rgba(0,232,138,0.2); background: rgba(0,232,138,0.06); }
+  .fan-status .spinning { animation: spin var(--spin-dur, 1s) linear infinite; }
+
+  /* ─── Schwellwerte (Gehäuselüfter) ─── */
+  .threshold-controls { display: flex; flex-direction: column; gap: 8px; }
+  .threshold-row {
+    display: flex; align-items: center; gap: 8px;
+    font: 500 var(--fs-xs) var(--font); color: var(--text-secondary);
+  }
+  .threshold-row span:first-child { min-width: 130px; display: flex; align-items: center; gap: 6px; }
+  .threshold-row input { flex: 1; }
+  .threshold-val { font: 600 var(--fs-xs) var(--mono); color: var(--text-primary); background: var(--bg-deep); padding: 3px 8px; border-radius: var(--radius-sm); min-width: 44px; text-align: center; }
 
   /* ─── LED-Leiste ─── */
   .led-strip {
@@ -409,6 +470,9 @@
   .curve-pt-label { font: 600 9px var(--mono); fill: var(--text-muted); }
   .curve-pt { fill: var(--accent); stroke: var(--bg-card); stroke-width: 3; transition: r 150ms; }
   .curve-pt.draggable { cursor: grab; } .curve-pt.draggable:hover { r: 10; } .curve-pt.active { fill: var(--cyan); r: 10; }
+
+  /* ─── PWM Einstellungen ─── */
+  .pwm-controls { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
 
   /* ─── Einstellungen ─── */
   .setting-row, .manual-row {
