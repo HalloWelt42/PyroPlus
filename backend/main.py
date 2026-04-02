@@ -176,6 +176,9 @@ def get_stats():
 @app.get("/api/state", tags=["System"],
          summary="Kompletter Systemstatus")
 def get_full_state():
+    # LED-States frisch vom HW-Proxy holen
+    if leds:
+        leds.refresh_led_states()
     return {
         "version": VERSION,
         "hw_proxy": hw_client.health(),
