@@ -49,27 +49,125 @@
     {id:'move',icon:'fa-up-down-left-right',label:'Verschieben',key:'V'},
   ];
 
-  /* ═══ WIDGETS ═══ */
-  const widgets = [
-    {id:'clock',cat:'zeit',label:'Uhr HH:MM',w:58,h:14,draw:(x,y,s)=>E.drawText(ap(),String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0'),x,y,2)},
-    {id:'clock_s',cat:'zeit',label:'Uhr HH:MM:SS',w:48,h:7,draw:(x,y)=>E.drawText(ap(),'14:32:07',x,y)},
-    {id:'clock_l',cat:'zeit',label:'Uhr Groß',w:90,h:21,draw:(x,y)=>E.drawText(ap(),'14:32',x,y,3)},
-    {id:'date',cat:'zeit',label:'Datum',w:60,h:7,draw:(x,y)=>E.drawText(ap(),'02.04.2026',x,y)},
-    {id:'cpu',cat:'sys',label:'CPU Temperatur',w:24,h:7,draw:(x,y)=>E.drawText(ap(),Math.round(s.stats?.cpu?.temp||0)+'°C',x,y)},
-    {id:'ram',cat:'sys',label:'RAM Auslastung',w:54,h:7,draw:(x,y)=>E.drawText(ap(),'RAM '+(s.stats?.ram?.percent||0)+'%',x,y)},
-    {id:'ip',cat:'sys',label:'IP-Adresse',w:60,h:7,draw:(x,y)=>E.drawText(ap(),s.stats?.network?.ip||'0.0.0.0',x,y)},
-    {id:'uptime',cat:'sys',label:'Uptime',w:60,h:7,draw:(x,y)=>E.drawText(ap(),s.stats?.uptime?.formatted||'0:00',x,y)},
-    {id:'label',cat:'deko',label:'Textfeld',w:48,h:7,draw:(x,y)=>E.drawText(ap(),'Text',x,y)},
-    {id:'line_h',cat:'deko',label:'Linie',w:60,h:1,draw:(x,y)=>{for(let i=0;i<60;i++)sp(x+i,y,1);}},
-    {id:'rect_w',cat:'deko',label:'Rahmen',w:40,h:20,draw:(x,y)=>E.drawRect(x,y,x+39,y+19,(px,py)=>sp(px,py,1),false)},
-  ];
-  function placeWidget(w) { addLayer(w.label); pushH(); w.draw(4,4); render(); s.toast(`${w.label} eingefügt`,'ok'); }
+  /* ═══ WIDGETS MIT LIVE-DATEN ═══ */
+  const widgetTypes = {
+    clock:     { cat:'zeit', label:'Uhr HH:MM',    w:58, h:14, props:{ scale:2, format:'HH:MM' },
+                 getText: (p) => { const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }},
+    clock_s:   { cat:'zeit', label:'Uhr HH:MM:SS', w:48, h:7, props:{ scale:1 },
+                 getText: () => { const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0'); }},
+    clock_l:   { cat:'zeit', label:'Uhr Groß',     w:90, h:21, props:{ scale:3 },
+                 getText: () => { const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }},
+    date:      { cat:'zeit', label:'Datum',         w:60, h:7, props:{ scale:1 },
+                 getText: () => new Date().toLocaleDateString('de-DE') },
+    weekday:   { cat:'zeit', label:'Wochentag',     w:14, h:7, props:{ scale:1 },
+                 getText: () => ['So','Mo','Di','Mi','Do','Fr','Sa'][new Date().getDay()] },
+    cpu_temp:  { cat:'sys',  label:'CPU Temperatur', w:30, h:7, props:{ scale:1, unit:'°C' },
+                 getText: () => Math.round(s.stats?.cpu?.temp||0)+'°C' },
+    cpu_pct:   { cat:'sys',  label:'CPU Auslastung', w:42, h:7, props:{ scale:1 },
+                 getText: () => 'CPU '+Math.round(s.stats?.cpu?.percent||0)+'%' },
+    ram:       { cat:'sys',  label:'RAM',            w:54, h:7, props:{ scale:1 },
+                 getText: () => 'RAM '+(s.stats?.ram?.used_gb||0)+'/'+(s.stats?.ram?.total_gb||0)+'G' },
+    ram_pct:   { cat:'sys',  label:'RAM %',          w:36, h:7, props:{ scale:1 },
+                 getText: () => 'RAM '+(s.stats?.ram?.percent||0)+'%' },
+    ip:        { cat:'sys',  label:'IP-Adresse',     w:72, h:7, props:{ scale:1 },
+                 getText: () => 'IP '+(s.stats?.network?.ip||'0.0.0.0') },
+    uptime:    { cat:'sys',  label:'Uptime',         w:60, h:7, props:{ scale:1 },
+                 getText: () => 'Up '+(s.stats?.uptime?.formatted||'0:00') },
+    label:     { cat:'deko', label:'Textfeld',       w:48, h:7, props:{ scale:1, text:'Text' },
+                 getText: (p) => p.text || 'Text' },
+    line_h:    { cat:'deko', label:'Linie ─',        w:60, h:1, props:{ width:60 }, isShape: true,
+                 draw: (px,x,y,p) => { for(let i=0;i<(p.width||60);i++) if(x+i>=0&&x+i<W) px[y*W+x+i]=1; }},
+    line_v:    { cat:'deko', label:'Linie │',        w:1, h:20, props:{ height:20 }, isShape: true,
+                 draw: (px,x,y,p) => { for(let i=0;i<(p.height||20);i++) if(y+i>=0&&y+i<H) px[(y+i)*W+x]=1; }},
+    rect_o:    { cat:'deko', label:'Rahmen □',       w:40, h:20, props:{ width:40, height:20 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawRect(x,y,x+(p.width||40)-1,y+(p.height||20)-1,(px2,py)=>{if(px2>=0&&px2<W&&py>=0&&py<H)px[py*W+px2]=1;},false) },
+    rect_f:    { cat:'deko', label:'Block ■',        w:40, h:20, props:{ width:40, height:20 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawRect(x,y,x+(p.width||40)-1,y+(p.height||20)-1,(px2,py)=>{if(px2>=0&&px2<W&&py>=0&&py<H)px[py*W+px2]=1;},true) },
+  };
+  const widgetList = Object.entries(widgetTypes).map(([id,v])=>({id,...v}));
+
+  /* Platzierte Widgets — jedes hat Position, Typ, eigene Eigenschaften */
+  let placedWidgets = $state([]);
+  let selectedWidget = $state(-1);
+
+  function placeWidget(w) {
+    const wt = widgetTypes[w.id];
+    placedWidgets = [...placedWidgets, {
+      id: Date.now(),
+      type: w.id,
+      x: 4, y: 4,
+      props: { ...wt.props },
+    }];
+    selectedWidget = placedWidgets.length - 1;
+    renderWidgets();
+    s.toast(`${wt.label} eingefügt`, 'ok');
+  }
+
+  function removeWidget(idx) {
+    placedWidgets = placedWidgets.filter((_, i) => i !== idx);
+    if (selectedWidget >= placedWidgets.length) selectedWidget = placedWidgets.length - 1;
+    renderWidgets();
+  }
+
+  function moveWidget(idx, dx, dy) {
+    const w = placedWidgets[idx];
+    w.x = Math.max(0, Math.min(W - 1, w.x + dx));
+    w.y = Math.max(0, Math.min(H - 1, w.y + dy));
+    placedWidgets = [...placedWidgets];
+    renderWidgets();
+  }
+
+  function updateWidgetProp(idx, key, val) {
+    placedWidgets[idx].props[key] = val;
+    placedWidgets = [...placedWidgets];
+    renderWidgets();
+  }
+
+  /* Alle Widgets in Layer 0 rendern */
+  function renderWidgets() {
+    const px = layers[0].pixels;
+    px.fill(0);
+    for (const w of placedWidgets) {
+      const wt = widgetTypes[w.type];
+      if (!wt) continue;
+      if (wt.isShape) {
+        wt.draw(px, w.x, w.y, w.props);
+      } else {
+        const text = wt.getText(w.props);
+        E.drawText(px, text, w.x, w.y, w.props.scale || 1);
+      }
+    }
+    layers = [...layers];
+    render();
+  }
+
+  /* Widget-Rendering alle Sekunde aktualisieren (für Uhr etc.) */
+  let _widgetTimer;
+  function startWidgetTimer() { _widgetTimer = setInterval(() => { if (placedWidgets.length > 0) renderWidgets(); }, 1000); }
+  function stopWidgetTimer() { clearInterval(_widgetTimer); }
 
   /* ═══ CANVAS ═══ */
   let canvasEl = $state(null), previewEl = $state(null);
   function render() {
     const comp = E.composite(layers);
-    if (canvasEl) E.renderCanvas(canvasEl.getContext('2d'), comp, zoom, showGrid);
+    if (canvasEl) {
+      E.renderCanvas(canvasEl.getContext('2d'), comp, zoom, showGrid);
+      // Widget-Rahmen zeichnen
+      if (selectedWidget >= 0 && placedWidgets[selectedWidget]) {
+        const ctx = canvasEl.getContext('2d');
+        const w = placedWidgets[selectedWidget];
+        const wt = widgetTypes[w.type];
+        if (wt) {
+          const ww = wt.isShape ? (w.props.width || wt.w) : wt.w * (w.props.scale || 1);
+          const wh = wt.isShape ? (w.props.height || wt.h) : wt.h * (w.props.scale || 1);
+          ctx.strokeStyle = 'rgba(0,180,255,0.7)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 2]);
+          ctx.strokeRect(w.x * zoom - 1, w.y * zoom - 1, ww * zoom + 2, wh * zoom + 2);
+          ctx.setLineDash([]);
+        }
+      }
+    }
     if (previewEl) E.renderPreview(previewEl.getContext('2d'), comp);
   }
 
@@ -77,9 +175,40 @@
   let drawing=$state(false), sx=0, sy=0, lx=-1, ly=-1, snap=null, mvStart=null;
   function m2p(e) { const r=canvasEl.getBoundingClientRect(); return [Math.max(0,Math.min(W-1,Math.floor((e.clientX-r.left)/zoom))),Math.max(0,Math.min(H-1,Math.floor((e.clientY-r.top)/zoom)))]; }
 
+  function hitTestWidget(x, y) {
+    for (let i = placedWidgets.length - 1; i >= 0; i--) {
+      const w = placedWidgets[i];
+      const wt = widgetTypes[w.type];
+      if (!wt) continue;
+      const ww = wt.isShape ? (w.props.width || wt.w) : wt.w * (w.props.scale || 1);
+      const wh = wt.isShape ? (w.props.height || wt.h) : wt.h * (w.props.scale || 1);
+      if (x >= w.x && x < w.x + ww && y >= w.y && y < w.y + wh) return i;
+    }
+    return -1;
+  }
+
+  let widgetDrag = null;
   function onDown(e) {
     if (!canvasEl) return;
-    const [x,y]=m2p(e); drawing=true; sx=x; sy=y; lx=x; ly=y;
+    const [x,y]=m2p(e);
+
+    // Widget-Klick prüfen (im Move-Modus oder bei Rechtsklick)
+    if (tool === 'move') {
+      const hit = hitTestWidget(x, y);
+      if (hit >= 0) {
+        selectedWidget = hit;
+        widgetDrag = { idx: hit, startX: x, startY: y, origX: placedWidgets[hit].x, origY: placedWidgets[hit].y };
+        drawing = true;
+        render();
+        return;
+      }
+    }
+
+    // Klick ohne Tool-Aktion = Widget abwählen
+    selectedWidget = hitTestWidget(x, y);
+    render();
+
+    drawing=true; sx=x; sy=y; lx=x; ly=y;
     if (tool==='pencil'||tool==='eraser') { pushH(); plot(x,y); render(); }
     else if (tool==='fill') { pushH(); E.floodFill(ap(),x,y,gp(x,y)===1?0:1); render(); drawing=false; }
     else if (tool==='text') { pushH(); E.drawText(ap(),textInput,x,y,textScale); render(); drawing=false; }
@@ -90,6 +219,15 @@
     if (!canvasEl) return;
     const [x,y]=m2p(e); cursorX=x; cursorY=y;
     if (!drawing) return;
+    // Widget-Drag
+    if (widgetDrag) {
+      const dx = x - widgetDrag.startX, dy = y - widgetDrag.startY;
+      placedWidgets[widgetDrag.idx].x = Math.max(0, Math.min(W-1, widgetDrag.origX + dx));
+      placedWidgets[widgetDrag.idx].y = Math.max(0, Math.min(H-1, widgetDrag.origY + dy));
+      placedWidgets = [...placedWidgets];
+      renderWidgets();
+      return;
+    }
     if (tool==='pencil'||tool==='eraser') { E.bresenhamLine(lx,ly,x,y,plot); lx=x; ly=y; render(); }
     else if (tool==='move'&&mvStart) {
       const layer=gl(activeLayer); if(!layer)return;
@@ -106,7 +244,7 @@
       render();
     }
   }
-  function onUp(){if(!drawing)return;if(snap)pushH();if(tool==='move'&&mvStart){pushH();mvStart=null;}drawing=false;snap=null;}
+  function onUp(){if(!drawing)return;if(widgetDrag){widgetDrag=null;drawing=false;return;}if(snap)pushH();if(tool==='move'&&mvStart){pushH();mvStart=null;}drawing=false;snap=null;}
   function clearLayer(){pushH();ap()?.fill(0);render();}
   function invertLayer(){pushH();const px=ap();if(px)for(let i=0;i<px.length;i++)px[i]=px[i]?0:1;render();}
   async function sendToOled(){s.toast('An OLED gesendet','ok');}
@@ -128,7 +266,8 @@
   function panelLabel(id) { return _pd[id]?.label || id; }
   function panelCollapsible(id) { return _pd[id]?.c ?? true; }
 
-  onMount(()=>{pushH();render();});
+  onMount(()=>{pushH();render();startWidgetTimer();});
+  onDestroy(()=>{stopWidgetTimer();});
   $effect(()=>{zoom;showGrid;render();});
 </script>
 
@@ -150,9 +289,31 @@
     <div class="pv-box"><div class="pv-bezel"><canvas bind:this={previewEl} width={W} height={H} class="pv-canvas"></canvas></div></div>
     <button class="send-btn" onclick={sendToOled}><i class="fa-solid fa-paper-plane"></i> An OLED senden</button>
   {:else if id==='props'}
-    <div class="rr"><span>Position</span><span class="mono">{cursorX>=0?`${cursorX}, ${cursorY}`:'—'}</span></div>
-    <div class="rr"><span>Ebene</span><span class="mono">{gl(activeLayer)?.name||'—'}</span></div>
-    <div class="rr"><span>Pixel</span><span class="mono">{ap()?.reduce((a,v)=>a+v,0)||0}</span></div>
+    {#if selectedWidget >= 0 && placedWidgets[selectedWidget]}
+      {@const sw = placedWidgets[selectedWidget]}
+      {@const wt = widgetTypes[sw.type]}
+      <div class="rr"><span>Widget</span><span class="mono">{wt?.label}</span></div>
+      <div class="rr"><span>Position</span><span class="mono">{sw.x}, {sw.y}</span></div>
+      <div class="pr"><span>X</span><input type="range" min="0" max={W-1} value={sw.x} oninput={(e)=>{sw.x=+e.target.value;placedWidgets=[...placedWidgets];renderWidgets();}}><span class="pv">{sw.x}</span></div>
+      <div class="pr"><span>Y</span><input type="range" min="0" max={H-1} value={sw.y} oninput={(e)=>{sw.y=+e.target.value;placedWidgets=[...placedWidgets];renderWidgets();}}><span class="pv">{sw.y}</span></div>
+      {#if sw.props.scale !== undefined}
+        <div class="pr"><span>Größe</span><input type="range" min="1" max="3" value={sw.props.scale} oninput={(e)=>updateWidgetProp(selectedWidget,'scale',+e.target.value)}><span class="pv">{sw.props.scale}×</span></div>
+      {/if}
+      {#if sw.props.text !== undefined}
+        <div class="pr"><span>Text</span><input type="text" class="ti" value={sw.props.text} oninput={(e)=>updateWidgetProp(selectedWidget,'text',e.target.value)}></div>
+      {/if}
+      {#if sw.props.width !== undefined}
+        <div class="pr"><span>Breite</span><input type="range" min="4" max="128" value={sw.props.width} oninput={(e)=>updateWidgetProp(selectedWidget,'width',+e.target.value)}><span class="pv">{sw.props.width}</span></div>
+      {/if}
+      {#if sw.props.height !== undefined}
+        <div class="pr"><span>Höhe</span><input type="range" min="2" max="64" value={sw.props.height} oninput={(e)=>updateWidgetProp(selectedWidget,'height',+e.target.value)}><span class="pv">{sw.props.height}</span></div>
+      {/if}
+      <button class="ab" style="width:100%;aspect-ratio:auto;height:28px;margin-top:6px" onclick={()=>removeWidget(selectedWidget)}><i class="fa-solid fa-trash-can"></i> Widget entfernen</button>
+    {:else}
+      <div class="rr"><span>Cursor</span><span class="mono">{cursorX>=0?`${cursorX}, ${cursorY}`:'—'}</span></div>
+      <div class="rr"><span>Widgets</span><span class="mono">{placedWidgets.length}</span></div>
+      <div class="rr" style="color:var(--text-muted);font-size:var(--fs-xs)">Klicke ein Widget auf dem Canvas zum Bearbeiten</div>
+    {/if}
   {:else if id==='layers'}
     <div class="ll">{#each [...layers].reverse() as layer, ri}{@const idx=layers.length-1-ri}<div class="li" class:active={layer.id===activeLayer} class:drag-over={ldOver===idx} draggable="true" onclick={()=>activeLayer=layer.id} ondragstart={(e)=>ldStart(e,idx)} ondragover={(e)=>ldDragOver(e,idx)} ondrop={(e)=>ldDrop(e,idx)} ondragend={ldEnd}><span class="lh"><i class="fa-solid fa-grip-vertical"></i></span><button class="lv" onclick={(e)=>{e.stopPropagation();toggleVis(layer.id);render();}}><i class="fa-solid {layer.visible?'fa-eye':'fa-eye-slash'}"></i></button><span class="ln" contenteditable="false" ondblclick={(e)=>{e.target.contentEditable='true';e.target.focus();}} onblur={(e)=>{e.target.contentEditable='false';layers=layers.map(l=>l.id===layer.id?{...l,name:e.target.textContent}:l);}} onkeydown={(e)=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}}}>{layer.name}</span></div>{/each}</div>
     <div class="la"><button class="lab" onclick={()=>addLayer()}><i class="fa-solid fa-plus"></i></button><button class="lab" onclick={()=>dupLayer(activeLayer)}><i class="fa-solid fa-copy"></i></button><button class="lab" onclick={()=>rmLayer(activeLayer)}><i class="fa-solid fa-trash"></i></button></div>
@@ -160,7 +321,7 @@
 {/snippet}
 
 <div class="studio">
-  <WidgetStrip {widgets} onPlace={placeWidget} />
+  <WidgetStrip widgets={widgetList} onPlace={placeWidget} />
   <div class="editor-main">
     <div class="side-panel" ondragover={(e)=>sDragOver(e,'left')} ondragleave={sDragLeave} ondrop={(e)=>sDrop(e,'left')} class:drop-target={pdropSide==='left'}>
       {#each lpanels as pid (pid)}
