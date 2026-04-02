@@ -208,7 +208,8 @@ def fan_set_profile(name: str):
           summary="Benutzerdefinierte Temperaturkurve setzen")
 def fan_set_curve(req: FanCurveRequest):
     points = [{"temp": p.temp, "speed": p.speed} for p in req.points]
-    return {"ok": True, "curve": fan.set_curve(points)}
+    fan.set_curve(points)
+    return {"ok": True, **fan.get_state()}
 
 @app.post("/api/fan/manual-speed", tags=["Lüfter"],
           summary="Manuelle Geschwindigkeit setzen (0-100%)")

@@ -96,8 +96,8 @@ export function getState() {
     async setFanMode(m) { const r = await api.fan.mode(m); if (!r.error) { fan = { ...fan, mode: m, fan_on: m !== 'off' && (m === 'manual' || fan.fan_on) }; toast(`Lüfter → ${m}`, 'ok'); } },
     async setFanProfile(p) { const r = await api.fan.profile(p); if (!r.error) { fan = { ...fan, ...r }; toast(`Profil → ${p}`, 'ok'); } },
     async setFanManualSpeed(s) { await api.fan.manualSpeed(s); fan = { ...fan, manual_speed: s }; },
-    async setFanCurve(points) { const r = await api.fan.curve(points); if (!r.error) fan = { ...fan, curve: r.curve || points }; },
-    async setFanSettings(settings) { const r = await api.fan.settings(settings); if (!r.error) fan = { ...fan, settings: { ...fan.settings, ...r.settings } }; },
+    async setFanCurve(points) { const r = await api.fan.curve(points); if (!r.error) fan = { ...fan, ...r }; },
+    async setFanSettings(s) { const r = await api.fan.settings(s); if (!r.error) fan = { ...fan, ...r }; },
 
     async setLedEffect(n) { await api.leds.effect(n); leds = { ...leds, effect: n }; toast(`LED → ${n}`, 'ok'); },
     async setLedColor(r, g, b) { await api.leds.color(r, g, b); leds = { ...leds, color: { r, g, b } }; },
