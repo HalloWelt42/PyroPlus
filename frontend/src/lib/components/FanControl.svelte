@@ -76,7 +76,7 @@
   }
 
   /* ─── Diagramm-Konfiguration ─── */
-  const CHART = { w: 500, h: 210, pl: 40, pr: 50, pt: 14, pb: 20 };
+  const CHART = { w: 500, h: 210, pl: 40, pr: 50, pt: 14, pb: 28 };
   const CW = CHART.w - CHART.pl - CHART.pr;
   const CH = CHART.h - CHART.pt - CHART.pb;
 
@@ -210,9 +210,21 @@
             <text x={CHART.pl + CW + 6} y={cy(thresholdOff) + 3.5} class="chart-label-off">{thresholdOff}° Aus</text>
           {/if}
 
-          <!-- Y-Achse und Grundlinie -->
+          <!-- Achsen -->
           <line x1={CHART.pl} y1={CHART.pt} x2={CHART.pl} y2={CHART.pt + CH} stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
           <line x1={CHART.pl} y1={CHART.pt + CH} x2={CHART.pl + CW} y2={CHART.pt + CH} stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+
+          <!-- Zeitachse (X): rechts = jetzt, links = älteste -->
+          {#if tempHistory.length > 2}
+            {#each [60, 45, 30, 15, 0] as ago}
+              {@const idx = Math.max(0, tempHistory.length - 1 - ago)}
+              {@const xPos = cx(idx, tempHistory.length)}
+              <line x1={xPos} y1={CHART.pt + CH} x2={xPos} y2={CHART.pt + CH + 4} stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+              <text x={xPos} y={CHART.pt + CH + 16} text-anchor="middle" class="chart-label">
+                {ago === 0 ? 'jetzt' : `-${ago}s`}
+              </text>
+            {/each}
+          {/if}
 
           <!-- Daten -->
           {#if tempHistory.length > 2}

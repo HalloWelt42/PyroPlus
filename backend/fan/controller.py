@@ -140,9 +140,12 @@ class FanController:
             self.mode = mode
             if mode == "off":
                 self.target_speed = 0
-                self._apply_speed(0)
+                self.current_speed = 0.0
+                self._apply_fan(False)
             elif mode == "manual":
                 self.target_speed = self.manual_speed
+                self.current_speed = 100.0
+                self._apply_fan(True)
         self._save_settings()
 
     def set_manual_speed(self, speed: float):

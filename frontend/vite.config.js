@@ -8,8 +8,15 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
-      '/api': { target: 'http://localhost:8071', changeOrigin: true },
-      '/ws': { target: 'ws://localhost:8071', ws: true },
-    }
-  }
+      '/api': {
+        target: 'http://localhost:8071',
+        changeOrigin: true,
+      },
+      '/ws': {
+        target: 'http://localhost:8071',
+        ws: true,
+        changeOrigin: true,
+      },
+    },
+  },
 });

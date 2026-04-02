@@ -243,7 +243,11 @@ def simulate_temp(req: dict):
     temp = req.get("temp")
     if temp is None:
         _sim_temp = None
-        if fan: fan.sim_temp = None
+        if fan:
+            fan.sim_temp = None
+            # Sofort echte Temperatur lesen und Fan-State aktualisieren
+            real_temp = hw_client.get_temp() if hw_client else 40.0
+            fan.current_temp = real_temp
         # Sofort echte Temperatur an HW-Proxy pushen
         if leds:
             real_temp = hw_client.get_temp() if hw_client else 40.0
@@ -524,8 +528,9 @@ async def _ws_push_loop():
                 stats = await asyncio.to_thread(collect_stats)
 
                 # Simulation überschreibt Temperatur systemweit
+                # WICHTIG: Kopie erstellen, um den Stats-Cache nicht zu korrumpieren!
                 if _sim_temp is not None and stats.get("cpu"):
-                    stats["cpu"]["temp"] = _sim_temp
+                    stats = {**stats, "cpu": {**stats["cpu"], "temp": _sim_temp}}
 
                 # System-Daten an LED Engine für reaktive Effekte
                 if leds and stats.get("cpu"):

@@ -89,11 +89,11 @@ export function getState() {
       else { await api.quick.oledOn(); oled = { ...oled, mode: 'auto' }; toast('Display ein', 'ok'); }
     },
     async toggleFan() {
-      if (fan?.mode !== 'off') { await api.quick.fanOff(); fan = { ...fan, mode: 'off' }; toast('Lüfter aus', 'ok'); }
+      if (fan?.mode !== 'off') { await api.quick.fanOff(); fan = { ...fan, mode: 'off', fan_on: false, current_speed: 0 }; toast('Lüfter aus', 'ok'); }
       else { await api.quick.fanAuto(); fan = { ...fan, mode: 'auto' }; toast('Lüfter ein (Auto)', 'ok'); }
     },
 
-    async setFanMode(m) { const r = await api.fan.mode(m); if (!r.error) { fan = { ...fan, mode: m }; toast(`Lüfter → ${m}`, 'ok'); } },
+    async setFanMode(m) { const r = await api.fan.mode(m); if (!r.error) { fan = { ...fan, mode: m, fan_on: m !== 'off' && (m === 'manual' || fan.fan_on) }; toast(`Lüfter → ${m}`, 'ok'); } },
     async setFanProfile(p) { const r = await api.fan.profile(p); if (!r.error) { fan = { ...fan, ...r }; toast(`Profil → ${p}`, 'ok'); } },
     async setFanManualSpeed(s) { await api.fan.manualSpeed(s); fan = { ...fan, manual_speed: s }; },
     async setFanCurve(points) { const r = await api.fan.curve(points); if (!r.error) fan = { ...fan, curve: r.curve || points }; },
