@@ -156,7 +156,6 @@
     /* ─── System ─── */
     uptime:    { cat:'sys',  label:'Uptime',         w:48, h:7, props:{ scale:1, prefix:'' },
                  getText: (p) => (p.prefix||'')+(s.stats?.uptime?.formatted||'0:00') },
-                 getText: () => { const n=s.stats?.network; const b=n?.tx_bytes_sec||0; return b>1048576?(b/1048576).toFixed(1)+'MB/s':b>1024?(b/1024).toFixed(0)+'KB/s':b+'B/s'; }},
     label:     { cat:'deko', label:'Textfeld',       w:48, h:7, props:{ scale:1, text:'Text' },
                  getText: (p) => p.text || 'Text' },
     line_h:    { cat:'deko', label:'Linie ─',        w:60, h:1, props:{ width:60 }, isShape: true,
