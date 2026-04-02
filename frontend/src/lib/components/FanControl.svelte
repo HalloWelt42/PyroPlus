@@ -5,8 +5,7 @@
   const mode = $derived(s.fan?.mode || 'auto');
   let simTemp = $state(null);
   const currentTemp = $derived(simTemp !== null ? simTemp : (s.fan?.current_temp || s.stats?.cpu?.temp || 0));
-  const currentSpeed = $derived(s.fan?.current_speed || 0);
-  const estimatedRpm = $derived(s.fan?.estimated_rpm || 0);
+  const fanOn = $derived(s.fan?.fan_on || false);
   const settings = $derived(s.fan?.settings || {});
 
   /* Schwellwerte — lokal getrackt für sofortige UI-Reaktion */
@@ -157,7 +156,7 @@
 <div class="layout">
   <!-- ═══ KOPFZEILE ═══ -->
   <header class="topbar">
-    <i class="fa-solid fa-fan topbar-icon" class:spinning={currentSpeed > 0}></i>
+    <i class="fa-solid fa-fan topbar-icon" class:spinning={fanOn}></i>
     <h1>Lüftersteuerung</h1>
   </header>
 
@@ -169,9 +168,9 @@
       <div class="hero">
         <div class="hero-info">
           <div class="hero-temp" style="color:{tempColorStr}">{currentTemp.toFixed(1)}<span class="hero-unit">°C</span></div>
-          <div class="hero-status" style="color:{currentSpeed > 0 ? 'var(--green)' : mode === 'off' ? 'var(--red)' : 'var(--text-secondary)'}">
-            <i class="fa-solid fa-fan" class:spinning={currentSpeed > 0}></i>
-            {currentSpeed > 0 ? 'Lüfter läuft' : mode === 'off' ? 'Deaktiviert' : 'Bereitschaft'}
+          <div class="hero-status" style="color:{fanOn ? 'var(--green)' : mode === 'off' ? 'var(--red)' : 'var(--text-secondary)'}">
+            <i class="fa-solid fa-fan" class:spinning={fanOn}></i>
+            {fanOn ? 'Lüfter läuft' : mode === 'off' ? 'Deaktiviert' : 'Bereitschaft'}
           </div>
         </div>
         <div class="hero-leds">

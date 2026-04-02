@@ -183,48 +183,35 @@ class FanController:
         self._apply_speed(0)
 
     def _control_loop(self):
-        last_time = time.time()
+        """An/Aus-Steuerung basierend auf Temperaturschwellen."""
         while self._running:
-            now = time.time()
-            dt = now - last_time
-            last_time = now
             self.current_temp = self.sim_temp if self.sim_temp is not None else hw_client.get_temp()
 
             if self.mode == "auto":
-                raw_target = self.get_speed_for_temp(self.current_temp)
-                with self._lock:
-                    if raw_target > self.target_speed:
-                        self.target_speed = raw_target
-                        self.last_direction = "up"
-                    elif raw_target < self.target_speed:
-                        hyst_target = self.get_speed_for_temp(self.current_temp + self.hysteresis)
-                        if hyst_target < self.target_speed:
-                            self.target_speed = raw_target
-                            self.last_direction = "down"
-                if self.target_speed > 0 and self.target_speed < self.min_speed:
-                    self.target_speed = self.min_speed
+                # Einschalten wenn Temperatur über threshold_on steigt
+                if self.current_temp >= self.threshold_on and self.current_speed == 0:
+                    self.current_speed = 100.0
+                    self._apply_fan(True)
+                    logger.info(f"Lüfter EIN bei {self.current_temp:.1f}°C (Schwelle: {self.threshold_on}°C)")
+                # Ausschalten wenn Temperatur unter threshold_off fällt
+                elif self.current_temp <= self.threshold_off and self.current_speed > 0:
+                    self.current_speed = 0.0
+                    self._apply_fan(False)
+                    logger.info(f"Lüfter AUS bei {self.current_temp:.1f}°C (Schwelle: {self.threshold_off}°C)")
             elif self.mode == "manual":
-                self.target_speed = self.manual_speed
+                if self.current_speed == 0:
+                    self.current_speed = 100.0
+                    self._apply_fan(True)
             elif self.mode == "off":
-                self.target_speed = 0
+                if self.current_speed > 0:
+                    self.current_speed = 0.0
+                    self._apply_fan(False)
 
-            speed_diff = self.target_speed - self.current_speed
-            if abs(speed_diff) > 0.5:
-                if speed_diff > 0:
-                    rate = 100.0 / max(0.1, self.ramp_up) if self.ramp_up > 0 else 1000.0
-                    self.current_speed = min(self.target_speed, self.current_speed + rate * dt)
-                else:
-                    rate = 100.0 / max(0.1, self.ramp_down) if self.ramp_down > 0 else 1000.0
-                    self.current_speed = max(self.target_speed, self.current_speed - rate * dt)
-            else:
-                self.current_speed = self.target_speed
-
-            self._apply_speed(self.current_speed)
-            fan_speed_history.append(round(self.current_speed, 1))
             time.sleep(self.poll_interval)
 
-    def _apply_speed(self, speed: float):
-        hw_client.fan_set_pwm(max(0.0, min(100.0, speed)))
+    def _apply_fan(self, on: bool):
+        """Lüfter ein- oder ausschalten (GPIO Digital)."""
+        hw_client.fan_set_pwm(100.0 if on else 0.0)
 
     def get_state(self) -> dict:
         return {
@@ -232,11 +219,9 @@ class FanController:
             "mode": self.mode,
             "profile": self.profile,
             "curve": self.curve,
+            "fan_on": self.current_speed > 0,
             "current_speed": round(self.current_speed, 1),
-            "target_speed": round(self.target_speed, 1),
-            "current_temp": self.current_temp,
-            "manual_speed": self.manual_speed,
-            "estimated_rpm": round(self.current_speed * 60),
+            "current_temp": round(self.current_temp, 1),
             "settings": {
                 "hysteresis": self.hysteresis,
                 "ramp_up": self.ramp_up,
