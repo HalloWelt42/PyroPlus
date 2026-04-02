@@ -147,6 +147,15 @@
         </div>
       </div>
 
+      <!-- Hinweis wenn Lüfter die LEDs steuert -->
+      {#if ['temp_reactive', 'load_reactive'].includes(s.leds?.effect)}
+        <div class="led-source-hint">
+          <i class="fa-solid fa-fan"></i>
+          <span>LEDs werden von der Lüftersteuerung bestimmt</span>
+          <button class="led-source-btn" onclick={() => s.setLedEffect('static')}>LED-Steuerung übernehmen</button>
+        </div>
+      {/if}
+
       <!-- Themen-Tabs -->
       <div class="theme-tabs">
         {#each tabs as tab}
@@ -327,6 +336,21 @@
   .tog.on { background: var(--green); }
   .tog::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform var(--tr); box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
   .tog.on::after { transform: translateX(16px); }
+
+  /* LED-Quelle Hinweis */
+  .led-source-hint {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-radius: var(--radius-sm);
+    background: rgba(255,176,32,0.06); border: 1px solid rgba(255,176,32,0.15);
+    font: 500 var(--fs-sm) var(--font); color: var(--amber);
+  }
+  .led-source-hint i { font-size: var(--fs-sm); }
+  .led-source-hint span { flex: 1; }
+  .led-source-btn {
+    padding: 4px 10px; border-radius: 99px; border: 1px solid var(--accent);
+    background: var(--accent-dim); color: var(--accent);
+    font: 500 var(--fs-xs) var(--font); cursor: pointer; white-space: nowrap;
+  }
 
   @media (max-width: 900px) { .content { grid-template-columns: 1fr; } }
 </style>

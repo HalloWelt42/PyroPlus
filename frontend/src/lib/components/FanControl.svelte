@@ -219,6 +219,15 @@
         <div class="fan-badge" class:on={currentRpm > 0}><i class="fa-solid fa-fan" style="animation-duration:{fanSpinDuration}" class:spinning={currentRpm > 0}></i> {currentRpm > 0 ? `${currentRpm} RPM` : 'Aus'}</div>
       </div>
 
+      <!-- LED-Quelle -->
+      {#if !['temp_reactive', 'load_reactive'].includes(s.leds?.effect)}
+        <div class="led-source-hint">
+          <i class="fa-solid fa-info-circle"></i>
+          <span>LEDs werden vom LED-Bereich gesteuert</span>
+          <button class="led-source-btn" onclick={() => s.setLedEffect('temp_reactive')}>Temperatur-Modus aktivieren</button>
+        </div>
+      {/if}
+
       <!-- Kurveneditor mit Profilen und LEDs oben -->
       <div class="chart chart-with-profiles">
         <div class="chart-topbar">
@@ -305,6 +314,21 @@
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
   @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } }
+
+  /* LED-Quelle Hinweis */
+  .led-source-hint {
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    padding: 8px 12px; border-radius: var(--radius-sm);
+    background: rgba(255,176,32,0.06); border: 1px solid rgba(255,176,32,0.15);
+    font: 500 var(--fs-xs) var(--font); color: var(--amber);
+  }
+  .led-source-hint i { font-size: var(--fs-sm); }
+  .led-source-hint span { flex: 1; }
+  .led-source-btn {
+    padding: 4px 10px; border-radius: 99px; border: 1px solid var(--accent);
+    background: var(--accent-dim); color: var(--accent);
+    font: 500 var(--fs-xs) var(--font); cursor: pointer; white-space: nowrap;
+  }
 
   /* Punkt-Aktionen */
   .point-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
