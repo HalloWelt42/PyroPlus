@@ -224,10 +224,9 @@
           {#if tempHistory.length > 2}
             <path d={areaPath(tempHistory)} fill="url(#area-grad)"/>
             <path d={smoothPath(tempHistory)} fill="none" stroke={tempColorStr} stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <!-- Aktueller Punkt (letzter Wert) -->
-            <circle cx={cx(tempHistory.length - 1, tempHistory.length)} cy={cy(tempHistory[tempHistory.length - 1])} r="4" fill={tempColorStr} stroke="var(--bg-card)" stroke-width="2"/>
-            <!-- Aktueller Wert als Label -->
-            <text x={cx(tempHistory.length - 1, tempHistory.length)} y={cy(tempHistory[tempHistory.length - 1]) - 10} text-anchor="end" class="chart-value">{tempHistory[tempHistory.length - 1].toFixed(1)}°C</text>
+            <!-- Aktueller Punkt — immer currentTemp, nicht den letzten History-Wert -->
+            <circle cx={cx(tempHistory.length - 1, tempHistory.length)} cy={cy(currentTemp)} r="4" fill={tempColorStr} stroke="var(--bg-card)" stroke-width="2"/>
+            <text x={cx(tempHistory.length - 1, tempHistory.length)} y={cy(currentTemp) - 10} text-anchor="end" class="chart-value">{currentTemp.toFixed(1)}°C</text>
           {:else}
             <text x={CHART.pl + CW / 2} y={CHART.pt + CH / 2} text-anchor="middle" class="chart-empty">Warte auf Messdaten…</text>
           {/if}
