@@ -37,6 +37,7 @@ class FanController:
         self.current_speed: float = 0.0
         self.target_speed: float = 0.0
         self.current_temp: float = 0.0
+        self.sim_temp: float | None = None  # Simulierte Temperatur (überschreibt Echtdaten)
         self.last_direction: str = "down"
         self.available: bool = hw_client.fan_available()
         self._running = False
@@ -179,7 +180,7 @@ class FanController:
             now = time.time()
             dt = now - last_time
             last_time = now
-            self.current_temp = hw_client.get_temp()
+            self.current_temp = self.sim_temp if self.sim_temp is not None else hw_client.get_temp()
 
             if self.mode == "auto":
                 raw_target = self.get_speed_for_temp(self.current_temp)

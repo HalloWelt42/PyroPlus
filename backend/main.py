@@ -234,15 +234,17 @@ def fan_speed_for_temp(temp: float = Query()):
 _sim_temp: float | None = None
 
 @app.post("/api/simulate/temp", tags=["Simulation"],
-          summary="Temperatur simulieren (für LED/Lüfter-Test)")
+          summary="Temperatur simulieren (wirkt auf LEDs und Lüfter)")
 def simulate_temp(req: dict):
     global _sim_temp
     temp = req.get("temp")
     if temp is None:
         _sim_temp = None
+        if fan: fan.sim_temp = None
         return {"ok": True, "simulation": False}
     _sim_temp = float(temp)
-    leds.update_system_data(_sim_temp, leds.cpu_load)
+    if leds: leds.update_system_data(_sim_temp, leds.cpu_load)
+    if fan: fan.sim_temp = _sim_temp
     return {"ok": True, "simulation": True, "temp": _sim_temp}
 
 
@@ -514,11 +516,16 @@ async def _ws_push_loop():
                 # refresh_led_states() macht HTTP zu HW-Proxy (synchron)
                 stats = await asyncio.to_thread(collect_stats)
 
+                # Simulation überschreibt Temperatur systemweit
+                if _sim_temp is not None and stats.get("cpu"):
+                    stats["cpu"]["temp"] = _sim_temp
+
                 # System-Daten an LED Engine für reaktive Effekte
-                # Simulation hat Vorrang vor echten Werten
                 if leds and stats.get("cpu"):
-                    temp = _sim_temp if _sim_temp is not None else stats["cpu"].get("temp", 40)
-                    leds.update_system_data(temp, stats["cpu"].get("percent", 10))
+                    leds.update_system_data(
+                        stats["cpu"].get("temp", 40),
+                        stats["cpu"].get("percent", 10),
+                    )
 
                 # LED-States vom HW-Proxy holen (aktuell berechnete Farben)
                 if leds:
