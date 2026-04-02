@@ -34,6 +34,8 @@ class FanController:
         self.ramp_down: float = FAN_DEFAULT_RAMP_DOWN
         self.min_speed: float = FAN_DEFAULT_MIN_SPEED
         self.poll_interval: float = FAN_DEFAULT_POLL_INTERVAL
+        self.threshold_on: float = 50.0
+        self.threshold_off: float = 45.0
         self.current_speed: float = 0.0
         self.target_speed: float = 0.0
         self.current_temp: float = 0.0
@@ -149,7 +151,9 @@ class FanController:
             self.target_speed = self.manual_speed
         self._save_settings()
 
-    def set_fine_settings(self, hysteresis=None, ramp_up=None, ramp_down=None, min_speed=None, poll_interval=None):
+    def set_fine_settings(self, hysteresis=None, ramp_up=None, ramp_down=None,
+                          min_speed=None, poll_interval=None,
+                          threshold_on=None, threshold_off=None):
         if hysteresis is not None:
             self.hysteresis = round(max(0.5, min(10.0, hysteresis)) * 2) / 2
         if ramp_up is not None:
@@ -160,6 +164,10 @@ class FanController:
             self.min_speed = round(max(0.0, min(40.0, min_speed)))
         if poll_interval is not None:
             self.poll_interval = round(max(0.5, min(10.0, poll_interval)) * 2) / 2
+        if threshold_on is not None:
+            self.threshold_on = round(max(35, min(75, threshold_on)))
+        if threshold_off is not None:
+            self.threshold_off = round(max(30, min(70, threshold_off)))
         self._save_settings()
 
     def start(self):
@@ -247,6 +255,7 @@ class FanController:
                 "manual_speed": self.manual_speed, "hysteresis": self.hysteresis,
                 "ramp_up": self.ramp_up, "ramp_down": self.ramp_down,
                 "min_speed": self.min_speed, "poll_interval": self.poll_interval,
+                "threshold_on": self.threshold_on, "threshold_off": self.threshold_off,
             }
             (DATA_DIR / "fan_settings.json").write_text(json.dumps(data, indent=2))
         except Exception as e:
@@ -266,6 +275,8 @@ class FanController:
             self.ramp_down = data.get("ramp_down", self.ramp_down)
             self.min_speed = data.get("min_speed", self.min_speed)
             self.poll_interval = data.get("poll_interval", self.poll_interval)
+            self.threshold_on = data.get("threshold_on", self.threshold_on)
+            self.threshold_off = data.get("threshold_off", self.threshold_off)
             if "curve" in data and len(data["curve"]) >= 2:
                 self.curve = data["curve"]
             if "custom_curve" in data and len(data["custom_curve"]) >= 2:

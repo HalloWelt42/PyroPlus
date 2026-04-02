@@ -157,39 +157,26 @@
   <div class="content">
     <!-- ─── Hauptbereich ─── -->
     <div class="panel panel-main">
-      <!-- Live-Status -->
-      <div class="status-bar">
-        <div class="status-item">
-          <span class="status-label">Temperatur</span>
-          <span class="status-value" style="color:{tempColor(currentTemp)}">{currentTemp.toFixed(1)}°C</span>
-        </div>
-        <div class="status-divider"></div>
-        <div class="status-item">
-          <span class="status-label">Lüfter</span>
-          <span class="status-value" style="color:{currentSpeed > 0 ? 'var(--green)' : mode === 'off' ? 'var(--red)' : 'var(--text-secondary)'}">
-            {currentSpeed > 0 ? 'Läuft' : mode === 'off' ? 'Deaktiviert' : 'Bereitschaft'}
-          </span>
-        </div>
-        {#if estimatedRpm > 0}
-          <div class="status-divider"></div>
-          <div class="status-item">
-            <span class="status-label">Drehzahl</span>
-            <span class="status-value">{estimatedRpm} RPM</span>
+      <!-- Status + LEDs kombiniert -->
+      <div class="hero">
+        <div class="hero-info">
+          <div class="hero-temp" style="color:{tempColorStr}">{currentTemp.toFixed(1)}<span class="hero-unit">°C</span></div>
+          <div class="hero-status" style="color:{currentSpeed > 0 ? 'var(--green)' : mode === 'off' ? 'var(--red)' : 'var(--text-secondary)'}">
+            <i class="fa-solid fa-fan" class:spinning={currentSpeed > 0}></i>
+            {currentSpeed > 0 ? 'Lüfter läuft' : mode === 'off' ? 'Deaktiviert' : 'Bereitschaft'}
           </div>
-        {/if}
-      </div>
-
-
-      <!-- LED-Temperaturanzeige -->
-      <div class="led-strip">
-        {#each [0,1,2,3] as i}
-          <div class="led-housing">
-            <div class="led-glow" class:blink={isBlinking} style="background:radial-gradient(circle, {ledGlows()[i]}, transparent 70%)"></div>
-            <div class="led-pixel" class:blink={isBlinking} style="background:{ledColors()[i]};box-shadow:0 0 8px {ledGlows()[i]}, 0 0 20px {ledGlows()[i]}"></div>
+        </div>
+        <div class="hero-leds">
+          <div class="led-strip">
+            {#each [0,1,2,3] as i}
+              <div class="led-housing">
+                <div class="led-glow" class:blink={isBlinking} style="background:radial-gradient(circle, {ledGlows()[i]}, transparent 70%)"></div>
+                <div class="led-pixel" class:blink={isBlinking} style="background:{ledColors()[i]};box-shadow:0 0 10px {ledGlows()[i]}, 0 0 25px {ledGlows()[i]}"></div>
+              </div>
+            {/each}
           </div>
-        {/each}
-        <span class="led-title">LEDs</span>
-        <span class="led-label" style="color:{tempColorStr}">{currentTemp.toFixed(1)}°C</span>
+          <span class="led-caption">LEDs</span>
+        </div>
       </div>
 
       <!-- Temperatur-Diagramm -->
@@ -331,50 +318,48 @@
   .panel-main { display: flex; flex-direction: column; padding: 20px; gap: 20px; }
   .panel-side { display: flex; flex-direction: column; overflow-y: auto; }
 
-  /* ─── Status-Leiste ─── */
-  .status-bar {
-    display: flex; align-items: center; gap: 16px;
-    padding: 10px 18px; border-radius: var(--radius-sm);
+  /* ─── Hero: Status + LEDs ─── */
+  .hero {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px; flex-shrink: 0;
+    border-radius: var(--radius-sm);
     background: var(--bg-elevated); border: 1px solid var(--border);
-    flex-shrink: 0;
   }
-  .status-item { display: flex; flex-direction: column; align-items: center; }
-  .status-label { font: 500 var(--fs-xs) var(--font); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-  .status-value { font: 700 var(--fs-base) var(--mono); }
-  .status-divider { width: 1px; height: 32px; background: var(--border); }
+  .hero-info { display: flex; flex-direction: column; gap: 4px; }
+  .hero-temp { font: 800 48px var(--mono); line-height: 1; transition: color 1s; }
+  .hero-unit { font-size: 24px; font-weight: 400; color: var(--text-muted); }
+  .hero-status {
+    font: 500 var(--fs-sm) var(--font);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .hero-status .spinning { animation: spin 1.5s linear infinite; }
 
-
-  /* ─── LED-Leiste ─── */
+  .hero-leds { display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .led-strip {
     display: flex; align-items: center; justify-content: center;
-    gap: 16px; padding: 12px 20px; flex-shrink: 0;
-    background: linear-gradient(180deg, #080808, #111);
-    border-radius: var(--radius-sm); border: 1px solid #222;
+    gap: 20px; padding: 22px 32px;
+    background: #000; border-radius: var(--radius);
+    border: 1px solid #222;
   }
   .led-housing {
-    position: relative; width: 32px; height: 32px;
+    position: relative; width: 44px; height: 44px;
     display: flex; align-items: center; justify-content: center;
   }
   .led-glow {
-    position: absolute; width: 60px; height: 60px;
+    position: absolute; width: 80px; height: 80px;
     border-radius: 50%; top: 50%; left: 50%;
     transform: translate(-50%, -50%); pointer-events: none;
   }
   .led-pixel {
-    width: 20px; height: 20px; border-radius: 4px;
-    border: 1px solid rgba(255,255,255,0.15);
+    width: 24px; height: 24px; border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.12);
     position: relative; z-index: 1;
     transition: background 1s ease, box-shadow 1s ease;
   }
-  .led-title {
-    font: 600 var(--fs-xs) var(--font);
+  .led-caption {
+    font: 500 var(--fs-xs) var(--font);
     color: var(--text-muted); text-transform: uppercase;
-    letter-spacing: 0.08em; margin-left: 12px;
-  }
-  .led-label {
-    font: 700 var(--fs-base) var(--mono);
-    margin-left: 4px;
-    transition: color 1s;
+    letter-spacing: 0.1em;
   }
   .led-pixel.blink, .led-glow.blink {
     animation: ledAlarm 0.33s steps(1) infinite;

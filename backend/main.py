@@ -99,6 +99,8 @@ class FanFineSettings(BaseModel):
     ramp_down: Optional[float] = Field(None, ge=0.0, le=30.0)
     min_speed: Optional[float] = Field(None, ge=0.0, le=40.0)
     poll_interval: Optional[float] = Field(None, ge=0.5, le=10.0)
+    threshold_on: Optional[float] = Field(None, ge=35, le=75)
+    threshold_off: Optional[float] = Field(None, ge=30, le=70)
 
 class CurvePoint(BaseModel):
     temp: float = Field(ge=20.0, le=85.0)
@@ -221,6 +223,7 @@ def fan_set_fine_settings(req: FanFineSettings):
         hysteresis=req.hysteresis, ramp_up=req.ramp_up,
         ramp_down=req.ramp_down, min_speed=req.min_speed,
         poll_interval=req.poll_interval,
+        threshold_on=req.threshold_on, threshold_off=req.threshold_off,
     )
     return {"ok": True, "settings": fan.get_state()["settings"]}
 
