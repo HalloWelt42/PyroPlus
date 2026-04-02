@@ -278,13 +278,13 @@
       <!-- Simulation -->
       <div class="side-section">
         <div class="side-title"><i class="fa-solid fa-flask"></i> Simulation</div>
-        <label class="sim-toggle">
-          <input type="checkbox" checked={simTemp !== null} onchange={(e) => {
-            if (e.target.checked) { simTemp = 40; api.simulate.temp(40); }
-            else { simTemp = null; api.simulate.stop(); }
-          }}>
-          <span>Temperatur simulieren</span>
-        </label>
+        <div class="sim-toggle">
+          <span class="sim-label">Temperatur simulieren</span>
+          <button class="toggle-switch" class:on={simTemp !== null} onclick={() => {
+            if (simTemp !== null) { simTemp = null; api.simulate.stop(); }
+            else { simTemp = 40; api.simulate.temp(40); }
+          }} aria-label="Simulation umschalten"></button>
+        </div>
         {#if simTemp !== null}
           <div class="sim-slider">
             <input type="range" min="20" max="85" step="0.5" value={simTemp}
@@ -439,10 +439,22 @@
 
   /* ─── Simulation ─── */
   .sim-toggle {
-    display: flex; align-items: center; gap: 8px;
-    font: 500 var(--fs-sm) var(--font); color: var(--text-secondary);
-    cursor: pointer; margin-bottom: 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
   }
+  .sim-label { font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); }
+  .toggle-switch {
+    width: 40px; height: 22px; border-radius: 11px; border: none;
+    background: rgba(255,255,255,0.1); cursor: pointer; position: relative;
+    transition: background var(--tr); flex-shrink: 0;
+  }
+  .toggle-switch.on { background: var(--green); }
+  .toggle-switch::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 16px; height: 16px; border-radius: 50%; background: #fff;
+    transition: transform var(--tr); box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .toggle-switch.on::after { transform: translateX(18px); }
   .sim-slider { display: flex; align-items: center; gap: 10px; }
   .sim-slider input { flex: 1; }
   .sim-val { font: 700 var(--fs-base) var(--mono); min-width: 64px; text-align: right; }
