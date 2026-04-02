@@ -164,7 +164,7 @@
   <div class="editor-main">
     <div class="side-panel" ondragover={(e)=>sDragOver(e,'left')} ondragleave={sDragLeave} ondrop={(e)=>sDrop(e,'left')} class:drop-target={pdropSide==='left'}>
       {#each lpanels as pid (pid)}
-        <PanelWrapper id={pid} icon="fa-{panelIcon(pid)}" label={panelLabel(pid)} collapsible={panelCollapsible(pid)} onDragStart={pDragStart}>
+        <PanelWrapper id={pid} icon="fa-{_pd[pid]?.icon||'circle'}" label={panelLabel(pid)} collapsible={panelCollapsible(pid)} onDragStart={pDragStart}>
           {@render panelContent(pid)}
         </PanelWrapper>
       {/each}
@@ -174,7 +174,7 @@
     </div>
     <div class="side-panel" ondragover={(e)=>sDragOver(e,'right')} ondragleave={sDragLeave} ondrop={(e)=>sDrop(e,'right')} class:drop-target={pdropSide==='right'}>
       {#each rpanels as pid (pid)}
-        <PanelWrapper id={pid} icon="fa-{panelIcon(pid)}" label={panelLabel(pid)} collapsible={panelCollapsible(pid)} onDragStart={pDragStart}>
+        <PanelWrapper id={pid} icon="fa-{_pd[pid]?.icon||'circle'}" label={panelLabel(pid)} collapsible={panelCollapsible(pid)} onDragStart={pDragStart}>
           {@render panelContent(pid)}
         </PanelWrapper>
       {/each}
