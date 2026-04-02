@@ -154,9 +154,14 @@ class FanController:
 
             # PWM setzen (überschreibt Kernel-Governor)
             self.current_duty = round(target, 1)
-            result = hw_client.fan_set_pwm(self.current_duty)
-            if result and isinstance(result, dict):
-                self.current_rpm = result.get("rpm", 0)
+            hw_client.fan_set_pwm(self.current_duty)
+
+            # RPM separat lesen (aktueller Wert, nicht aus Set-Antwort)
+            try:
+                status = hw_client.fan_get_status()
+                self.current_rpm = status.get("rpm", 0)
+            except Exception:
+                self.current_rpm = 0
 
             time.sleep(POLL_INTERVAL)
 
