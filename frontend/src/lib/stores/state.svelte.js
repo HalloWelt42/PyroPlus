@@ -120,6 +120,14 @@ function _ledTick(now) {
     _ledStep++; return;
   }
 
+  // Individuelle LEDs: direkt die gespeicherten Farben anzeigen
+  if (leds?.individual_mode && leds?.individual_colors?.length === N) {
+    setLedDisplay(leds.individual_colors.map(ic => ({
+      r: Math.round((ic.r||0)*br), g: Math.round((ic.g||0)*br), b: Math.round((ic.b||0)*br)
+    })));
+    _ledStep++; return;
+  }
+
   let L = Array.from({length:N}, ()=>({r:0,g:0,b:0}));
 
   if (fx === 'off') {}

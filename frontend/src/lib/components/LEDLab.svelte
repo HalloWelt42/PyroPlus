@@ -30,7 +30,15 @@
   function toHex(c) { return c ? '#' + [c.r, c.g, c.b].map(v => (v || 0).toString(16).padStart(2, '0')).join('') : '#0064ff'; }
   function fromHex(h) { return { r: parseInt(h.slice(1, 3), 16), g: parseInt(h.slice(3, 5), 16), b: parseInt(h.slice(5, 7), 16) }; }
 
-  function spdLabel(v) { return v; }
+  /* Farbpalette — Farben die auf WS2812B gut aussehen */
+  const palette = [
+    '#ff0000','#ff4000','#ff8000','#ffc000','#ffff00',
+    '#80ff00','#00ff00','#00ff80','#00ffff','#0080ff',
+    '#0000ff','#4000ff','#8000ff','#ff00ff','#ff0080',
+    '#ffffff','#ffd0a0','#ffb060','#ff8080','#000000',
+  ];
+
+  let editingLed = $state(-1); // -1=Primär, -2=Sekundär, 0-3=individuelle LED
 
   /* Aktiver Tab basierend auf aktuellem Effekt */
   function tabForEffect(fx) {
@@ -96,20 +104,39 @@
         </div>
       </div>
 
-      <!-- Farben (nur bei passenden Effekten) -->
+      <!-- Farbauswahl (kontextabhängig) -->
       {#if !tempEffects.includes(s.leds?.effect) && s.leds?.effect !== 'off'}
         <div class="color-section">
-          <div class="color-row">
-            <span class="color-label">Primärfarbe</span>
-            <input type="color" value={toHex(s.leds?.color)} oninput={(e) => { const c = fromHex(e.target.value); s.setLedColor(c.r, c.g, c.b); }}>
-            <div class="color-swatch" style="background:{toHex(s.leds?.color)}"></div>
-            <span class="color-hex">{toHex(s.leds?.color)}</span>
+          <!-- Farbziele -->
+          <div class="color-targets">
+            <button class="color-target" class:active={editingLed === -1} onclick={() => editingLed = -1}>
+              <div class="ct-swatch" style="background:{toHex(s.leds?.color)}"></div>
+              <span>Primär</span>
+            </button>
+            <button class="color-target" class:active={editingLed === -2} onclick={() => editingLed = -2}>
+              <div class="ct-swatch" style="background:{toHex(s.leds?.color2)}"></div>
+              <span>Sekundär</span>
+            </button>
+            {#if s.leds?.individual_mode}
+              {#each s.leds?.individual_colors || [] as ic, i}
+                <button class="color-target" class:active={editingLed === i} onclick={() => editingLed = i}>
+                  <div class="ct-swatch" style="background:{toHex(ic)}"></div>
+                  <span>LED {i+1}</span>
+                </button>
+              {/each}
+            {/if}
           </div>
-          <div class="color-row">
-            <span class="color-label">Sekundärfarbe</span>
-            <input type="color" value={toHex(s.leds?.color2)} oninput={(e) => { const c = fromHex(e.target.value); s.setLedColor2(c.r, c.g, c.b); }}>
-            <div class="color-swatch" style="background:{toHex(s.leds?.color2)}"></div>
-            <span class="color-hex">{toHex(s.leds?.color2)}</span>
+
+          <!-- Farbpalette -->
+          <div class="palette-grid">
+            {#each palette as hex}
+              <button class="palette-color" style="background:{hex}" onclick={() => {
+                const c = fromHex(hex);
+                if (editingLed === -1) s.setLedColor(c.r, c.g, c.b);
+                else if (editingLed === -2) s.setLedColor2(c.r, c.g, c.b);
+                else if (editingLed >= 0) s.setLedIndColor(editingLed, c.r, c.g, c.b);
+              }} aria-label={hex}></button>
+            {/each}
           </div>
         </div>
       {/if}
@@ -199,24 +226,15 @@
           </div>
 
           <!-- Individuelle LEDs -->
-          {#if s.leds?.individual_mode !== undefined}
-            <div class="individual-section">
-              <div class="ctrl-row">
-                <span>Individuelle LEDs</span>
-                <button class="tog" class:on={s.leds?.individual_mode} onclick={() => s.setLedIndividual(!s.leds?.individual_mode)} aria-label="Individuell"></button>
-              </div>
-              {#if s.leds?.individual_mode}
-                <div class="ind-grid">
-                  {#each s.leds?.individual_colors || [] as ic, i}
-                    <div class="ind-led">
-                      <span class="ind-num">LED {i + 1}</span>
-                      <input type="color" value={toHex(ic)} oninput={(e) => { const c = fromHex(e.target.value); s.setLedIndColor(i, c.r, c.g, c.b); }}>
-                    </div>
-                  {/each}
-                </div>
-              {/if}
+          <div class="individual-section">
+            <div class="ctrl-row">
+              <span>Individuelle LEDs</span>
+              <button class="tog" class:on={s.leds?.individual_mode} onclick={() => s.setLedIndividual(!s.leds?.individual_mode)} aria-label="Individuell"></button>
             </div>
-          {/if}
+            {#if s.leds?.individual_mode}
+              <div class="ind-hint">Wähle oben links eine LED und dann eine Farbe aus der Palette.</div>
+            {/if}
+          </div>
 
         {:else if activeTab === 'anim'}
           <div class="effect-desc">Animierte Lichteffekte — Geschwindigkeit über den Regler links steuerbar.</div>
@@ -283,13 +301,24 @@
   .ctrl-row input[type=range] { flex: 1; }
   .ctrl-val { font: 600 var(--fs-sm) var(--mono); color: var(--text-primary); background: var(--bg-deep); padding: 3px 10px; border-radius: var(--radius-sm); min-width: 60px; text-align: center; }
 
-  /* Farben */
+  /* Farbauswahl */
   .color-section { display: flex; flex-direction: column; gap: 10px; }
-  .color-row { display: flex; align-items: center; gap: 12px; }
-  .color-label { font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); min-width: 120px; }
-  .color-row input[type=color] { width: 48px; height: 36px; }
-  .color-swatch { width: 36px; height: 36px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
-  .color-hex { font: 500 var(--fs-sm) var(--mono); color: var(--text-muted); }
+  .color-targets { display: flex; gap: 6px; flex-wrap: wrap; }
+  .color-target {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 6px 10px; border-radius: var(--radius-sm);
+    border: 2px solid transparent; background: none;
+    cursor: pointer; font: 500 var(--fs-xs) var(--font); color: var(--text-muted);
+    transition: all 150ms;
+  }
+  .color-target.active { border-color: var(--accent); color: var(--accent); }
+  .ct-swatch { width: 28px; height: 28px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); }
+  .palette-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+  .palette-color {
+    aspect-ratio: 1; border-radius: 4px; border: 2px solid transparent;
+    cursor: pointer; transition: border-color 150ms;
+  }
+  .palette-color:hover { border-color: var(--accent); transform: scale(1.1); }
 
   /* Reaktive Info */
   .reactive-info { display: flex; justify-content: center; gap: 12px; }
@@ -339,6 +368,7 @@
 
   /* Individuelle LEDs */
   .individual-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .ind-hint { font: 500 var(--fs-xs) var(--font); color: var(--text-muted); margin-top: 6px; }
   .ind-grid { display: flex; gap: 16px; margin-top: 10px; }
   .ind-led { display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .ind-num { font: 500 var(--fs-sm) var(--font); color: var(--text-muted); }
