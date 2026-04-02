@@ -56,7 +56,7 @@
   function commitCaseFan() { s.setFanSettings({ threshold_on: thresholdOn, threshold_off: thresholdOff }); }
 
   /* ═══ TEMPERATUR-DIAGRAMM ═══ */
-  const CHART = { w: 460, h: 200, pl: 36, pr: 50, pt: 12, pb: 24 };
+  const CHART = { w: 460, h: 300, pl: 36, pr: 50, pt: 12, pb: 24 };
   const CW = CHART.w - CHART.pl - CHART.pr, CH = CHART.h - CHART.pt - CHART.pb;
   const chartMin = $derived(Math.min(30, ...tempHistory) - 2);
   const chartMax = $derived(Math.max(60, ...tempHistory) + 2);
@@ -78,7 +78,7 @@
   function areaPath(arr) { const l = smoothPath(arr); return l ? `${l}L${chx(arr.length-1,arr.length).toFixed(1)},${CHART.pt+CH}L${chx(0,arr.length).toFixed(1)},${CHART.pt+CH}Z` : ''; }
 
   /* ═══ KURVEN-EDITOR ═══ */
-  const CURVE = { w: 460, h: 220, pl: 36, pr: 50, pt: 40, pb: 24 };
+  const CURVE = { w: 460, h: 300, pl: 36, pr: 50, pt: 40, pb: 24 };
   const KW = CURVE.w - CURVE.pl - CURVE.pr, KH = CURVE.h - CURVE.pt - CURVE.pb;
   const TMIN = 25, TMAX = 80;
   function ktx(t) { return CURVE.pl + ((t - TMIN) / (TMAX - TMIN)) * KW; }
