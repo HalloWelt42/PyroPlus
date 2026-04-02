@@ -298,12 +298,25 @@ class LEDEffectEngine:
             br = 0.05 + math.sin(step * 0.01) * 0.02
             self._set_all(int(255 * br), int(200 * br), int(120 * br))
         elif self.effect == "temp_reactive":
-            t = max(30.0, min(80.0, self.cpu_temp))
-            ratio = (t - 30.0) / 50.0
-            if ratio < 0.5:
-                self._set_all(0, int(255 * ratio * 2), int(255 * (1 - ratio * 2)))
-            else:
-                self._set_all(int(255 * (ratio - 0.5) * 2), int(255 * (1 - (ratio - 0.5) * 2)), 0)
+            t = self.cpu_temp
+            # Farbskala: 25-30 Blau, 30-40 Gelb, 40-55 Orange, 55-60 Rot, 60+ Rot blinkend
+            r, g, b = self._temp_to_rgb(t)
+            # Ab 60°C: Blinken als Warnung
+            if t >= 60.0:
+                blink = (math.sin(step * 0.5) + 1) / 2  # Pulsieren 0→1→0
+                r = int(r * (0.15 + 0.85 * blink))
+                g = int(g * (0.15 + 0.85 * blink))
+                b = int(b * (0.15 + 0.85 * blink))
+            # Leichter Versatz pro LED für natürlichen Farbverlauf
+            for i in range(LED_COUNT):
+                offset = (i - 1.5) * 2.0
+                ri, gi, bi = self._temp_to_rgb(t + offset)
+                if t >= 60.0:
+                    blink = (math.sin(step * 0.5 + i * 0.3) + 1) / 2
+                    ri = int(ri * (0.15 + 0.85 * blink))
+                    gi = int(gi * (0.15 + 0.85 * blink))
+                    bi = int(bi * (0.15 + 0.85 * blink))
+                self.led_states[i] = {"r": ri, "g": gi, "b": bi}
         elif self.effect == "load_reactive":
             intensity = min(100.0, self.cpu_load) / 100.0
             self._set_all(int(c["r"] * intensity), int(c["g"] * intensity), int(c["b"] * intensity))
@@ -312,6 +325,25 @@ class LEDEffectEngine:
     def _hsv(h: float, s: float, v: float) -> tuple:
         r, g, b = colorsys.hsv_to_rgb(h / 360, s, v)
         return int(r * 255), int(g * 255), int(b * 255)
+
+    @staticmethod
+    def _temp_to_rgb(t: float) -> tuple:
+        """Temperatur → RGB-Farbe.
+        25-30°C → Blau, 30-40°C → Gelb, 40-55°C → Orange,
+        55-60°C → Rot, 60°C+ → Rot (Blinken separat)."""
+        if t <= 25:
+            return (0, 60, 255)
+        if t <= 30:
+            f = (t - 25) / 5
+            return (int(255 * f), int(60 + 180 * f), int(255 * (1 - f)))
+        if t <= 40:
+            f = (t - 30) / 10
+            return (255, int(240 - 100 * f), 0)
+        if t <= 55:
+            f = (t - 40) / 15
+            return (255, int(140 - 100 * f), 0)
+        # Ab 55°C: Rot
+        return (255, int(40 * max(0, 1 - (t - 55) / 5)), 0)
 
     # ═══════════════════════════════════════════════════════
     #  ANIMATIONS-LOOP (läuft nativ auf dem Pi!)
@@ -352,7 +384,7 @@ class LEDEffectEngine:
                     continue
 
                 # ─── Statische Effekte: nur bei Änderung senden ───
-                if eff in ("static", "warm_white", "gradient"):
+                if eff in ("static", "warm_white", "gradient") or (eff == "temp_reactive" and self.cpu_temp < 60):
                     self._tick(step)
                     new_states = tuple((l["r"], l["g"], l["b"]) for l in self.led_states)
                     if new_states != last_states:

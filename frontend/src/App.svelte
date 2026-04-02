@@ -133,7 +133,9 @@ function selectView(id) {
     transition: all 250ms ease;
   }
 
-  .sb-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .sb-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; gap: 6px; }
+  .sidebar-collapsed .sb-top { flex-direction: column; gap: 8px; }
+  .sidebar-collapsed .sb-logo { padding: 4px 0; justify-content: center; }
   .sb-logo { display: flex; align-items: center; gap: 10px; padding: 4px 6px; }
   .sb-logo-icon {
     width: 40px; height: 40px; border-radius: var(--radius);
