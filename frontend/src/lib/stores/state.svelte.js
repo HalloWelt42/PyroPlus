@@ -70,20 +70,24 @@ function toast(msg, type = 'info') {
 
 function destroy() { ws?.close(); if (_pollTimer) clearInterval(_pollTimer); }
 
-/* Globaler LED-Zustand — wird von der lokalen Simulation ODER vom Backend gesetzt */
+/* Globaler LED-Zustand — eine einzige Quelle für alle Anzeigen */
 let ledDisplay = $state([
   {r:0,g:0,b:0,rgb:'rgb(0,0,0)',glow:'rgba(0,0,0,0.5)'},
   {r:0,g:0,b:0,rgb:'rgb(0,0,0)',glow:'rgba(0,0,0,0.5)'},
   {r:0,g:0,b:0,rgb:'rgb(0,0,0)',glow:'rgba(0,0,0,0.5)'},
   {r:0,g:0,b:0,rgb:'rgb(0,0,0)',glow:'rgba(0,0,0,0.5)'},
 ]);
+let _simActive = false; // Wenn true: Simulation hat Vorrang, Polling überschreibt nicht
 
-function setLedDisplay(leds4) {
+function setLedDisplay(leds4, fromSim = false) {
+  if (!fromSim && _simActive) return; // Polling darf Simulation nicht überschreiben
   ledDisplay = leds4.map(l => {
     const r = l.r || 0, g = l.g || 0, b = l.b || 0;
     return { r, g, b, rgb: `rgb(${r},${g},${b})`, glow: `rgba(${r},${g},${b},0.5)` };
   });
 }
+
+function setSimActive(active) { _simActive = active; }
 
 export function getState() {
   return {
@@ -93,6 +97,7 @@ export function getState() {
     get leds() { return leds; },
     get ledColors() { return ledDisplay; },
     setLedDisplay,
+    setSimActive,
     get oled() { return oled; },
     get hwProxy() { return hwProxy; },
     get version() { return version; },

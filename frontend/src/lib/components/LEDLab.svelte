@@ -31,12 +31,7 @@
   function toHex(c) { return c ? '#' + [c.r, c.g, c.b].map(v => (v || 0).toString(16).padStart(2, '0')).join('') : '#0064ff'; }
   function fromHex(h) { return { r: parseInt(h.slice(1, 3), 16), g: parseInt(h.slice(3, 5), 16), b: parseInt(h.slice(5, 7), 16) }; }
 
-  /* Speed-Wert (1-1000) in lesbare Zyklusdauer umrechnen */
-  function spdLabel(v) {
-    const hz = Math.pow(v / 100, 1.5) * 25;
-    if (hz < 1) return (1 / hz).toFixed(1) + ' Sekunden/Zyklus';
-    return hz.toFixed(0) + ' Zyklen/Sekunde';
-  }
+  function spdLabel(v) { return v; }
 
   /* Aktiver Tab basierend auf aktuellem Effekt */
   function tabForEffect(fx) {
@@ -90,11 +85,11 @@
     const c2 = s.leds?.color2 || {r:255,g:0,b:0};
     const step = _step;
 
-    // Hardware-States bevorzugen bei reaktiven Effekten
+    // Hardware-States bevorzugen bei: reaktive Effekte, individuelle LEDs
     const hw = s.leds?.led_states;
-    if (tempEffects.includes(fx) && hw?.length === N) {
+    if (hw?.length === N && (tempEffects.includes(fx) || s.leds?.individual_mode)) {
       simLeds = hw.map(l => ({r:l.r||0, g:l.g||0, b:l.b||0}));
-      s.setLedDisplay(simLeds);
+      s.setLedDisplay(simLeds, true);
       _step++; countFps(now); return;
     }
 
@@ -137,7 +132,7 @@
     else { L=L.map(()=>({...c})); }
 
     simLeds = L.map(l => ({r:Math.round(l.r*br),g:Math.round(l.g*br),b:Math.round(l.b*br)}));
-    s.setLedDisplay(simLeds);
+    s.setLedDisplay(simLeds, true);
     _step++;
     countFps(now);
   }
@@ -147,8 +142,8 @@
     if (now - _fpsTime >= 1000) { simFps = _frameCount; _frameCount = 0; _fpsTime = now; }
   }
 
-  onMount(() => { _fpsTime = performance.now(); _rafId = requestAnimationFrame(simTick); });
-  onDestroy(() => { if (_rafId) cancelAnimationFrame(_rafId); });
+  onMount(() => { _fpsTime = performance.now(); _rafId = requestAnimationFrame(simTick); s.setSimActive(true); });
+  onDestroy(() => { if (_rafId) cancelAnimationFrame(_rafId); s.setSimActive(false); });
 </script>
 
 <div class="layout">
