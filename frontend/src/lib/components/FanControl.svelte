@@ -77,7 +77,7 @@
   }
 
   /* ─── Diagramm-Konfiguration ─── */
-  const CHART = { w: 500, h: 140, pl: 40, pr: 50, pt: 14, pb: 20 };
+  const CHART = { w: 500, h: 210, pl: 40, pr: 50, pt: 14, pb: 20 };
   const CW = CHART.w - CHART.pl - CHART.pr;
   const CH = CHART.h - CHART.pt - CHART.pb;
 
