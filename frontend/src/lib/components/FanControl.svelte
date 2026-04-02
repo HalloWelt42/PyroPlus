@@ -216,7 +216,7 @@
   }
 
   /* Lüfter-Header */
-  .fan-header { display: flex; align-items: flex-start; gap: 10px; flex-shrink: 0; }
+  .fan-header { display: flex; align-items: flex-start; gap: 10px; flex-shrink: 0; min-height: 60px; }
   .fan-icon { font-size: var(--fs-xl); color: var(--accent); line-height: 1; margin-top: 2px; }
   .fan-title { font: 700 var(--fs-xl) var(--font); line-height: 1; }
   .fan-sub { font: 500 var(--fs-sm) var(--mono); color: var(--text-muted); }
