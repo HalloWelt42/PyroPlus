@@ -47,15 +47,33 @@
     return `rgb(${c.r},${c.g},${c.b})`;
   }
 
-  /* Temperatur-Sparkline (geglättete Kurve via Catmull-Rom → Cubic Bezier) */
-  function sparkPath(arr, w, h) {
-    if (!arr || arr.length < 2) return '';
-    const min = Math.min(...arr) - 3, max = Math.max(...arr) + 3;
-    const range = max - min || 1;
-    const step = w / (arr.length - 1);
-    const pts = arr.map((v, i) => ({ x: i * step, y: h - ((v - min) / range) * h * 0.9 - h * 0.05 }));
+  /* ─── Diagramm-Konfiguration ─── */
+  const CHART = { w: 500, h: 140, pl: 40, pr: 10, pt: 10, pb: 20 };
+  const CW = CHART.w - CHART.pl - CHART.pr;
+  const CH = CHART.h - CHART.pt - CHART.pb;
 
-    if (pts.length === 2) return `M${pts[0].x},${pts[0].y}L${pts[1].x},${pts[1].y}`;
+  /* Temperatur → Y-Koordinate im Diagramm */
+  const chartMin = $derived(Math.min(30, ...tempHistory) - 2);
+  const chartMax = $derived(Math.max(60, ...tempHistory) + 2);
+  const chartRange = $derived(chartMax - chartMin || 1);
+
+  function cy(t) { return CHART.pt + CH - ((t - chartMin) / chartRange) * CH; }
+  function cx(i, len) { return CHART.pl + (i / Math.max(1, len - 1)) * CW; }
+
+  /* Y-Achsen-Ticks (alle 5°C, gerundet) */
+  const yTicks = $derived(() => {
+    const ticks = [];
+    const start = Math.ceil(chartMin / 5) * 5;
+    for (let t = start; t <= chartMax; t += 5) ticks.push(t);
+    return ticks;
+  });
+
+  /* Geglätteter Pfad (Catmull-Rom → Cubic Bezier) */
+  function smoothPath(arr) {
+    if (!arr || arr.length < 2) return '';
+    const pts = arr.map((v, i) => ({ x: cx(i, arr.length), y: cy(v) }));
+
+    if (pts.length === 2) return `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}L${pts[1].x.toFixed(1)},${pts[1].y.toFixed(1)}`;
 
     let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
     for (let i = 0; i < pts.length - 1; i++) {
@@ -63,14 +81,20 @@
       const p1 = pts[i];
       const p2 = pts[Math.min(pts.length - 1, i + 1)];
       const p3 = pts[Math.min(pts.length - 1, i + 2)];
-      const tension = 0.3;
-      const cp1x = p1.x + (p2.x - p0.x) * tension;
-      const cp1y = p1.y + (p2.y - p0.y) * tension;
-      const cp2x = p2.x - (p3.x - p1.x) * tension;
-      const cp2y = p2.y - (p3.y - p1.y) * tension;
-      d += `C${cp1x.toFixed(1)},${cp1y.toFixed(1)},${cp2x.toFixed(1)},${cp2y.toFixed(1)},${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+      const t = 0.3;
+      d += `C${(p1.x + (p2.x - p0.x) * t).toFixed(1)},${(p1.y + (p2.y - p0.y) * t).toFixed(1)},${(p2.x - (p3.x - p1.x) * t).toFixed(1)},${(p2.y - (p3.y - p1.y) * t).toFixed(1)},${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
     }
     return d;
+  }
+
+  /* Flächenpfad (geschlossener Bereich unter der Kurve) */
+  function areaPath(arr) {
+    const line = smoothPath(arr);
+    if (!line) return '';
+    const lastX = cx(arr.length - 1, arr.length);
+    const firstX = cx(0, arr.length);
+    const bottom = CHART.pt + CH;
+    return `${line}L${lastX.toFixed(1)},${bottom}L${firstX.toFixed(1)},${bottom}Z`;
   }
 
   function updSetting(key, e) {
@@ -156,22 +180,47 @@
         </div>
       </div>
 
-      <!-- Temperatur-Verlauf -->
-      {#if tempHistory.length > 2}
-        <div class="history" style="--temp-color:{tempColorStr};--temp-glow:{tempGlow}">
-          <div class="history-label">Temperaturverlauf</div>
-          <svg class="sparkline" viewBox="0 0 400 80" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color={tempColorStr} stop-opacity="0.2"/>
-                <stop offset="100%" stop-color={tempColorStr} stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            <path d="{sparkPath(tempHistory, 400, 80)} L400,80 L0,80 Z" fill="url(#spark-grad)"/>
-            <path d={sparkPath(tempHistory, 400, 80)} fill="none" stroke={tempColorStr} stroke-width="2.5" stroke-linecap="round" filter="drop-shadow(0 0 4px {tempGlow})"/>
-          </svg>
-        </div>
-      {/if}
+      <!-- Temperatur-Diagramm -->
+      <div class="chart" style="--temp-color:{tempColorStr};--temp-glow:{tempGlow}">
+        <svg class="chart-svg" viewBox="0 0 {CHART.w} {CHART.h}">
+          <defs>
+            <linearGradient id="area-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color={tempColorStr} stop-opacity="0.15"/>
+              <stop offset="100%" stop-color={tempColorStr} stop-opacity="0.02"/>
+            </linearGradient>
+          </defs>
+
+          <!-- Gitternetzlinien und Y-Achsenbeschriftung -->
+          {#each yTicks() as t}
+            <line x1={CHART.pl} y1={cy(t)} x2={CHART.pl + CW} y2={cy(t)} stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/>
+            <text x={CHART.pl - 6} y={cy(t) + 3.5} text-anchor="end" class="chart-label">{t}°</text>
+          {/each}
+
+          <!-- Schwellwert-Linien im Automatik-Modus -->
+          {#if mode === 'auto'}
+            <line x1={CHART.pl} y1={cy(thresholdOn)} x2={CHART.pl + CW} y2={cy(thresholdOn)} stroke="var(--red)" stroke-width="0.8" stroke-dasharray="4 3" opacity="0.5"/>
+            <text x={CHART.pl + CW + 2} y={cy(thresholdOn) + 3.5} class="chart-label-on">Ein</text>
+            <line x1={CHART.pl} y1={cy(thresholdOff)} x2={CHART.pl + CW} y2={cy(thresholdOff)} stroke="var(--green)" stroke-width="0.8" stroke-dasharray="4 3" opacity="0.5"/>
+            <text x={CHART.pl + CW + 2} y={cy(thresholdOff) + 3.5} class="chart-label-off">Aus</text>
+          {/if}
+
+          <!-- Y-Achse und Grundlinie -->
+          <line x1={CHART.pl} y1={CHART.pt} x2={CHART.pl} y2={CHART.pt + CH} stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+          <line x1={CHART.pl} y1={CHART.pt + CH} x2={CHART.pl + CW} y2={CHART.pt + CH} stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+
+          <!-- Daten -->
+          {#if tempHistory.length > 2}
+            <path d={areaPath(tempHistory)} fill="url(#area-grad)"/>
+            <path d={smoothPath(tempHistory)} fill="none" stroke={tempColorStr} stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Aktueller Punkt (letzter Wert) -->
+            <circle cx={cx(tempHistory.length - 1, tempHistory.length)} cy={cy(tempHistory[tempHistory.length - 1])} r="4" fill={tempColorStr} stroke="var(--bg-card)" stroke-width="2"/>
+            <!-- Aktueller Wert als Label -->
+            <text x={cx(tempHistory.length - 1, tempHistory.length)} y={cy(tempHistory[tempHistory.length - 1]) - 8} text-anchor="middle" class="chart-value">{tempHistory[tempHistory.length - 1].toFixed(1)}°C</text>
+          {:else}
+            <text x={CHART.pl + CW / 2} y={CHART.pt + CH / 2} text-anchor="middle" class="chart-empty">Warte auf Messdaten…</text>
+          {/if}
+        </svg>
+      </div>
     </div>
 
     <!-- ─── Seitenleiste ─── -->
@@ -310,10 +359,19 @@
     font: 500 var(--fs-xs) var(--font);
   }
 
-  /* ─── Verlauf ─── */
-  .history { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .history-label { font: 500 var(--fs-xs) var(--font); color: var(--text-muted); margin-bottom: 6px; }
-  .sparkline { width: 100%; flex: 1; display: block; }
+  /* ─── Diagramm ─── */
+  .chart {
+    flex: 1; min-height: 0;
+    background: var(--bg-deep);
+    border-radius: var(--radius-sm);
+    padding: 8px 4px;
+  }
+  .chart-svg { width: 100%; height: 100%; display: block; }
+  .chart-label { font: 10px var(--mono); fill: var(--text-muted); }
+  .chart-label-on { font: 600 9px var(--mono); fill: var(--red); }
+  .chart-label-off { font: 600 9px var(--mono); fill: var(--green); }
+  .chart-value { font: 700 11px var(--mono); fill: var(--text-primary); }
+  .chart-empty { font: 500 12px var(--font); fill: var(--text-muted); }
 
   /* ─── Seitenleiste ─── */
   .side-section { padding: 16px 18px; border-bottom: 1px solid var(--border); }
