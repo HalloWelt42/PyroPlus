@@ -16,7 +16,12 @@ export default defineConfig({
         target: 'http://localhost:8071',
         ws: true,
         changeOrigin: true,
+        rewriteWsOrigin: true,
       },
+    },
+    // Vite HMR auf separatem Pfad, damit kein Konflikt mit /ws
+    hmr: {
+      path: '/__vite_hmr',
     },
   },
 });
