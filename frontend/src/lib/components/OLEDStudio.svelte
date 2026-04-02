@@ -1,7 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import PanelWrapper from './oled/PanelWrapper.svelte';
-  import WidgetStrip from './oled/WidgetStrip.svelte';
   import * as E from './oled/engine.js';
   let { state: s } = $props();
   const W = E.W, H = E.H;
@@ -250,7 +249,7 @@
   async function sendToOled(){s.toast('An OLED gesendet','ok');}
 
   /* ═══ PANEL D&D ═══ */
-  let lpanels=$state(['preview','props','layers']), rpanels=$state(['tools','display','color']);
+  let lpanels=$state(['preview','props','layers','widgets']), rpanels=$state(['tools','display','color']);
   let pdragId=$state(null), pdropSide=$state(null);
   function pDragStart(e,id){pdragId=id;e.dataTransfer.setData('application/x-oled-panel',id);e.dataTransfer.effectAllowed='move';}
   function pDragEnd(){pdragId=null;pdropSide=null;}
@@ -261,7 +260,7 @@
   function onKey(e){if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;if(e.ctrlKey&&e.key==='z'){undo();e.preventDefault();}if(e.ctrlKey&&e.key==='y'){redo();e.preventDefault();}if(e.key==='g'){showGrid=!showGrid;render();}if(e.key==='+')zoom=Math.min(16,zoom+1);if(e.key==='-')zoom=Math.max(2,zoom-1);const t=drawTools.find(t=>t.key===e.key.toUpperCase());if(t&&!e.ctrlKey)tool=t.id;}
 
   /* Panel-Metadaten */
-  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, color:{icon:'palette',label:'Farbe',c:false}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false} };
+  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, color:{icon:'palette',label:'Farbe',c:false}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, widgets:{icon:'puzzle-piece',label:'Widgets',c:true} };
   function panelIcon(id) { return _pd[id]?.icon || 'circle'; }
   function panelLabel(id) { return _pd[id]?.label || id; }
   function panelCollapsible(id) { return _pd[id]?.c ?? true; }
@@ -317,12 +316,25 @@
   {:else if id==='layers'}
     <div class="ll">{#each [...layers].reverse() as layer, ri}{@const idx=layers.length-1-ri}<div class="li" class:active={layer.id===activeLayer} class:drag-over={ldOver===idx} draggable="true" onclick={()=>activeLayer=layer.id} ondragstart={(e)=>ldStart(e,idx)} ondragover={(e)=>ldDragOver(e,idx)} ondrop={(e)=>ldDrop(e,idx)} ondragend={ldEnd}><span class="lh"><i class="fa-solid fa-grip-vertical"></i></span><button class="lv" onclick={(e)=>{e.stopPropagation();toggleVis(layer.id);render();}}><i class="fa-solid {layer.visible?'fa-eye':'fa-eye-slash'}"></i></button><span class="ln" contenteditable="false" ondblclick={(e)=>{e.target.contentEditable='true';e.target.focus();}} onblur={(e)=>{e.target.contentEditable='false';layers=layers.map(l=>l.id===layer.id?{...l,name:e.target.textContent}:l);}} onkeydown={(e)=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}}}>{layer.name}</span></div>{/each}</div>
     <div class="la"><button class="lab" onclick={()=>addLayer()}><i class="fa-solid fa-plus"></i></button><button class="lab" onclick={()=>dupLayer(activeLayer)}><i class="fa-solid fa-copy"></i></button><button class="lab" onclick={()=>rmLayer(activeLayer)}><i class="fa-solid fa-trash"></i></button></div>
+  {:else if id==='widgets'}
+    {#each ['zeit','sys','deko'] as cat}
+      {@const items = widgetList.filter(w => w.cat === cat)}
+      {#if items.length > 0}
+        <div class="wc-cat"><i class="fa-solid {cat==='zeit'?'fa-clock':cat==='sys'?'fa-microchip':'fa-pen'}"></i> {cat==='zeit'?'Zeit':cat==='sys'?'System':'Dekoration'}</div>
+        <div class="wc-grid">
+          {#each items as w}
+            <button class="wc-btn" onclick={() => placeWidget(w)} title="{w.label} ({w.w}×{w.h})">
+              <span class="wc-name">{w.label}</span>
+              <span class="wc-size">{w.w}×{w.h}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    {/each}
   {/if}
 {/snippet}
 
 <div class="studio">
-  <WidgetStrip widgets={widgetList} onPlace={placeWidget} />
-  <div class="editor-main">
     <div class="side-panel" ondragover={(e)=>sDragOver(e,'left')} ondragleave={sDragLeave} ondrop={(e)=>sDrop(e,'left')} class:drop-target={pdropSide==='left'}>
       {#each lpanels as pid (pid)}
         <PanelWrapper id={pid} icon="fa-{_pd[pid]?.icon||'circle'}" label={panelLabel(pid)} collapsible={panelCollapsible(pid)} onDragStart={pDragStart}>
@@ -340,13 +352,11 @@
         </PanelWrapper>
       {/each}
     </div>
-  </div>
 </div>
 
 
 <style>
-  .studio { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-  .editor-main { display: flex; flex: 1; min-height: 0; }
+  .studio { display: flex; height: 100%; overflow: hidden; }
 
   .side-panel { width: 300px; flex-shrink: 0; background: var(--bg-base); padding: 4px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
   .side-panel:first-child { border-right: 1px solid var(--border); }
@@ -406,6 +416,14 @@
   .la { display: flex; gap: 3px; margin-top: 6px; }
   .lab { flex: 1; padding: 5px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); cursor: pointer; font-size: var(--fs-sm); text-align: center; }
   .lab:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Widgets */
+  .wc-cat { font: 600 var(--fs-xs) var(--font); text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+  .wc-cat i { color: var(--accent); }
+  .wc-grid { display: flex; flex-direction: column; gap: 2px; }
+  .wc-btn { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); font: 500 var(--fs-xs) var(--font); cursor: pointer; transition: all 120ms; text-align: left; width: 100%; }
+  .wc-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .wc-size { font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
 
   @media (max-width: 900px) { .side-panel { width: 200px; } }
 </style>
