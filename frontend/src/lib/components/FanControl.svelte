@@ -25,7 +25,11 @@
   /* currentTemp für gemeinsame Elemente (LEDs, Farbe) — CPU-Sim hat Vorrang */
   const currentTemp = $derived(simCpuTemp !== null ? simCpuTemp : (simCaseTemp !== null ? simCaseTemp : realTemp));
 
-  function simCaseLive(val) { simCaseTemp = val; }
+  function simCaseLive(val) {
+    simCaseTemp = val;
+    clearTimeout(_simTimer);
+    _simTimer = setTimeout(() => api.simulate.temp(val), 200);
+  }
   function simCpuLive(val) {
     simCpuTemp = val;
     clearTimeout(_simTimer);
@@ -200,7 +204,7 @@
         </div>
         <div class="sim">
           <span>Simulation</span>
-          <button class="tog" class:on={simCaseTemp!==null} onclick={()=>{ simCaseTemp = simCaseTemp !== null ? null : 40; }} aria-label="Simulation"></button>
+          <button class="tog" class:on={simCaseTemp!==null} onclick={()=>{if(simCaseTemp!==null){simCaseTemp=null;api.simulate.stop();}else{simCaseTemp=40;api.simulate.temp(40);}}} aria-label="Simulation"></button>
           {#if simCaseTemp!==null}<input type="range" min="20" max="85" step="0.5" value={simCaseTemp} oninput={(e)=>simCaseLive(parseFloat(e.target.value))}><span class="sim-v" style="color:{tempColorStr}">{simCaseTemp.toFixed(0)}°</span>{/if}
         </div>
       </div>
