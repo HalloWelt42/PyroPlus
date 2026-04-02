@@ -33,12 +33,14 @@
   }
 
   /* ═══ TEMPERATUR → FARBE ═══ */
+  /* Farbskala: 25° Blau → 35° Cyan → 45° Gelb → 55° Orange → 65° Rot */
   function tempToRgb(t) {
-    if (t <= 25) return { r: 0, g: 60, b: 255 };
-    if (t <= 30) { const f = (t - 25) / 5; return { r: Math.round(255 * f), g: Math.round(60 + 180 * f), b: Math.round(255 * (1 - f)) }; }
-    if (t <= 40) { const f = (t - 30) / 10; return { r: 255, g: Math.round(240 - 100 * f), b: 0 }; }
-    if (t <= 55) { const f = (t - 40) / 15; return { r: 255, g: Math.round(140 - 100 * f), b: 0 }; }
-    return { r: 255, g: Math.round(40 * Math.max(0, 1 - (t - 55) / 5)), b: 0 };
+    if (t <= 25) return { r: 0, g: 80, b: 255 };
+    if (t <= 35) { const f = (t - 25) / 10; return { r: Math.round(200 * f), g: Math.round(80 + 175 * f), b: Math.round(255 * (1 - f)) }; }
+    if (t <= 45) { const f = (t - 35) / 10; return { r: Math.round(200 + 55 * f), g: Math.round(255 - 40 * f), b: 0 }; }
+    if (t <= 55) { const f = (t - 45) / 10; return { r: 255, g: Math.round(215 - 115 * f), b: 0 }; }
+    if (t <= 65) { const f = (t - 55) / 10; return { r: 255, g: Math.round(100 - 80 * f), b: 0 }; }
+    return { r: 255, g: Math.round(20 * Math.max(0, 1 - (t - 65) / 10)), b: 0 };
   }
   const tempRgb = $derived(tempToRgb(currentTemp));
   const tempColorStr = $derived(`rgb(${tempRgb.r},${tempRgb.g},${tempRgb.b})`);
@@ -46,17 +48,41 @@
   const ledColors = $derived(() => [0,1,2,3].map(i => { const c = tempToRgb(currentTemp + (i - 1.5) * 2); return `rgb(${c.r},${c.g},${c.b})`; }));
   const ledGlows = $derived(() => [0,1,2,3].map(i => { const c = tempToRgb(currentTemp + (i - 1.5) * 2); return `rgba(${c.r},${c.g},${c.b},0.5)`; }));
 
-  /* ═══ GEHÄUSELÜFTER — Schwellwerte ═══ */
+  /* ═══ GEHÄUSELÜFTER — Profile mit Schwellwerten ═══ */
   let caseFanOn = $derived(s.fan?.gpio_on || false);
-  let thresholdOn = $state(50);
-  let thresholdOff = $state(45);
-  $effect(() => { if (s.fan?.threshold_on) thresholdOn = s.fan.threshold_on; if (s.fan?.threshold_off) thresholdOff = s.fan.threshold_off; });
-  function onThresholdOnInput(e) { thresholdOn = parseInt(e.target.value); if (thresholdOff >= thresholdOn - 2) thresholdOff = thresholdOn - 3; }
-  function onThresholdOffInput(e) { thresholdOff = parseInt(e.target.value); if (thresholdOn <= thresholdOff + 2) thresholdOn = thresholdOff + 3; }
-  function commitCaseFan() { s.setFanSettings({ threshold_on: thresholdOn, threshold_off: thresholdOff }); }
+  let thresholdOn = $state(55);
+  let thresholdOff = $state(48);
+  let caseProfile = $state('balanced');
+
+  /* Profile: "Leise" = spät ein (Lüfter ist laut), "Leistung" = früh ein */
+  const caseProfiles = {
+    silent:      { on: 65, off: 58 },
+    balanced:    { on: 55, off: 48 },
+    performance: { on: 45, off: 38 },
+    night:       { on: 70, off: 62 },
+    custom:      { on: 55, off: 48 },
+  };
+
+  $effect(() => {
+    if (s.fan?.threshold_on) thresholdOn = s.fan.threshold_on;
+    if (s.fan?.threshold_off) thresholdOff = s.fan.threshold_off;
+    if (s.fan?.case_profile) caseProfile = s.fan.case_profile;
+  });
+
+  function selectCaseProfile(name) {
+    caseProfile = name;
+    if (name !== 'custom') {
+      thresholdOn = caseProfiles[name].on;
+      thresholdOff = caseProfiles[name].off;
+    }
+    commitCaseFan();
+  }
+  function onThresholdOnInput(e) { thresholdOn = parseInt(e.target.value); if (thresholdOff >= thresholdOn - 2) thresholdOff = thresholdOn - 3; caseProfile = 'custom'; }
+  function onThresholdOffInput(e) { thresholdOff = parseInt(e.target.value); if (thresholdOn <= thresholdOff + 2) thresholdOn = thresholdOff + 3; caseProfile = 'custom'; }
+  function commitCaseFan() { s.setFanSettings({ threshold_on: thresholdOn, threshold_off: thresholdOff, case_profile: caseProfile }); }
 
   /* ═══ TEMPERATUR-DIAGRAMM ═══ */
-  const CHART = { w: 460, h: 300, pl: 36, pr: 50, pt: 12, pb: 24 };
+  const CHART = { w: 460, h: 300, pl: 36, pr: 50, pt: 50, pb: 24 };
   const CW = CHART.w - CHART.pl - CHART.pr, CH = CHART.h - CHART.pt - CHART.pb;
   const chartMin = $derived(Math.min(30, ...tempHistory) - 2);
   const chartMax = $derived(Math.max(60, ...tempHistory) + 2);
@@ -115,8 +141,15 @@
         <div class="fan-badge" class:on={caseFanOn}><i class="fa-solid fa-fan" class:spinning={caseFanOn} style="animation-duration:1.5s"></i> {caseFanOn ? 'Läuft' : 'Aus'}</div>
       </div>
 
-      <!-- Diagramm mit Schwellwerten -->
-      <div class="chart">
+      <!-- Diagramm mit Schwellwerten und Profilen -->
+      <div class="chart chart-with-profiles">
+        <div class="chart-topbar">
+          <div class="chart-profiles">
+            {#each Object.entries(caseProfiles) as [key, cp]}
+              <button class="pill" class:active={caseProfile===key} onclick={()=>selectCaseProfile(key)}><i class="fa-solid {profIcons[key]||'fa-circle'}"></i> {profLabels[key]||key}</button>
+            {/each}
+          </div>
+        </div>
         <svg viewBox="0 0 {CHART.w} {CHART.h}">
           <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color={tempColorStr} stop-opacity="0.15"/><stop offset="100%" stop-color={tempColorStr} stop-opacity="0.02"/></linearGradient></defs>
           {#each yTicks() as t}<line x1={CHART.pl} y1={cy(t)} x2={CHART.pl+CW} y2={cy(t)} stroke="rgba(255,255,255,0.04)" stroke-width="0.5"/><text x={CHART.pl-5} y={cy(t)+3.5} text-anchor="end" class="ax">{t}°</text>{/each}
@@ -131,6 +164,11 @@
             <path d={areaPath(tempHistory)} fill="url(#ag)"/>
             <path d={smoothPath(tempHistory)} fill="none" stroke={tempColorStr} stroke-width="2" stroke-linecap="round"/>
             <circle cx={chx(tempHistory.length-1,tempHistory.length)} cy={cy(tempHistory[tempHistory.length-1])} r="4" fill={tempColorStr} stroke="var(--bg-card)" stroke-width="2"/>
+          {/if}
+          {#if simCaseTemp !== null}
+            <line x1={CHART.pl} y1={cy(simCaseTemp)} x2={CHART.pl+CW} y2={cy(simCaseTemp)} stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.8"/>
+            <circle cx={CHART.pl+CW} cy={cy(simCaseTemp)} r="5" fill="var(--amber)" stroke="var(--bg-card)" stroke-width="2"/>
+            <text x={CHART.pl+CW+4} y={cy(simCaseTemp)+4} class="ax-now">{simCaseTemp.toFixed(0)}°</text>
           {/if}
         </svg>
       </div>
@@ -247,18 +285,19 @@
   /* Profile + LEDs (im Chart-Bereich) */
   .chart-with-profiles { position: relative; }
   .chart-topbar {
-    position: absolute; top: 8px; left: 8px; right: 8px; z-index: 2;
+    position: absolute; top: 10px; left: 12px; right: 12px; z-index: 2;
     display: flex; align-items: center; justify-content: space-between;
+    gap: 16px;
   }
-  .chart-profiles { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chart-leds { display: flex; gap: 10px; align-items: center; }
+  .chart-profiles { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chart-leds { display: flex; gap: 14px; align-items: center; }
   .led-sm {
-    width: 22px; height: 22px; border-radius: 5px;
+    width: 26px; height: 26px; border-radius: 6px;
     border: 1px solid rgba(255,255,255,0.1);
     transition: background 1s, box-shadow 1s;
   }
   .led-sm.blink { animation: blink 0.33s steps(1) infinite; }
-  .pill { padding: 8px 14px; background: rgba(10,14,24,0.85); backdrop-filter: blur(4px); border: 1px solid var(--border); border-radius: 99px; font: 500 var(--fs-xs) var(--font); cursor: pointer; color: var(--text-muted); transition: all 150ms; display: flex; align-items: center; gap: 6px; }
+  .pill { padding: 8px 16px; background: rgba(10,14,24,0.85); backdrop-filter: blur(4px); border: 1px solid var(--border); border-radius: 99px; font: 500 var(--fs-xs) var(--font); cursor: pointer; color: var(--text-muted); transition: all 150ms; display: flex; align-items: center; gap: 8px; }
   .pill:hover { border-color: var(--text-muted); }
   .pill.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
