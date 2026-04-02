@@ -90,8 +90,8 @@
           </div>
           <div class="ctrl-row">
             <span><i class="fa-solid fa-gauge-high"></i> Geschwindigkeit</span>
-            <input type="range" min="1" max="1000" value={s.leds?.speed || 50} oninput={(e) => s.setLedSpeed(+e.target.value)}>
-            <span class="ctrl-val">{spdLabel(s.leds?.speed || 0)}</span>
+            <input type="range" min="1" max="250" step="1" value={Math.round((s.leds?.speed || 50) / 4)} oninput={(e) => s.setLedSpeed(+e.target.value * 4)}>
+            <span class="ctrl-val">{((s.leds?.speed || 50) / 40).toFixed(1)} FPS</span>
           </div>
         </div>
       </div>
