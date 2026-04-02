@@ -287,7 +287,7 @@
       {#each savedImages as img}
         <div class="strip-item" onclick={()=>loadSavedImage(img)} title={img.name}>
           <img src={img.dataUrl} alt={img.name} class="strip-thumb" />
-          <button class="strip-del" onclick|stopPropagation={()=>deleteSavedImage(img.id)}><i class="fa-solid fa-xmark"></i></button>
+          <button class="strip-del" onclick={(e)=>{e.stopPropagation();deleteSavedImage(img.id);}}><i class="fa-solid fa-xmark"></i></button>
         </div>
       {/each}
       <button class="strip-add" onclick={saveCurrentImage} title="Aktuelles Bild speichern"><i class="fa-solid fa-plus"></i></button>
