@@ -149,14 +149,18 @@
         </div>
       </div>
 
-      <!-- Hinweis wenn Lüfter die LEDs steuert -->
-      {#if ['temp_reactive', 'load_reactive'].includes(s.leds?.effect)}
-        <div class="led-source-hint">
-          <i class="fa-solid fa-fan"></i>
-          <span>LEDs werden von der Lüftersteuerung bestimmt</span>
-          <button class="led-source-btn" onclick={() => s.setLedEffect('static')}>LED-Steuerung übernehmen</button>
+      <!-- LED-Zuordnung (gleicher Schalter wie auf Lüfterseite) -->
+      <div class="led-mode-switch">
+        <span class="led-mode-label">LED-Farbe bestimmt durch</span>
+        <div class="led-mode-btns">
+          <button class="led-mode-btn" class:active={['temp_reactive','load_reactive'].includes(s.leds?.effect)} onclick={() => s.setLedEffect('temp_reactive')}>
+            <i class="fa-solid fa-temperature-half"></i> Temperatur
+          </button>
+          <button class="led-mode-btn" class:active={!['temp_reactive','load_reactive'].includes(s.leds?.effect)} onclick={() => { if (['temp_reactive','load_reactive'].includes(s.leds?.effect)) s.setLedEffect('static'); }}>
+            <i class="fa-solid fa-palette"></i> LED-Steuerung
+          </button>
         </div>
-      {/if}
+      </div>
 
       <!-- Themen-Tabs -->
       <div class="theme-tabs">
@@ -341,20 +345,19 @@
   .tog::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform var(--tr); box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
   .tog.on::after { transform: translateX(16px); }
 
-  /* LED-Quelle Hinweis */
-  .led-source-hint {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 12px; border-radius: var(--radius-sm);
-    background: rgba(255,176,32,0.06); border: 1px solid rgba(255,176,32,0.15);
-    font: 500 var(--fs-sm) var(--font); color: var(--amber);
+  /* LED-Zuordnung */
+  .led-mode-switch { display: flex; align-items: center; gap: 10px; }
+  .led-mode-label { font: 500 var(--fs-sm) var(--font); color: var(--text-muted); white-space: nowrap; }
+  .led-mode-btns { display: flex; gap: 4px; flex: 1; }
+  .led-mode-btn {
+    flex: 1; height: 34px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--bg-elevated);
+    color: var(--text-muted); font: 500 var(--fs-xs) var(--font);
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: all 150ms;
   }
-  .led-source-hint i { font-size: var(--fs-sm); }
-  .led-source-hint span { flex: 1; }
-  .led-source-btn {
-    padding: 4px 10px; border-radius: 99px; border: 1px solid var(--accent);
-    background: var(--accent-dim); color: var(--accent);
-    font: 500 var(--fs-xs) var(--font); cursor: pointer; white-space: nowrap;
-  }
+  .led-mode-btn:hover { border-color: var(--text-muted); }
+  .led-mode-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
   @media (max-width: 900px) { .content { grid-template-columns: 1fr; } }
 </style>

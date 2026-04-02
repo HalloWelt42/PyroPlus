@@ -52,7 +52,7 @@ async function init() {
   if (!fx?.error) effectsCatalog = fx;
   /* WebSocket für schnelle Updates + Polling als Fallback */
   ws = createWebSocket(handleWs);
-  _pollTimer = setInterval(pollState, 2000);
+  _pollTimer = setInterval(pollState, 1000);
 }
 
 let _tid = 0;
@@ -64,14 +64,13 @@ function toast(msg, type = 'info') {
 
 function destroy() { ws?.close(); if (_pollTimer) clearInterval(_pollTimer); }
 
-/* Globale LED-Farben — berechnet aus echten Hardware-States */
+/* Globale LED-Farben — direkt aus Hardware-States (bereits helligkeitskorrigiert) */
 function getLedColors() {
   const states = leds?.led_states || [{r:0,g:0,b:0},{r:0,g:0,b:0},{r:0,g:0,b:0},{r:0,g:0,b:0}];
-  const br = Math.pow((leds?.brightness || 500) / 1000, 0.6);
   return states.map(led => {
-    const r = Math.round((led.r || 0) * br);
-    const g = Math.round((led.g || 0) * br);
-    const b = Math.round((led.b || 0) * br);
+    const r = led.r || 0;
+    const g = led.g || 0;
+    const b = led.b || 0;
     return { r, g, b, rgb: `rgb(${r},${g},${b})`, glow: `rgba(${r},${g},${b},0.5)` };
   });
 }
