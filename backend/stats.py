@@ -81,7 +81,7 @@ def get_disk_config() -> dict:
             return json.loads(_disk_config_path.read_text())
     except Exception:
         pass
-    return {"monitored_mounts": ["/"]}  # Default: nur System-Disk
+    return {"monitored_mounts": []}  # Leer = alle Disks anzeigen
 
 def set_disk_config(config: dict):
     """Disk-Konfiguration speichern."""

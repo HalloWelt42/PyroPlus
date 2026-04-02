@@ -115,18 +115,18 @@
                  getText: () => new Date().toLocaleDateString('de-DE') },
     weekday:   { cat:'zeit', label:'Wochentag',     w:14, h:7, props:{ scale:1 },
                  getText: () => ['So','Mo','Di','Mi','Do','Fr','Sa'][new Date().getDay()] },
-    cpu_temp:  { cat:'sys',  label:'CPU Temperatur', w:30, h:7, props:{ scale:1, unit:'°C' },
-                 getText: () => Math.round(s.stats?.cpu?.temp||0)+'°C' },
-    cpu_pct:   { cat:'sys',  label:'CPU Auslastung', w:42, h:7, props:{ scale:1 },
-                 getText: () => 'CPU '+Math.round(s.stats?.cpu?.percent||0)+'%' },
-    ram:       { cat:'sys',  label:'RAM',            w:54, h:7, props:{ scale:1 },
-                 getText: () => 'RAM '+(s.stats?.ram?.used_gb||0)+'/'+(s.stats?.ram?.total_gb||0)+'G' },
-    ram_pct:   { cat:'sys',  label:'RAM %',          w:36, h:7, props:{ scale:1 },
-                 getText: () => 'RAM '+(s.stats?.ram?.percent||0)+'%' },
-    ip:        { cat:'sys',  label:'IP-Adresse',     w:72, h:7, props:{ scale:1 },
-                 getText: () => 'IP '+(s.stats?.network?.ip||'0.0.0.0') },
-    uptime:    { cat:'sys',  label:'Uptime',         w:60, h:7, props:{ scale:1 },
-                 getText: () => 'Up '+(s.stats?.uptime?.formatted||'0:00') },
+    cpu_temp:  { cat:'sys',  label:'CPU Temperatur', w:30, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+Math.round(s.stats?.cpu?.temp||0)+'°C' },
+    cpu_pct:   { cat:'sys',  label:'CPU Auslastung', w:42, h:7, props:{ scale:1, prefix:'CPU ' },
+                 getText: (p) => (p.prefix??'CPU ')+Math.round(s.stats?.cpu?.percent||0)+'%' },
+    ram:       { cat:'sys',  label:'RAM',            w:54, h:7, props:{ scale:1, prefix:'RAM ' },
+                 getText: (p) => (p.prefix??'RAM ')+(s.stats?.ram?.used_gb||0)+'/'+(s.stats?.ram?.total_gb||0)+'G' },
+    ram_pct:   { cat:'sys',  label:'RAM %',          w:36, h:7, props:{ scale:1, prefix:'RAM ' },
+                 getText: (p) => (p.prefix??'RAM ')+(s.stats?.ram?.percent||0)+'%' },
+    ip:        { cat:'sys',  label:'IP-Adresse',     w:72, h:7, props:{ scale:1, prefix:'IP ' },
+                 getText: (p) => (p.prefix??'IP ')+(s.stats?.network?.ip||'0.0.0.0') },
+    uptime:    { cat:'sys',  label:'Uptime',         w:60, h:7, props:{ scale:1, prefix:'Up ' },
+                 getText: (p) => (p.prefix??'Up ')+(s.stats?.uptime?.formatted||'0:00') },
     w_temp:    { cat:'wetter', label:'Temperatur',    w:36, h:14, props:{ scale:2 },
                  getText: () => Math.round(weather?.temperature_2m ?? 0)+'°' },
     w_temp_s:  { cat:'wetter', label:'Temperatur klein', w:30, h:7, props:{ scale:1 },
@@ -329,7 +329,40 @@
   function onUp(){if(!drawing)return;if(widgetDrag){widgetDrag=null;drawing=false;return;}if(snap)pushH();if(tool==='move'&&mvStart){pushH();mvStart=null;}drawing=false;snap=null;}
   function clearLayer(){pushH();ap()?.fill(0);render();}
   function invertLayer(){pushH();const px=ap();if(px)for(let i=0;i<px.length;i++)px[i]=px[i]?0:1;render();}
-  async function sendToOled(){s.toast('An OLED gesendet','ok');}
+  async function sendToOled() {
+    // Widgets als Screen-Konfiguration ans Backend senden
+    const screenData = {
+      type: 'system',
+      name: 'Editor',
+      widgets: placedWidgets.map(w => ({
+        type: w.type,
+        x: w.x,
+        y: w.y,
+        font: w.props.scale === 3 ? 'xl' : w.props.scale === 2 ? 'lg' : 'sm',
+        ...(w.props.text !== undefined ? { text: w.props.text } : {}),
+        ...(w.props.prefix !== undefined ? { prefix: w.props.prefix } : {}),
+        ...(w.props.width !== undefined ? { w: w.props.width } : {}),
+        ...(w.props.height !== undefined ? { h: w.props.height } : {}),
+      })),
+    };
+    // Auch das gerenderte Bild als Pixel-Art senden (Fallback)
+    const comp = E.composite(layers);
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#fff';
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (comp[y * W + x]) ctx.fillRect(x, y, 1, 1);
+    const base64 = c.toDataURL().split(',')[1];
+
+    // An Backend senden
+    try {
+      await s.updateOledScreen(0, screenData);
+      s.toast('An OLED gesendet', 'ok');
+    } catch (e) {
+      s.toast('Fehler: ' + e.message, 'err');
+    }
+  }
 
   /* ═══ PANEL D&D ═══ */
   let lpanels=$state(['preview','props','layers','widgets']), rpanels=$state(['tools','display','color','weather']);
@@ -416,6 +449,9 @@
       {/if}
       {#if sw.props.text !== undefined}
         <div class="pr"><span>Text</span><input type="text" class="ti" value={sw.props.text} oninput={(e)=>updateWidgetProp(selectedWidget,'text',e.target.value)}></div>
+      {/if}
+      {#if sw.props.prefix !== undefined}
+        <div class="pr"><span>Präfix</span><input type="text" class="ti" value={sw.props.prefix} oninput={(e)=>updateWidgetProp(selectedWidget,'prefix',e.target.value)}></div>
       {/if}
       {#if sw.props.width !== undefined}
         <div class="pr"><span>Breite</span><input type="range" min="4" max="128" value={sw.props.width} oninput={(e)=>updateWidgetProp(selectedWidget,'width',+e.target.value)}><span class="pv">{sw.props.width}</span></div>
