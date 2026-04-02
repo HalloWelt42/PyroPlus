@@ -103,6 +103,9 @@
     return 'Gewitter';
   }
 
+  /* Zahl rechtsbündig mit führenden Leerzeichen */
+  function pad(n, len=3) { const s = String(n); return s.length >= len ? s : ' '.repeat(len - s.length) + s; }
+
   /* ═══ WIDGETS MIT LIVE-DATEN ═══ */
   const widgetTypes = {
     clock:     { cat:'zeit', label:'Uhr HH:MM',    w:58, h:14, props:{ scale:2, format:'HH:MM' },
@@ -117,9 +120,9 @@
                  getText: () => ['So','Mo','Di','Mi','Do','Fr','Sa'][new Date().getDay()] },
     /* ─── CPU ─── */
     cpu_temp:  { cat:'cpu',  label:'Temperatur °C',  w:24, h:7, props:{ scale:1, prefix:'' },
-                 getText: (p) => (p.prefix||'')+Math.round(s.stats?.cpu?.temp||0)+'°' },
+                 getText: (p) => (p.prefix||'')+pad(Math.round(s.stats?.cpu?.temp||0))+'°' },
     cpu_pct:   { cat:'cpu',  label:'Auslastung %',   w:24, h:7, props:{ scale:1, prefix:'' },
-                 getText: (p) => (p.prefix||'')+Math.round(s.stats?.cpu?.percent||0)+'%' },
+                 getText: (p) => (p.prefix||'')+pad(Math.round(s.stats?.cpu?.percent||0))+'%' },
     cpu_cores: { cat:'cpu',  label:'Kerne',          w:12, h:7, props:{ scale:1, prefix:'' },
                  getText: (p) => (p.prefix||'')+(s.stats?.cpu?.cores||4) },
     cpu_bar:   { cat:'cpu',  label:'Balken',         w:60, h:6, props:{ width:60, height:6 }, isShape: true,
@@ -130,7 +133,7 @@
     ram_total: { cat:'ram',  label:'Gesamt',         w:24, h:7, props:{ scale:1, prefix:'' },
                  getText: (p) => (p.prefix||'')+(s.stats?.ram?.total_gb||0)+' G' },
     ram_pct:   { cat:'ram',  label:'Prozent',        w:24, h:7, props:{ scale:1, prefix:'' },
-                 getText: (p) => (p.prefix||'')+(s.stats?.ram?.percent||0)+'%' },
+                 getText: (p) => (p.prefix||'')+pad(Math.round(s.stats?.ram?.percent||0))+'%' },
     ram_bar:   { cat:'ram',  label:'Balken',         w:60, h:6, props:{ width:60, height:6 }, isShape: true,
                  draw: (px,x,y,p) => E.drawBar(px, x, y, p.width||60, p.height||6, s.stats?.ram?.percent||0) },
     /* ─── Disk ─── */
@@ -141,7 +144,7 @@
     disk_total:{ cat:'disk', label:'Gesamt',         w:36, h:7, props:{ scale:1, prefix:'', diskIdx:0 },
                  getText: (p) => { const d=s.stats?.disks?.[p.diskIdx||0]; return (p.prefix||'')+(d?Math.round(d.total_gb)+' G':'?'); }},
     disk_pct:  { cat:'disk', label:'Prozent',        w:24, h:7, props:{ scale:1, prefix:'', diskIdx:0 },
-                 getText: (p) => (p.prefix||'')+(s.stats?.disks?.[p.diskIdx||0]?.percent||0)+'%' },
+                 getText: (p) => (p.prefix||'')+pad(Math.round(s.stats?.disks?.[p.diskIdx||0]?.percent||0))+'%' },
     disk_bar:  { cat:'disk', label:'Balken',         w:60, h:6, props:{ width:60, height:6, diskIdx:0 }, isShape: true,
                  draw: (px,x,y,p) => E.drawBar(px, x, y, p.width||60, p.height||6, s.stats?.disks?.[p.diskIdx||0]?.percent||0) },
     /* ─── Netzwerk ─── */
@@ -150,9 +153,9 @@
     net_if:    { cat:'net',  label:'Interface',      w:36, h:7, props:{ scale:1, prefix:'' },
                  getText: (p) => (p.prefix||'')+(s.stats?.network?.interface||'?') },
     net_rx:    { cat:'net',  label:'Download',       w:48, h:7, props:{ scale:1, prefix:'' },
-                 getText: (p) => { const b=s.stats?.network?.rx_bytes_sec||0; return (p.prefix||'')+(b>1048576?(b/1048576).toFixed(1)+' M':b>1024?Math.round(b/1024)+' K':b+' B')+'/s'; }},
+                 getText: (p) => { const b=s.stats?.network?.rx_bytes_sec||0; return (p.prefix||'')+(b>1048576?pad((b/1048576).toFixed(1),5)+' MB/s':b>1024?pad(Math.round(b/1024),5)+' KB/s':pad(b,5)+' B/s'); }},
     net_tx:    { cat:'net',  label:'Upload',         w:48, h:7, props:{ scale:1, prefix:'' },
-                 getText: (p) => { const b=s.stats?.network?.tx_bytes_sec||0; return (p.prefix||'')+(b>1048576?(b/1048576).toFixed(1)+' M':b>1024?Math.round(b/1024)+' K':b+' B')+'/s'; }},
+                 getText: (p) => { const b=s.stats?.network?.tx_bytes_sec||0; return (p.prefix||'')+(b>1048576?pad((b/1048576).toFixed(1),5)+' MB/s':b>1024?pad(Math.round(b/1024),5)+' KB/s':pad(b,5)+' B/s'); }},
     /* ─── System ─── */
     uptime:    { cat:'sys',  label:'Uptime',         w:48, h:7, props:{ scale:1, prefix:'' },
                  getText: (p) => (p.prefix||'')+(s.stats?.uptime?.formatted||'0:00') },
