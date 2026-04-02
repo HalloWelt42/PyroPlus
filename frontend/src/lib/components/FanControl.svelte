@@ -248,7 +248,15 @@
           {#each curve as pt, i}<circle cx={ktx(pt.temp)} cy={ksy(pt.speed)} r={dragging===i?10:7} class="dot" class:drag={profile==='custom'} class:act={dragging===i} onmousedown={(e)=>startDrag(i,e)} ontouchstart={(e)=>startDrag(i,e)} ondblclick={()=>removeCurvePoint(i)}/><text x={ktx(pt.temp)} y={ksy(pt.speed)-12} text-anchor="middle" class="ax-pt">{pt.temp}°/{pt.speed}%</text>{/each}
         </svg>
         {#if profile === 'custom'}
-          <button class="curve-add" onclick={addCurvePoint} title="Punkt hinzufügen"><i class="fa-solid fa-plus"></i></button>
+          <div class="curve-bottom">
+            <button class="curve-add-btn" onclick={addCurvePoint}><i class="fa-solid fa-plus"></i> Punkt</button>
+            {#each [...curve].sort((a,b)=>a.temp-b.temp) as pt}
+              <span class="curve-chip">
+                {pt.temp}°→{pt.speed}%
+                {#if curve.length > 2}<button class="curve-chip-x" onclick={()=>removeCurvePoint(curve.indexOf(pt))}><i class="fa-solid fa-xmark"></i></button>{/if}
+              </span>
+            {/each}
+          </div>
         {/if}
       </div>
 
@@ -311,14 +319,28 @@
 
   /* Profile + LEDs (im Chart-Bereich) */
   .chart-with-profiles { position: relative; }
-  .curve-add {
-    position: absolute; bottom: 8px; right: 8px; z-index: 2;
-    width: 28px; height: 28px; border-radius: 50%;
-    border: 1px dashed var(--accent); background: rgba(10,14,24,0.85);
-    color: var(--accent); cursor: pointer; font-size: 12px;
-    display: flex; align-items: center; justify-content: center;
+  .curve-bottom {
+    position: absolute; bottom: 6px; left: 6px; right: 6px; z-index: 2;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
   }
-  .curve-add:hover { background: var(--accent); color: #fff; border-style: solid; }
+  .curve-add-btn {
+    padding: 3px 10px; border-radius: 99px;
+    border: 1px dashed var(--accent); background: rgba(10,14,24,0.85);
+    color: var(--accent); cursor: pointer; font: 500 var(--fs-xs) var(--font);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .curve-add-btn:hover { background: var(--accent); color: #fff; border-style: solid; }
+  .curve-chip {
+    display: flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: 99px;
+    background: rgba(10,14,24,0.85); border: 1px solid var(--border);
+    font: 500 11px var(--mono); color: var(--text-secondary);
+  }
+  .curve-chip-x {
+    background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 10px; padding: 0 2px; display: flex;
+  }
+  .curve-chip-x:hover { color: var(--red); }
   .chart-topbar {
     position: absolute; top: 10px; left: 12px; right: 12px; z-index: 2;
     display: flex; align-items: center; justify-content: space-between;
