@@ -468,8 +468,8 @@
   .drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; background: rgba(0,180,255,0.04); }
 
   .canvas-area { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #1a1a22; }
-  .canvas-scroll { flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; }
-  .canvas-scroll canvas { image-rendering: pixelated; touch-action: none; cursor: crosshair; box-shadow: 0 0 0 1px var(--border), 0 4px 20px rgba(0,0,0,0.4); }
+  .canvas-scroll { flex: 1; overflow: scroll; display: flex; align-items: flex-start; justify-content: flex-start; padding: 20px; }
+  .canvas-scroll canvas { image-rendering: pixelated; touch-action: none; cursor: crosshair; box-shadow: 0 0 0 1px var(--border), 0 4px 20px rgba(0,0,0,0.4); flex-shrink: 0; }
 
   /* Tool Grid */
   .tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-bottom: 6px; }
