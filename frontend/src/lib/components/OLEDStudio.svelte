@@ -16,6 +16,64 @@
   function dupLayer(id) { const src = gl(id); if (!src) return; const nid = _nid++; layers = [...layers, { id: nid, name: src.name+' Kopie', pixels: new Uint8Array(src.pixels), visible: true }]; activeLayer = nid; }
   function toggleVis(id) { layers = layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l); }
 
+  /* ═══ SCREEN-VERWALTUNG (mehrere Bilder/Displays) ═══ */
+  let screens = $state([{ id: 0, name: 'Screen 1', widgets: [], layers: [{ id: 0, name: 'Hintergrund', pixels: Array.from(new Uint8Array(W*H)), visible: true }], thumbnail: '' }]);
+  let activeScreen = $state(0);
+  let rotation = $state(false);
+  let rotationInterval = $state(10);
+  let _screenId = 1;
+
+  function saveCurrentScreen() {
+    const idx = screens.findIndex(sc => sc.id === activeScreen);
+    if (idx < 0) return;
+    screens[idx].widgets = JSON.parse(JSON.stringify(placedWidgets));
+    screens[idx].layers = layers.map(l => ({ ...l, pixels: Array.from(l.pixels) }));
+    screens[idx].thumbnail = E.compositeToDataUrl(layers);
+    screens = [...screens];
+  }
+
+  function addScreen() {
+    saveCurrentScreen();
+    const id = _screenId++;
+    screens = [...screens, { id, name: `Screen ${id + 1}`, widgets: [], layers: [{ id: 0, name: 'Hintergrund', pixels: Array.from(new Uint8Array(W*H)), visible: true }], thumbnail: '' }];
+    switchScreen(id);
+  }
+
+  function removeScreen(id) {
+    if (screens.length <= 1) return;
+    screens = screens.filter(sc => sc.id !== id);
+    if (activeScreen === id) switchScreen(screens[0].id);
+  }
+
+  function switchScreen(id) {
+    saveCurrentScreen();
+    activeScreen = id;
+    const sc = screens.find(sc => sc.id === id);
+    if (!sc) return;
+    placedWidgets = sc.widgets ? JSON.parse(JSON.stringify(sc.widgets)) : [];
+    layers = sc.layers ? sc.layers.map(l => ({ ...l, pixels: new Uint8Array(l.pixels) })) : [{ id: 0, name: 'Hintergrund', pixels: new Uint8Array(W*H), visible: true }];
+    activeLayer = layers[0]?.id || 0;
+    _nid = Math.max(0, ...layers.map(l => l.id)) + 1;
+    selectedWidget = -1;
+    renderWidgets();
+  }
+
+  function duplicateScreen() {
+    saveCurrentScreen();
+    const src = screens.find(sc => sc.id === activeScreen);
+    if (!src) return;
+    const id = _screenId++;
+    screens = [...screens, { id, name: src.name + ' Kopie', widgets: JSON.parse(JSON.stringify(src.widgets)), layers: JSON.parse(JSON.stringify(src.layers)), thumbnail: src.thumbnail }];
+    switchScreen(id);
+  }
+
+  /* Screen D&D Reorder */
+  let scDragFrom = $state(-1), scDragOver = $state(-1);
+  function scDragStart(e, idx) { scDragFrom = idx; e.dataTransfer.effectAllowed = 'move'; }
+  function scDragOverFn(e, idx) { e.preventDefault(); scDragOver = idx; }
+  function scDrop(e, idx) { e.preventDefault(); scDragOver = -1; if (scDragFrom === idx) return; const arr = [...screens]; const [m] = arr.splice(scDragFrom, 1); arr.splice(idx, 0, m); screens = arr; scDragFrom = -1; }
+  function scDragEnd() { scDragFrom = -1; scDragOver = -1; }
+
   /* Layer D&D */
   let ldFrom = $state(-1), ldOver = $state(-1);
   function ldStart(e, i) { ldFrom = i; e.dataTransfer.effectAllowed = 'move'; }
@@ -392,10 +450,10 @@
   /* ═══ PERSISTENZ (localStorage Auto-Save) ═══ */
   function saveState() {
     try {
+      saveCurrentScreen();
       const data = {
-        placedWidgets: placedWidgets.map(w => ({ type: w.type, x: w.x, y: w.y, props: w.props })),
-        layers: layers.map(l => ({ id: l.id, name: l.name, visible: l.visible, pixels: Array.from(l.pixels) })),
-        zoom, showGrid,
+        screens: screens.map(sc => ({ ...sc, thumbnail: sc.thumbnail || '' })),
+        activeScreen, rotation, rotationInterval, zoom, showGrid,
       };
       localStorage.setItem('pp-oled-state', JSON.stringify(data));
     } catch {}
@@ -406,16 +464,23 @@
       const raw = localStorage.getItem('pp-oled-state');
       if (!raw) return;
       const data = JSON.parse(raw);
-      if (data.placedWidgets) {
-        placedWidgets = data.placedWidgets.map(w => ({ id: Date.now() + Math.random(), ...w }));
+      if (data.screens?.length > 0) {
+        screens = data.screens;
+        _screenId = Math.max(0, ...screens.map(sc => sc.id)) + 1;
       }
-      if (data.layers?.length > 0) {
-        layers = data.layers.map(l => ({ ...l, pixels: new Uint8Array(l.pixels) }));
-        activeLayer = layers[0].id;
-        _nid = Math.max(...layers.map(l => l.id)) + 1;
-      }
+      if (data.activeScreen !== undefined) activeScreen = data.activeScreen;
+      if (data.rotation !== undefined) rotation = data.rotation;
+      if (data.rotationInterval) rotationInterval = data.rotationInterval;
       if (data.zoom) zoom = data.zoom;
       if (data.showGrid !== undefined) showGrid = data.showGrid;
+      // Aktiven Screen laden
+      const sc = screens.find(sc => sc.id === activeScreen) || screens[0];
+      if (sc) {
+        placedWidgets = sc.widgets ? JSON.parse(JSON.stringify(sc.widgets)) : [];
+        layers = sc.layers ? sc.layers.map(l => ({ ...l, pixels: new Uint8Array(l.pixels) })) : [{ id: 0, name: 'Hintergrund', pixels: new Uint8Array(W*H), visible: true }];
+        activeLayer = layers[0]?.id || 0;
+        _nid = Math.max(0, ...layers.map(l => l.id)) + 1;
+      }
     } catch {}
   }
 
@@ -532,6 +597,33 @@
     </div>
     <div class="canvas-area">
       <div class="canvas-scroll"><canvas bind:this={canvasEl} width={W*zoom} height={H*zoom} onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} style="width:{W*zoom}px;height:{H*zoom}px"></canvas></div>
+      <!-- Screen-Galerie unten -->
+      <div class="screen-gallery">
+        <div class="sg-strip">
+          {#each screens as sc, i}
+            <div class="sg-item" class:active={sc.id===activeScreen} class:drag-over={scDragOver===i}
+              draggable="true" onclick={()=>switchScreen(sc.id)}
+              ondragstart={(e)=>scDragStart(e,i)} ondragover={(e)=>scDragOverFn(e,i)}
+              ondrop={(e)=>scDrop(e,i)} ondragend={scDragEnd}>
+              <div class="sg-thumb">
+                {#if sc.thumbnail}<img src={sc.thumbnail} alt={sc.name} />{:else}<div class="sg-empty"></div>{/if}
+              </div>
+              <span class="sg-name">{sc.name}</span>
+              {#if screens.length > 1}
+                <button class="sg-del" onclick={(e)=>{e.stopPropagation();removeScreen(sc.id);}}><i class="fa-solid fa-xmark"></i></button>
+              {/if}
+            </div>
+          {/each}
+          <button class="sg-add" onclick={addScreen}><i class="fa-solid fa-plus"></i></button>
+          <button class="sg-dup" onclick={duplicateScreen} title="Aktiven Screen duplizieren"><i class="fa-solid fa-copy"></i></button>
+        </div>
+        <div class="sg-controls">
+          <div class="sg-ctrl"><span>Rotation</span><button class="tog" class:on={rotation} onclick={()=>rotation=!rotation}></button></div>
+          {#if rotation}
+            <div class="sg-ctrl"><span>Intervall</span><input type="range" min="3" max="60" value={rotationInterval} oninput={(e)=>rotationInterval=+e.target.value}><span class="pv">{rotationInterval}s</span></div>
+          {/if}
+        </div>
+      </div>
     </div>
     <div class="side-panel" ondragover={(e)=>sDragOver(e,'right')} ondragleave={sDragLeave} ondrop={(e)=>sDrop(e,'right')} class:drop-target={pdropSide==='right'}>
       {#each rpanels as pid (pid)}
@@ -623,6 +715,25 @@
   .wc-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
   .wc-btn:active { background: var(--accent); color: #fff; }
   .wc-size { font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
+
+  /* Screen-Galerie */
+  .screen-gallery { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--bg-base); padding: 8px; }
+  .sg-strip { display: flex; gap: 8px; overflow-x: auto; align-items: flex-end; margin-bottom: 6px; }
+  .sg-item { flex-shrink: 0; cursor: pointer; border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 3px; position: relative; transition: border-color 150ms; }
+  .sg-item.active { border-color: var(--accent); }
+  .sg-item.drag-over { border-color: var(--green); border-style: dashed; }
+  .sg-item:hover { border-color: var(--text-muted); }
+  .sg-thumb { width: 96px; height: 48px; background: #000; border-radius: 2px; overflow: hidden; }
+  .sg-thumb img { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+  .sg-empty { width: 100%; height: 100%; }
+  .sg-name { display: block; font: 500 var(--fs-xs) var(--font); color: var(--text-muted); text-align: center; margin-top: 2px; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sg-del { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; border: none; background: var(--bg-elevated); color: var(--red); cursor: pointer; font-size: 8px; display: none; align-items: center; justify-content: center; }
+  .sg-item:hover .sg-del { display: flex; }
+  .sg-add, .sg-dup { width: 96px; height: 48px; flex-shrink: 0; border-radius: var(--radius-sm); border: 2px dashed var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-base); display: flex; align-items: center; justify-content: center; }
+  .sg-add:hover, .sg-dup:hover { border-color: var(--accent); color: var(--accent); }
+  .sg-controls { display: flex; gap: 12px; align-items: center; }
+  .sg-ctrl { display: flex; align-items: center; gap: 6px; font: 500 var(--fs-xs) var(--font); color: var(--text-muted); }
+  .sg-ctrl input { width: 80px; }
 
   @media (max-width: 900px) { .side-panel { width: 200px; } }
 </style>
