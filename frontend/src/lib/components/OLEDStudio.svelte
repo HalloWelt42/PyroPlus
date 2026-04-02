@@ -339,7 +339,7 @@
   function sDragLeave(e){if(!e.currentTarget.contains(e.relatedTarget))pdropSide=null;}
   function sDrop(e,side){e.preventDefault();const id=e.dataTransfer.getData('application/x-oled-panel');if(!id)return;lpanels=lpanels.filter(p=>p!==id);rpanels=rpanels.filter(p=>p!==id);if(side==='left')lpanels=[...lpanels,id];else rpanels=[...rpanels,id];pdragId=null;pdropSide=null;}
 
-  function onKey(e){if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;if(e.ctrlKey&&e.key==='z'){undo();e.preventDefault();}if(e.ctrlKey&&e.key==='y'){redo();e.preventDefault();}if(e.key==='g'){showGrid=!showGrid;render();}if(e.key==='+')zoom=Math.min(16,zoom+1);if(e.key==='-')zoom=Math.max(2,zoom-1);const t=drawTools.find(t=>t.key===e.key.toUpperCase());if(t&&!e.ctrlKey)tool=t.id;}
+  function onKey(e){if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;if(e.ctrlKey&&e.key==='z'){undo();e.preventDefault();}if(e.ctrlKey&&e.key==='y'){redo();e.preventDefault();}if((e.key==='Delete'||e.key==='Backspace')&&selectedWidget>=0){removeWidget(selectedWidget);e.preventDefault();return;}if(e.key==='g'){showGrid=!showGrid;render();}if(e.key==='+')zoom=Math.min(16,zoom+1);if(e.key==='-')zoom=Math.max(2,zoom-1);const t=drawTools.find(t=>t.key===e.key.toUpperCase());if(t&&!e.ctrlKey)tool=t.id;}
 
   /* Panel-Metadaten */
   const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, color:{icon:'palette',label:'Farbe',c:false}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, widgets:{icon:'puzzle-piece',label:'Widgets',c:true}, weather:{icon:'cloud-sun',label:'Wetter-Ort',c:true} };
