@@ -218,7 +218,7 @@
     background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 14px; display: grid; gap: 8px;
     grid-template-rows: subgrid; grid-row: span 3;
-    overflow: hidden;
+    overflow: visible;
   }
 
   /* Lüfter-Header */
@@ -235,7 +235,7 @@
   @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } }
 
   /* Diagramm */
-  .chart { min-height: 0; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; }
+  .chart { min-height: 0; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; touch-action: none; }
   .panel-footer { display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; }
   .chart svg { width: 100%; height: 100%; display: block; }
   .ax { font: 10px var(--mono); fill: var(--text-muted); }
