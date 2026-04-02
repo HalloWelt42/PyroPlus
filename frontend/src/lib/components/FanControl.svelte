@@ -230,7 +230,10 @@
               <button class="led-takeover" onclick={() => s.setLedEffect('temp_reactive')} title="Temperaturfarbe übernehmen"><i class="fa-solid fa-temperature-half"></i></button>
             {/if}
             {#each s.ledColors as c}
-              <div class="led-sm" style="background:{c.rgb};box-shadow:0 0 6px {c.glow}"></div>
+              <div class="led-sm-wrap">
+                <div class="led-sm-glow" style="background:radial-gradient(circle, {c.glow}, transparent 70%)"></div>
+                <div class="led-sm" style="background:{c.rgb};box-shadow:0 0 8px {c.glow}, 0 0 20px {c.glow}"></div>
+              </div>
             {/each}
           </div>
         </div>
@@ -348,11 +351,13 @@
   }
   .chart-profiles { display: flex; gap: 8px; flex-wrap: wrap; }
   .chart-leds { display: flex; gap: 14px; align-items: center; }
+  .led-sm-wrap { position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+  .led-sm-glow { position: absolute; width: 56px; height: 56px; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%,-50%); pointer-events: none; }
   .led-sm {
-    width: 26px; height: 26px; border-radius: 6px;
+    width: 22px; height: 22px; border-radius: 5px;
     border: 1px solid rgba(255,255,255,0.1);
-    transition: background 1s, box-shadow 1s;
-    box-shadow: 0 0 8px var(--glow, transparent), 0 0 20px var(--glow, transparent);
+    position: relative; z-index: 1;
+    transition: background 0.5s, box-shadow 0.5s;
   }
   .led-sm.blink { animation: blink 0.33s steps(1) infinite; }
   .led-takeover {

@@ -68,7 +68,10 @@ const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
     <!-- LED-Status -->
     <div class="sb-leds">
       {#each s.ledColors as c}
-        <div class="sb-led" style="background:{c.rgb};box-shadow:0 0 6px {c.glow}"></div>
+        <div class="sb-led-wrap">
+          <div class="sb-led-glow" style="background:radial-gradient(circle, {c.glow}, transparent 70%)"></div>
+          <div class="sb-led" style="background:{c.rgb};box-shadow:0 0 8px {c.glow}, 0 0 20px {c.glow}"></div>
+        </div>
       {/each}
     </div>
 
@@ -201,9 +204,13 @@ const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
   .sidebar-collapsed .sb-temp { margin-bottom: 8px; }
 
   /* LED-Status */
-  .sb-leds { display: flex; justify-content: center; gap: 10px; margin-bottom: 16px; }
-  .sb-led { width: 20px; height: 20px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.1); transition: background 1s, box-shadow 1s; }
+  .sb-leds { display: flex; justify-content: center; gap: 14px; margin-bottom: 16px; }
+  .sb-led-wrap { position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+  .sb-led-glow { position: absolute; width: 52px; height: 52px; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%,-50%); pointer-events: none; }
+  .sb-led { width: 18px; height: 18px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); position: relative; z-index: 1; transition: background 0.5s, box-shadow 0.5s; }
   .sidebar-collapsed .sb-leds { gap: 4px; }
+  .sidebar-collapsed .sb-led-wrap { width: 16px; height: 16px; }
+  .sidebar-collapsed .sb-led-glow { display: none; }
   .sidebar-collapsed .sb-led { width: 10px; height: 10px; border-radius: 2px; }
 
   /* OLED-Display 1:1 */
