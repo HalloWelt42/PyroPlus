@@ -207,7 +207,7 @@ const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
   .sidebar-collapsed .sb-led { width: 10px; height: 10px; border-radius: 2px; }
 
   /* OLED-Display 1:1 */
-  .sb-oled { display: flex; justify-content: center; margin: 8px 0 12px; }
+  .sb-oled { display: flex; justify-content: center; margin: 14px 0 18px; }
   .sb-oled-screen {
     width: 132px; height: 68px;
     border: 2px solid #333;
