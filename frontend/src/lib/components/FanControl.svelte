@@ -116,7 +116,7 @@
             {#each [60,30,0] as ago}<text x={chx(Math.max(0,tempHistory.length-1-ago),tempHistory.length)} y={CHART.pt+CH+16} text-anchor="middle" class="ax">{ago===0?'jetzt':`-${ago}s`}</text>{/each}
             <path d={areaPath(tempHistory)} fill="url(#ag)"/>
             <path d={smoothPath(tempHistory)} fill="none" stroke={tempColorStr} stroke-width="2" stroke-linecap="round"/>
-            <circle cx={chx(tempHistory.length-1,tempHistory.length)} cy={cy(currentTemp)} r="4" fill={tempColorStr} stroke="var(--bg-card)" stroke-width="2"/>
+            <circle cx={chx(tempHistory.length-1,tempHistory.length)} cy={cy(tempHistory[tempHistory.length-1])} r="4" fill={tempColorStr} stroke="var(--bg-card)" stroke-width="2"/>
           {/if}
         </svg>
       </div>
