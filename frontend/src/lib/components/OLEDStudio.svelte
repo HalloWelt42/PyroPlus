@@ -112,7 +112,7 @@
   async function sendToOled(){s.toast('An OLED gesendet','ok');}
 
   /* ═══ PANEL D&D ═══ */
-  let lpanels=$state(['tools','display','color']), rpanels=$state(['preview','props','layers']);
+  let lpanels=$state(['preview','props','layers']), rpanels=$state(['tools','display','color']);
   let pdragId=$state(null), pdropSide=$state(null);
   function pDragStart(e,id){pdragId=id;e.dataTransfer.setData('application/x-oled-panel',id);e.dataTransfer.effectAllowed='move';}
   function pDragEnd(){pdragId=null;pdropSide=null;}
@@ -200,11 +200,11 @@
 
   /* Tool Grid */
   .tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 8px; }
-  .tool-btn { aspect-ratio: 1; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-base); display: flex; align-items: center; justify-content: center; transition: all 120ms; }
+  .tool-btn { aspect-ratio: 1; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; font-size: var(--fs-sm); display: flex; align-items: center; justify-content: center; transition: all 120ms; }
   .tool-btn:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
   .tool-btn.active { color: var(--accent); background: rgba(0,180,255,0.1); border-color: var(--accent); }
   .ag { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; }
-  .ab { aspect-ratio: 1; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); cursor: pointer; font-size: var(--fs-sm); display: flex; align-items: center; justify-content: center; }
+  .ab { height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); cursor: pointer; font-size: var(--fs-xs); display: flex; align-items: center; justify-content: center; }
   .ab:hover { border-color: var(--accent); color: var(--accent); }
 
   /* Property Rows */
