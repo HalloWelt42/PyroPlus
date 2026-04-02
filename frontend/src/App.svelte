@@ -72,6 +72,19 @@ const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
       {/each}
     </div>
 
+    <!-- OLED-Display 128×64 echte Pixel -->
+    {#if sidebarOpen}
+      <div class="sb-oled">
+        <div class="sb-oled-screen">
+          {#if s.oled?.preview}
+            <img src="data:image/png;base64,{s.oled.preview}" alt="OLED" class="sb-oled-img"/>
+          {:else}
+            <div class="sb-oled-off"></div>
+          {/if}
+        </div>
+      </div>
+    {/if}
+
     <nav class="sb-nav">
       {#each nav as item}
         <button class="nav-btn" class:active={s.currentView === item.id}
@@ -192,6 +205,23 @@ const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
   .sb-led { width: 18px; height: 18px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); transition: background 1s, box-shadow 1s; }
   .sidebar-collapsed .sb-leds { gap: 4px; }
   .sidebar-collapsed .sb-led { width: 10px; height: 10px; border-radius: 2px; }
+
+  /* OLED-Display 1:1 */
+  .sb-oled { display: flex; justify-content: center; margin: 8px 0 12px; }
+  .sb-oled-screen {
+    width: 132px; height: 68px;
+    border: 2px solid #333;
+    border-radius: 2px;
+    background: #000;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .sb-oled-img {
+    width: 128px; height: 64px;
+    image-rendering: pixelated;
+    display: block;
+  }
+  .sb-oled-off { width: 128px; height: 64px; }
 
   .sb-nav { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
   .nav-btn {
