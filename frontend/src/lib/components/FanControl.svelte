@@ -60,11 +60,11 @@
 
   /* Profile: "Leise" = spät ein (Lüfter ist laut), "Leistung" = früh ein */
   const caseProfiles = {
-    silent:      { on: 65, off: 58 },
-    balanced:    { on: 55, off: 48 },
-    performance: { on: 45, off: 38 },
-    night:       { on: 70, off: 62 },
-    custom:      { on: 55, off: 48 },
+    silent:      { on: 52, off: 46 },
+    balanced:    { on: 48, off: 42 },
+    performance: { on: 42, off: 36 },
+    night:       { on: 55, off: 48 },
+    custom:      { on: 48, off: 42 },
   };
 
   /* Nur einmalig initialisieren, nicht bei jedem Polling-Update überschreiben */
