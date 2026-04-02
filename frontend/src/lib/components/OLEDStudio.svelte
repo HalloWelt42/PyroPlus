@@ -121,6 +121,44 @@
   let widgetsOpen = $state(false);
   let displayOpen = $state(true);
 
+  /* ─── Panel Drag & Drop (links ↔ rechts) ─── */
+  let leftPanels = $state(['tools', 'actions', 'display', 'color']);
+  let rightPanels = $state(['preview', 'props', 'layers', 'widgets']);
+  let panelDragId = $state(null);
+  let panelDropSide = $state(null);
+
+  function onPanelDragStart(e, id) { panelDragId = id; e.dataTransfer.setData('text/plain', id); e.dataTransfer.effectAllowed = 'move'; }
+  function onPanelDragEnd() { panelDragId = null; panelDropSide = null; }
+  function onSideDragOver(e, side) { e.preventDefault(); panelDropSide = side; }
+  function onSideDragLeave() { panelDropSide = null; }
+  function onSideDrop(e, side) {
+    e.preventDefault(); panelDropSide = null;
+    if (!panelDragId) return;
+    leftPanels = leftPanels.filter(p => p !== panelDragId);
+    rightPanels = rightPanels.filter(p => p !== panelDragId);
+    if (side === 'left') leftPanels = [...leftPanels, panelDragId];
+    else rightPanels = [...rightPanels, panelDragId];
+    panelDragId = null;
+  }
+
+  /* ─── Gespeicherte Bilder (Snippet-Strip oben) ─── */
+  let savedImages = $state([]);
+  function saveCurrentImage() {
+    const comp = composite();
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const ctx = c.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0,0,W,H); ctx.fillStyle = '#fff';
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (comp[y*W+x]) ctx.fillRect(x,y,1,1);
+    savedImages = [...savedImages, { id: Date.now(), name: `Bild ${savedImages.length+1}`, dataUrl: c.toDataURL(), pixels: new Uint8Array(comp) }];
+    s.toast('Bild gespeichert', 'ok');
+  }
+  function loadSavedImage(img) {
+    pushHistory();
+    const layer = getLayer(activeLayer);
+    if (layer) { layer.pixels = new Uint8Array(img.pixels); layers = [...layers]; }
+    render();
+  }
+  function deleteSavedImage(id) { savedImages = savedImages.filter(i => i.id !== id); }
+
   /* ═══ WIDGETS ═══ */
   const widgetCatalog = [
     { id:'clock', cat:'zeit', label:'Uhr HH:MM', w:58, h:14, draw:(x,y)=>drawText('14:32',x,y,2) },
@@ -164,7 +202,7 @@
     ctx.fillStyle = '#fff';
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (comp[y*W+x]) ctx.fillRect(x*z, y*z, z, z);
     if (showGrid && z >= 4) {
-      ctx.strokeStyle = 'rgba(100,200,255,0.06)'; ctx.lineWidth = 0.5;
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.5;
       for (let x = 0; x <= W; x++) { ctx.beginPath(); ctx.moveTo(x*z,0); ctx.lineTo(x*z,H*z); ctx.stroke(); }
       for (let y = 0; y <= H; y++) { ctx.beginPath(); ctx.moveTo(0,y*z); ctx.lineTo(W*z,y*z); ctx.stroke(); }
     }
@@ -243,8 +281,22 @@
 <svelte:window onkeydown={onKey} />
 
 <div class="studio">
-  <!-- ═══ LINKES PANEL (PanelWrapper-Sektionen wie rechts) ═══ -->
-  <div class="panel-left">
+  <!-- ═══ GESPEICHERTE BILDER (Snippet-Strip oben) ═══ -->
+  <div class="snippet-strip">
+    <div class="strip-scroll">
+      {#each savedImages as img}
+        <div class="strip-item" onclick={()=>loadSavedImage(img)} title={img.name}>
+          <img src={img.dataUrl} alt={img.name} class="strip-thumb" />
+          <button class="strip-del" onclick|stopPropagation={()=>deleteSavedImage(img.id)}><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      {/each}
+      <button class="strip-add" onclick={saveCurrentImage} title="Aktuelles Bild speichern"><i class="fa-solid fa-plus"></i></button>
+    </div>
+  </div>
+
+  <div class="editor-main">
+  <!-- ═══ LINKES PANEL ═══ -->
+  <div class="panel-left" ondragover={(e)=>onSideDragOver(e,'left')} ondragleave={onSideDragLeave} ondrop={(e)=>onSideDrop(e,'left')} class:drop-target={panelDropSide==='left'}>
     <!-- Werkzeuge als Grid -->
     <div class="pw">
       <div class="pw-bar"><div class="pw-handle"><svg width="10" height="16" viewBox="0 0 10 16"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div><div class="pw-title"><i class="fa-solid fa-pen"></i> Werkzeuge</div></div>
@@ -327,8 +379,8 @@
     </div>
   </div>
 
-  <!-- ═══ RECHTES PANEL (Scrollbar mit PanelWrapper-Sektionen) ═══ -->
-  <div class="panel-right">
+  <!-- ═══ RECHTES PANEL ═══ -->
+  <div class="panel-right" ondragover={(e)=>onSideDragOver(e,'right')} ondragleave={onSideDragLeave} ondrop={(e)=>onSideDrop(e,'right')} class:drop-target={panelDropSide==='right'}>
     <!-- Vorschau-Panel -->
     <div class="pw">
       <div class="pw-bar"><div class="pw-handle"><svg width="10" height="16" viewBox="0 0 10 16"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div><div class="pw-title"><i class="fa-solid fa-display"></i> Vorschau</div></div>
@@ -400,13 +452,29 @@
       {/if}
     </div>
   </div>
+  </div>
 </div>
 
 <style>
-  .studio { display: flex; height: 100%; overflow: hidden; }
+  .studio { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+  .editor-main { display: flex; flex: 1; min-height: 0; }
+
+  /* Snippet-Strip (gespeicherte Bilder oben) */
+  .snippet-strip { flex-shrink: 0; background: var(--bg-base); border-bottom: 1px solid var(--border); padding: 4px 8px; }
+  .strip-scroll { display: flex; gap: 6px; overflow-x: auto; align-items: center; }
+  .strip-item { position: relative; cursor: pointer; flex-shrink: 0; border: 2px solid var(--border); border-radius: 4px; overflow: hidden; transition: border-color 150ms; }
+  .strip-item:hover { border-color: var(--accent); }
+  .strip-thumb { display: block; width: 64px; height: 32px; image-rendering: pixelated; background: #000; }
+  .strip-del { position: absolute; top: 1px; right: 1px; width: 14px; height: 14px; border-radius: 50%; border: none; background: rgba(0,0,0,0.7); color: var(--red); cursor: pointer; font-size: 8px; display: none; align-items: center; justify-content: center; }
+  .strip-item:hover .strip-del { display: flex; }
+  .strip-add { width: 64px; height: 32px; flex-shrink: 0; border-radius: 4px; border: 2px dashed var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-base); display: flex; align-items: center; justify-content: center; }
+  .strip-add:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Drop-Target Markierung */
+  .drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; background: rgba(0,180,255,0.04); }
 
   /* ─── Linkes Panel (PanelWrapper-Container) ─── */
-  .panel-left { width: 250px; flex-shrink: 0; background: var(--bg-base); border-right: 1px solid var(--border); padding: 4px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+  .panel-left { width: 300px; flex-shrink: 0; background: var(--bg-base); border-right: 1px solid var(--border); padding: 4px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
   /* Tool-Grid */
   .tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 8px; }
   .tool-btn { aspect-ratio: 1; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-base); display: flex; align-items: center; justify-content: center; transition: all 120ms; }
@@ -440,7 +508,7 @@
   .status-bar { display: flex; gap: 16px; padding: 3px 10px; background: var(--bg-base); border-top: 1px solid var(--border); flex-shrink: 0; font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
 
   /* ─── Rechtes Panel (PanelWrapper-Sektionen) ─── */
-  .panel-right { width: 280px; flex-shrink: 0; background: var(--bg-base); border-left: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; padding: 4px; overflow-y: auto; }
+  .panel-right { width: 300px; flex-shrink: 0; background: var(--bg-base); border-left: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; padding: 4px; overflow-y: auto; }
 
   /* PanelWrapper */
   .pw { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
