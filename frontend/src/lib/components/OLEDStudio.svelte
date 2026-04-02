@@ -281,7 +281,9 @@
         wt.draw(px, w.x, w.y, w.props);
       } else {
         const text = wt.getText(w.props);
-        E.drawText(px, text, w.x, w.y, w.props.scaleX || w.props.scale || 1, w.props.scaleY || w.props.scale || 1);
+        const sx = w.props.scaleX ?? w.props.scale ?? 1;
+        const sy = w.props.scaleY ?? w.props.scale ?? 1;
+        E.drawText(px, text, w.x, w.y, sx, sy);
       }
     }
     layers = [...layers];
@@ -306,8 +308,8 @@
         const w = placedWidgets[selectedWidget];
         const wt = widgetTypes[w.type];
         if (wt) {
-          const ww = wt.isShape ? (w.props.width || wt.w) : wt.w * (w.props.scaleX || w.props.scale || 1);
-          const wh = wt.isShape ? (w.props.height || wt.h) : wt.h * (w.props.scaleY || w.props.scale || 1);
+          const ww = wt.isShape ? (w.props.width || wt.w) : wt.w * (w.props.scaleX ?? w.props.scale ?? 1);
+          const wh = wt.isShape ? (w.props.height || wt.h) : wt.h * (w.props.scaleY ?? w.props.scale ?? 1);
           ctx.strokeStyle = 'rgba(0,180,255,0.7)';
           ctx.lineWidth = 1;
           ctx.setLineDash([4, 2]);
@@ -328,8 +330,8 @@
       const w = placedWidgets[i];
       const wt = widgetTypes[w.type];
       if (!wt) continue;
-      const ww = wt.isShape ? (w.props.width || wt.w) : wt.w * (w.props.scaleX || w.props.scale || 1);
-      const wh = wt.isShape ? (w.props.height || wt.h) : wt.h * (w.props.scaleY || w.props.scale || 1);
+      const ww = wt.isShape ? (w.props.width || wt.w) : wt.w * (w.props.scaleX ?? w.props.scale ?? 1);
+      const wh = wt.isShape ? (w.props.height || wt.h) : wt.h * (w.props.scaleY ?? w.props.scale ?? 1);
       if (x >= w.x && x < w.x + ww && y >= w.y && y < w.y + wh) return i;
     }
     return -1;
