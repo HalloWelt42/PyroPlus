@@ -64,12 +64,25 @@ function toast(msg, type = 'info') {
 
 function destroy() { ws?.close(); if (_pollTimer) clearInterval(_pollTimer); }
 
+/* Globale LED-Farben — berechnet aus echten Hardware-States */
+function getLedColors() {
+  const states = leds?.led_states || [{r:0,g:0,b:0},{r:0,g:0,b:0},{r:0,g:0,b:0},{r:0,g:0,b:0}];
+  const br = Math.pow((leds?.brightness || 500) / 1000, 0.6);
+  return states.map(led => {
+    const r = Math.round((led.r || 0) * br);
+    const g = Math.round((led.g || 0) * br);
+    const b = Math.round((led.b || 0) * br);
+    return { r, g, b, rgb: `rgb(${r},${g},${b})`, glow: `rgba(${r},${g},${b},0.5)` };
+  });
+}
+
 export function getState() {
   return {
     get connected() { return connected; },
     get stats() { return stats; },
     get fan() { return fan; },
     get leds() { return leds; },
+    get ledColors() { return getLedColors(); },
     get oled() { return oled; },
     get hwProxy() { return hwProxy; },
     get version() { return version; },
