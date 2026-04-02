@@ -115,13 +115,10 @@
     { id: 'move', icon: 'fa-up-down-left-right', label: 'Verschieben', key: 'V' },
   ];
 
-  /* ─── Rechtes Panel ─── */
-  let rightPanel = $state('props'); // props | layers | widgets
-  const panels = [
-    { id: 'props', icon: 'fa-sliders', label: 'Eigenschaften' },
-    { id: 'layers', icon: 'fa-layer-group', label: 'Ebenen' },
-    { id: 'widgets', icon: 'fa-puzzle-piece', label: 'Widgets' },
-  ];
+  /* ─── Panel Collapse States ─── */
+  let propsOpen = $state(true);
+  let layersOpen = $state(true);
+  let widgetsOpen = $state(false);
 
   /* ═══ WIDGETS ═══ */
   const widgetCatalog = [
@@ -316,75 +313,78 @@
     </div>
   </div>
 
-  <!-- ═══ RECHTE RAIL: Panel-Icons ═══ -->
-  <div class="rail rail-right">
-    {#each panels as p}
-      <button class="rail-btn" class:active={rightPanel===p.id} onclick={()=>rightPanel=p.id} title={p.label}>
-        <i class="fa-solid {p.icon}"></i>
-      </button>
-    {/each}
-  </div>
-
-  <!-- ═══ RECHTES PANEL ═══ -->
+  <!-- ═══ RECHTES PANEL (Scrollbar mit PanelWrapper-Sektionen) ═══ -->
   <div class="panel-right">
-    <!-- 1:1 Vorschau -->
-    <div class="preview-section">
-      <div class="preview-bezel"><canvas bind:this={previewEl} width={W} height={H} class="preview-canvas"></canvas></div>
-      <button class="send-btn" onclick={sendToOled}><i class="fa-solid fa-paper-plane"></i> An OLED</button>
+    <!-- Vorschau-Panel -->
+    <div class="pw">
+      <div class="pw-bar"><div class="pw-handle"><svg width="10" height="16" viewBox="0 0 10 16"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div><div class="pw-title"><i class="fa-solid fa-display"></i> Vorschau</div></div>
+      <div class="pw-body preview-body">
+        <div class="preview-bezel"><canvas bind:this={previewEl} width={W} height={H} class="preview-canvas"></canvas></div>
+        <button class="send-btn" onclick={sendToOled}><i class="fa-solid fa-paper-plane"></i> An OLED senden</button>
+      </div>
     </div>
 
-    {#if rightPanel==='props'}
-      <div class="rp-content">
-        <div class="rp-title"><i class="fa-solid fa-sliders"></i> Eigenschaften</div>
-        <div class="rp-info">
+    <!-- Eigenschaften-Panel -->
+    <div class="pw">
+      <button class="pw-bar" onclick={()=>propsOpen=!propsOpen}><div class="pw-handle"><svg width="10" height="16" viewBox="0 0 10 16"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div><div class="pw-title"><i class="fa-solid fa-sliders"></i> Eigenschaften <i class="fa-solid fa-chevron-down pw-chev" class:rotated={!propsOpen}></i></div></button>
+      {#if propsOpen}
+        <div class="pw-body">
           <div class="rp-row"><span>Position</span><span class="mono">{cursorX >= 0 ? `${cursorX}, ${cursorY}` : '—'}</span></div>
-          <div class="rp-row"><span>Aktive Ebene</span><span class="mono">{getLayer(activeLayer)?.name || '—'}</span></div>
-          <div class="rp-row"><span>Pixel gesetzt</span><span class="mono">{getActivePixels()?.reduce((a,v)=>a+v,0) || 0}</span></div>
+          <div class="rp-row"><span>Ebene</span><span class="mono">{getLayer(activeLayer)?.name || '—'}</span></div>
+          <div class="rp-row"><span>Pixel</span><span class="mono">{getActivePixels()?.reduce((a,v)=>a+v,0) || 0}</span></div>
         </div>
-      </div>
+      {/if}
+    </div>
 
-    {:else if rightPanel==='layers'}
-      <div class="rp-content">
-        <div class="rp-title"><i class="fa-solid fa-layer-group"></i> Ebenen</div>
-        <div class="layer-list">
-          {#each [...layers].reverse() as layer, ri}
-            {@const idx = layers.length - 1 - ri}
-            <div class="layer-item" class:active={layer.id===activeLayer} class:drag-over={dragOver===idx}
-              draggable="true" onclick={()=>activeLayer=layer.id}
-              ondragstart={(e)=>onLayerDragStart(e,idx)} ondragover={(e)=>onLayerDragOver(e,idx)}
-              ondrop={(e)=>onLayerDrop(e,idx)} ondragend={onLayerDragEnd}>
-              <span class="layer-handle"><i class="fa-solid fa-grip-vertical"></i></span>
-              <button class="layer-vis" onclick={(e)=>{e.stopPropagation();toggleVis(layer.id);render();}}>
-                <i class="fa-solid {layer.visible?'fa-eye':'fa-eye-slash'}"></i>
-              </button>
-              <span class="layer-name">{layer.name}</span>
+    <!-- Ebenen-Panel -->
+    <div class="pw">
+      <button class="pw-bar" onclick={()=>layersOpen=!layersOpen}><div class="pw-handle"><svg width="10" height="16" viewBox="0 0 10 16"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div><div class="pw-title"><i class="fa-solid fa-layer-group"></i> Ebenen <i class="fa-solid fa-chevron-down pw-chev" class:rotated={!layersOpen}></i></div></button>
+      {#if layersOpen}
+        <div class="pw-body">
+          <div class="layer-list">
+            {#each [...layers].reverse() as layer, ri}
+              {@const idx = layers.length - 1 - ri}
+              <div class="layer-item" class:active={layer.id===activeLayer} class:drag-over={dragOver===idx}
+                draggable="true" onclick={()=>activeLayer=layer.id}
+                ondragstart={(e)=>onLayerDragStart(e,idx)} ondragover={(e)=>onLayerDragOver(e,idx)}
+                ondrop={(e)=>onLayerDrop(e,idx)} ondragend={onLayerDragEnd}>
+                <span class="layer-handle"><svg width="8" height="14" viewBox="0 0 8 14"><circle cx="2.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="5.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="2.5" cy="7" r="1.2" fill="currentColor"/><circle cx="5.5" cy="7" r="1.2" fill="currentColor"/><circle cx="2.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="5.5" cy="11.5" r="1.2" fill="currentColor"/></svg></span>
+                <button class="layer-vis" onclick={(e)=>{e.stopPropagation();toggleVis(layer.id);render();}}>
+                  <i class="fa-solid {layer.visible?'fa-eye':'fa-eye-slash'}"></i>
+                </button>
+                <span class="layer-name">{layer.name}</span>
+              </div>
+            {/each}
+          </div>
+          <div class="layer-actions">
+            <button class="la-btn" onclick={()=>addLayer()} title="Neue Ebene"><i class="fa-solid fa-plus"></i></button>
+            <button class="la-btn" onclick={()=>duplicateLayer(activeLayer)} title="Duplizieren"><i class="fa-solid fa-copy"></i></button>
+            <button class="la-btn" onclick={()=>removeLayer(activeLayer)} title="Löschen"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </div>
+      {/if}
+    </div>
+
+    <!-- Widgets-Panel -->
+    <div class="pw">
+      <button class="pw-bar" onclick={()=>widgetsOpen=!widgetsOpen}><div class="pw-handle"><svg width="10" height="16" viewBox="0 0 10 16"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div><div class="pw-title"><i class="fa-solid fa-puzzle-piece"></i> Widgets <i class="fa-solid fa-chevron-down pw-chev" class:rotated={!widgetsOpen}></i></div></button>
+      {#if widgetsOpen}
+        <div class="pw-body">
+          {#each widgetCats as cat}
+            <div class="wc-cat"><i class="fa-solid {cat.icon}"></i> {cat.label}</div>
+            <div class="wc-list">
+              {#each widgetCatalog.filter(w=>w.cat===cat.id) as w}
+                <button class="wc-btn" onclick={()=>placeWidget(w)}>
+                  <i class="fa-solid fa-plus"></i>
+                  <span class="wc-name">{w.label}</span>
+                  <span class="wc-size">{w.w}×{w.h}</span>
+                </button>
+              {/each}
             </div>
           {/each}
         </div>
-        <div class="layer-actions">
-          <button class="la-btn" onclick={()=>addLayer()} title="Neue Ebene"><i class="fa-solid fa-plus"></i></button>
-          <button class="la-btn" onclick={()=>duplicateLayer(activeLayer)} title="Duplizieren"><i class="fa-solid fa-copy"></i></button>
-          <button class="la-btn" onclick={()=>removeLayer(activeLayer)} title="Löschen"><i class="fa-solid fa-trash"></i></button>
-        </div>
-      </div>
-
-    {:else if rightPanel==='widgets'}
-      <div class="rp-content">
-        <div class="rp-title"><i class="fa-solid fa-puzzle-piece"></i> Widgets einfügen</div>
-        {#each widgetCats as cat}
-          <div class="wc-cat"><i class="fa-solid {cat.icon}"></i> {cat.label}</div>
-          <div class="wc-list">
-            {#each widgetCatalog.filter(w=>w.cat===cat.id) as w}
-              <button class="wc-btn" onclick={()=>placeWidget(w)}>
-                <i class="fa-solid fa-plus"></i>
-                <span class="wc-name">{w.label}</span>
-                <span class="wc-size">{w.w}×{w.h}</span>
-              </button>
-            {/each}
-          </div>
-        {/each}
-      </div>
-    {/if}
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -424,24 +424,34 @@
   .tog.on::after { transform: translateX(14px); }
 
   /* ─── Canvas ─── */
-  .canvas-area { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-deep); }
+  .canvas-area { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #1a1a22; }
   .canvas-scroll { flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; }
   .canvas-scroll canvas { image-rendering: pixelated; touch-action: none; cursor: crosshair; box-shadow: 0 0 0 1px var(--border), 0 4px 20px rgba(0,0,0,0.4); }
   .status-bar { display: flex; gap: 16px; padding: 3px 10px; background: var(--bg-base); border-top: 1px solid var(--border); flex-shrink: 0; font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
 
-  /* ─── Rechtes Panel ─── */
-  .panel-right { width: 260px; flex-shrink: 0; background: var(--bg-card); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
-  .preview-section { padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 6px; border-bottom: 1px solid var(--border); }
-  .preview-bezel { background: #000; padding: 3px; border-radius: 3px; border: 2px solid #333; }
+  /* ─── Rechtes Panel (PanelWrapper-Sektionen) ─── */
+  .panel-right { width: 280px; flex-shrink: 0; background: var(--bg-base); border-left: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; padding: 4px; overflow-y: auto; }
+
+  /* PanelWrapper */
+  .pw { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
+  .pw-bar { display: flex; align-items: stretch; background: var(--bg-elevated); user-select: none; flex-shrink: 0; border: none; cursor: pointer; }
+  .pw-handle { width: 28px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; cursor: grab; color: var(--text-muted); position: relative; }
+  .pw-handle::after { content:''; position:absolute; right:0; top:4px; bottom:4px; width:2px; border-radius:1px; background:var(--border); }
+  .pw-handle:hover { background: rgba(0,232,138,0.08); color: var(--green); }
+  .pw-handle:hover::after { background: var(--green); }
+  .pw-title { flex:1; display:flex; align-items:center; gap:8px; padding:8px 10px; color:var(--text-secondary); font:600 var(--fs-sm) var(--font); text-transform:uppercase; letter-spacing:0.06em; text-align:left; }
+  .pw-title i:first-child { color: var(--accent); }
+  .pw-chev { font-size: var(--fs-xs); color: var(--text-muted); transition: transform 150ms; margin-left: auto; }
+  .pw-chev.rotated { transform: rotate(-90deg); }
+  .pw-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .preview-body { align-items: center; }
+
+  .preview-bezel { background: #000; padding: 3px; border-radius: 4px; border: 2px solid #444; }
   .preview-canvas { display: block; width: 128px; height: 64px; image-rendering: pixelated; }
-  .send-btn { width: 100%; padding: 5px; border-radius: var(--radius-sm); border: 1px solid var(--accent); background: var(--accent-dim); color: var(--accent); font: 500 var(--fs-sm) var(--font); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; }
+  .send-btn { width: 100%; padding: 8px; border-radius: var(--radius-sm); border: 1px solid var(--accent); background: var(--accent-dim); color: var(--accent); font: 500 var(--fs-sm) var(--font); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
   .send-btn:hover { background: var(--accent); color: #fff; }
 
-  .rp-content { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
-  .rp-title { font: 600 var(--fs-sm) var(--font); text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
-  .rp-title i { color: var(--accent); }
-  .rp-info { display: flex; flex-direction: column; gap: 3px; }
-  .rp-row { display: flex; justify-content: space-between; font: 500 var(--fs-sm) var(--font); color: var(--text-muted); padding: 2px 0; }
+  .rp-row { display: flex; justify-content: space-between; font: 500 var(--fs-sm) var(--font); color: var(--text-muted); padding: 3px 0; }
   .mono { font-family: var(--mono); color: var(--text-secondary); }
 
   /* Layers */
