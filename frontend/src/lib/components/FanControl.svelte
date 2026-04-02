@@ -226,12 +226,12 @@
             {#each profiles as p}<button class="pill" class:active={profile===p} onclick={()=>s.setFanProfile(p)}><i class="fa-solid {profIcons[p]||'fa-circle'}"></i> {profLabels[p]||p}</button>{/each}
           </div>
           <div class="chart-leds">
-            {#each s.ledColors as c}
-              <div class="led-sm" style="background:{c.rgb};box-shadow:0 0 6px {c.glow}"></div>
-            {/each}
             {#if !['temp_reactive','load_reactive'].includes(s.leds?.effect)}
               <button class="led-takeover" onclick={() => s.setLedEffect('temp_reactive')} title="Temperaturfarbe übernehmen"><i class="fa-solid fa-temperature-half"></i></button>
             {/if}
+            {#each s.ledColors as c}
+              <div class="led-sm" style="background:{c.rgb};box-shadow:0 0 6px {c.glow}"></div>
+            {/each}
           </div>
         </div>
         <svg bind:this={curveEl} viewBox="0 0 {CURVE.w} {CURVE.h}">
