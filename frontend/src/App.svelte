@@ -65,6 +65,14 @@ const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
       {/if}
     </div>
 
+    <!-- LED-Status -->
+    <div class="sb-leds">
+      {#each (s.leds?.led_states || [{r:0,g:0,b:0},{r:0,g:0,b:0},{r:0,g:0,b:0},{r:0,g:0,b:0}]) as led}
+        {@const br = Math.pow((s.leds?.brightness || 500) / 1000, 0.6)}
+        <div class="sb-led" style="background:rgb({Math.round((led.r||0)*br)},{Math.round((led.g||0)*br)},{Math.round((led.b||0)*br)});box-shadow:0 0 6px rgba({Math.round((led.r||0)*br)},{Math.round((led.g||0)*br)},{Math.round((led.b||0)*br)},0.5)"></div>
+      {/each}
+    </div>
+
     <nav class="sb-nav">
       {#each nav as item}
         <button class="nav-btn" class:active={s.currentView === item.id}
@@ -178,7 +186,13 @@ const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
   .sb-temp-val { font: 800 48px var(--mono); line-height: 1; }
   .sb-temp-unit { font: 400 20px var(--font); color: var(--text-muted); }
   .sb-temp-mini { font: 700 24px var(--mono); }
-  .sidebar-collapsed .sb-temp { margin-bottom: 12px; }
+  .sidebar-collapsed .sb-temp { margin-bottom: 8px; }
+
+  /* LED-Status */
+  .sb-leds { display: flex; justify-content: center; gap: 10px; margin-bottom: 16px; }
+  .sb-led { width: 18px; height: 18px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); transition: background 1s, box-shadow 1s; }
+  .sidebar-collapsed .sb-leds { gap: 4px; }
+  .sidebar-collapsed .sb-led { width: 10px; height: 10px; border-radius: 2px; }
 
   .sb-nav { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
   .nav-btn {
