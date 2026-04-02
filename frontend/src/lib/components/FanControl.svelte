@@ -208,15 +208,21 @@
 <style>
   .layout { display: flex; flex-direction: column; height: 100%; }
   .layout { display: flex; flex-direction: column; height: 100%; }
-  .content { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-height: 0; }
+  .content {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    flex: 1; min-height: 0;
+    /* Gleiche Zeilen für beide Spalten */
+    grid-template-rows: auto 1fr auto;
+  }
   .panel {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 14px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto;
-    height: 100%;
+    padding: 14px; display: grid; gap: 8px;
+    grid-template-rows: subgrid; grid-row: span 3;
+    overflow: hidden;
   }
 
   /* Lüfter-Header */
-  .fan-header { display: flex; align-items: flex-start; gap: 10px; flex-shrink: 0; min-height: 60px; }
+  .fan-header { display: flex; align-items: flex-start; gap: 10px; }
   .fan-icon { font-size: var(--fs-xl); color: var(--accent); line-height: 1; margin-top: 2px; }
   .fan-title { font: 700 var(--fs-xl) var(--font); line-height: 1; }
   .fan-sub { font: 500 var(--fs-sm) var(--mono); color: var(--text-muted); }
@@ -229,8 +235,8 @@
   @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } }
 
   /* Diagramm */
-  .chart { flex: 1; min-height: 80px; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; }
-  .panel-footer { flex-shrink: 0; min-height: 160px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; }
+  .chart { min-height: 0; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; }
+  .panel-footer { display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; }
   .chart svg { width: 100%; height: 100%; display: block; }
   .ax { font: 10px var(--mono); fill: var(--text-muted); }
   .ax-on { font: 600 9px var(--mono); fill: var(--red); }
