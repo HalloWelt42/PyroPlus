@@ -119,6 +119,7 @@
   let propsOpen = $state(true);
   let layersOpen = $state(true);
   let widgetsOpen = $state(false);
+  let displayOpen = $state(true);
 
   /* ═══ WIDGETS ═══ */
   const widgetCatalog = [
@@ -242,57 +243,70 @@
 <svelte:window onkeydown={onKey} />
 
 <div class="studio">
-  <!-- ═══ LINKE RAIL: Werkzeug-Icons ═══ -->
-  <div class="rail rail-left">
-    <div class="rail-group">
-      <div class="rail-label">Zeichnen</div>
-      {#each drawingTools as t}
-        <button class="rail-btn" class:active={activeTool===t.id} onclick={()=>activeTool=t.id} title="{t.label} ({t.key})">
-          <i class="fa-solid {t.icon}"></i>
-        </button>
-      {/each}
-    </div>
-    <div class="rail-group">
-      <div class="rail-label">Auswahl</div>
-      {#each selectTools as t}
-        <button class="rail-btn" class:active={activeTool===t.id} onclick={()=>activeTool=t.id} title="{t.label} ({t.key})">
-          <i class="fa-solid {t.icon}"></i>
-        </button>
-      {/each}
-    </div>
-    <div class="rail-group" style="margin-top:auto">
-      <button class="rail-btn" onclick={undo} title="Rückgängig"><i class="fa-solid fa-rotate-left"></i></button>
-      <button class="rail-btn" onclick={redo} title="Wiederholen"><i class="fa-solid fa-rotate-right"></i></button>
-      <button class="rail-btn" onclick={clearLayer} title="Löschen"><i class="fa-solid fa-trash-can"></i></button>
-      <button class="rail-btn" onclick={invertLayer} title="Invertieren"><i class="fa-solid fa-circle-half-stroke"></i></button>
-    </div>
-  </div>
-
-  <!-- ═══ LINKES PANEL: Tool-Optionen ═══ -->
+  <!-- ═══ LINKES PANEL (PanelWrapper-Sektionen wie rechts) ═══ -->
   <div class="panel-left">
-    <div class="pl-section">
-      <div class="pl-title">Werkzeug-Optionen</div>
-      {#if activeTool==='pencil'||activeTool==='eraser'}
-        <div class="pl-row"><span class="pl-label">Größe</span><input type="range" min="1" max="8" value={penSize} oninput={(e)=>penSize=+e.target.value}><span class="pl-val">{penSize}</span></div>
-      {/if}
-      {#if activeTool==='rect'||activeTool==='circle'||activeTool==='ellipse'}
-        <div class="pl-row"><span class="pl-label">Gefüllt</span><button class="tog" class:on={filled} onclick={()=>filled=!filled}></button></div>
-      {/if}
-      {#if activeTool==='text'}
-        <div class="pl-row"><span class="pl-label">Text</span><input type="text" class="pl-input" bind:value={textInput} maxlength="20"></div>
-        <div class="pl-row"><span class="pl-label">Größe</span><input type="range" min="1" max="3" value={textScale} oninput={(e)=>textScale=+e.target.value}><span class="pl-val">{textScale}×</span></div>
+    <!-- Werkzeuge als Grid -->
+    <div class="pw">
+      <div class="pw-bar"><div class="pw-handle"><svg width="10" height="16" viewBox="0 0 10 16"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div><div class="pw-title"><i class="fa-solid fa-pen"></i> Werkzeuge</div></div>
+      <div class="pw-body">
+        <div class="tool-grid">
+          {#each drawingTools as t}
+            <button class="tool-btn" class:active={activeTool===t.id} onclick={()=>activeTool=t.id} title="{t.label} ({t.key})">
+              <i class="fa-solid {t.icon}"></i>
+            </button>
+          {/each}
+          {#each selectTools as t}
+            <button class="tool-btn" class:active={activeTool===t.id} onclick={()=>activeTool=t.id} title="{t.label} ({t.key})">
+              <i class="fa-solid {t.icon}"></i>
+            </button>
+          {/each}
+        </div>
+        <!-- Werkzeug-Optionen -->
+        {#if activeTool==='pencil'||activeTool==='eraser'}
+          <div class="pl-row"><span class="pl-label">Größe</span><input type="range" min="1" max="8" value={penSize} oninput={(e)=>penSize=+e.target.value}><span class="pl-val">{penSize}</span></div>
+        {/if}
+        {#if activeTool==='rect'||activeTool==='circle'||activeTool==='ellipse'}
+          <div class="pl-row"><span class="pl-label">Gefüllt</span><button class="tog" class:on={filled} onclick={()=>filled=!filled}></button></div>
+        {/if}
+        {#if activeTool==='text'}
+          <div class="pl-row"><span class="pl-label">Text</span><input type="text" class="pl-input" bind:value={textInput} maxlength="20"></div>
+          <div class="pl-row"><span class="pl-label">Größe</span><input type="range" min="1" max="3" value={textScale} oninput={(e)=>textScale=+e.target.value}><span class="pl-val">{textScale}×</span></div>
+        {/if}
+      </div>
+    </div>
+
+    <!-- Aktionen -->
+    <div class="pw">
+      <div class="pw-bar"><div class="pw-handle"><svg width="10" height="16" viewBox="0 0 10 16"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div><div class="pw-title"><i class="fa-solid fa-bolt"></i> Aktionen</div></div>
+      <div class="pw-body">
+        <div class="action-grid">
+          <button class="action-btn-sm" onclick={undo} title="Rückgängig (Strg+Z)"><i class="fa-solid fa-rotate-left"></i> Rückgängig</button>
+          <button class="action-btn-sm" onclick={redo} title="Wiederholen (Strg+Y)"><i class="fa-solid fa-rotate-right"></i> Wiederholen</button>
+          <button class="action-btn-sm" onclick={clearLayer} title="Löschen"><i class="fa-solid fa-trash-can"></i> Löschen</button>
+          <button class="action-btn-sm" onclick={invertLayer} title="Invertieren"><i class="fa-solid fa-circle-half-stroke"></i> Invertieren</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Anzeige -->
+    <div class="pw">
+      <button class="pw-bar" onclick={()=>displayOpen=!displayOpen}><div class="pw-handle"><svg width="10" height="16" viewBox="0 0 10 16"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div><div class="pw-title"><i class="fa-solid fa-eye"></i> Anzeige <i class="fa-solid fa-chevron-down pw-chev" class:rotated={!displayOpen}></i></div></button>
+      {#if displayOpen}
+        <div class="pw-body">
+          <div class="pl-row"><span class="pl-label">Zoom</span><input type="range" min="2" max="16" value={zoom} oninput={(e)=>zoom=+e.target.value}><span class="pl-val">{zoom}×</span></div>
+          <div class="pl-row"><span class="pl-label">Raster</span><button class="tog" class:on={showGrid} onclick={()=>{showGrid=!showGrid;}}></button></div>
+        </div>
       {/if}
     </div>
-    <div class="pl-section">
-      <div class="pl-title">Anzeige</div>
-      <div class="pl-row"><span class="pl-label">Zoom</span><input type="range" min="2" max="16" value={zoom} oninput={(e)=>zoom=+e.target.value}><span class="pl-val">{zoom}×</span></div>
-      <div class="pl-row"><span class="pl-label">Raster</span><button class="tog" class:on={showGrid} onclick={()=>{showGrid=!showGrid;}}></button></div>
-    </div>
-    <div class="pl-section">
-      <div class="pl-title">Farbe</div>
-      <div class="color-pair">
-        <div class="color-swatch white" class:active={activeTool!=='eraser'} onclick={()=>{if(activeTool==='eraser')activeTool='pencil';}} title="Weiß (Zeichnen)"></div>
-        <div class="color-swatch black" class:active={activeTool==='eraser'} onclick={()=>activeTool='eraser'} title="Schwarz (Radieren)"></div>
+
+    <!-- Farbe -->
+    <div class="pw">
+      <div class="pw-bar"><div class="pw-handle"><svg width="10" height="16" viewBox="0 0 10 16"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg></div><div class="pw-title"><i class="fa-solid fa-palette"></i> Farbe</div></div>
+      <div class="pw-body">
+        <div class="color-pair">
+          <div class="color-swatch white" class:active={activeTool!=='eraser'} onclick={()=>{if(activeTool==='eraser')activeTool='pencil';}} title="Weiß (Zeichnen)"></div>
+          <div class="color-swatch black" class:active={activeTool==='eraser'} onclick={()=>activeTool='eraser'} title="Schwarz (Radieren)"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -352,7 +366,7 @@
                 <button class="layer-vis" onclick={(e)=>{e.stopPropagation();toggleVis(layer.id);render();}}>
                   <i class="fa-solid {layer.visible?'fa-eye':'fa-eye-slash'}"></i>
                 </button>
-                <span class="layer-name">{layer.name}</span>
+                <span class="layer-name" contenteditable="false" ondblclick={(e)=>{e.target.contentEditable='true';e.target.focus();}} onblur={(e)=>{e.target.contentEditable='false';layers=layers.map(l=>l.id===layer.id?{...l,name:e.target.textContent}:l);}} onkeydown={(e)=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}}}>{layer.name}</span>
               </div>
             {/each}
           </div>
@@ -391,32 +405,28 @@
 <style>
   .studio { display: flex; height: 100%; overflow: hidden; }
 
-  /* ─── Rails ─── */
-  .rail { width: 54px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px; background: var(--bg-base); }
-  .rail-left { border-right: 1px solid var(--border); }
-  .rail-right { border-left: 1px solid var(--border); }
-  .rail-group { display: flex; flex-direction: column; gap: 4px; width: 100%; align-items: center; }
-  .rail-label { font: 600 var(--fs-xs) var(--font); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 0 2px; }
-  .rail-btn { width: 38px; height: 38px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-base); display: flex; align-items: center; justify-content: center; transition: all 120ms; position: relative; }
-  .rail-btn:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
-  .rail-btn.active { color: var(--accent); background: rgba(0,180,255,0.1); border-color: var(--accent); }
-  .rail-left .rail-btn.active::before { content:''; position:absolute; left:-5px; top:50%; transform:translateY(-50%); width:3px; height:16px; background:var(--accent); border-radius:0 2px 2px 0; }
-  .rail-right .rail-btn.active::before { content:''; position:absolute; right:-5px; top:50%; transform:translateY(-50%); width:3px; height:16px; background:var(--accent); border-radius:2px 0 0 2px; }
+  /* ─── Linkes Panel (PanelWrapper-Container) ─── */
+  .panel-left { width: 250px; flex-shrink: 0; background: var(--bg-base); border-right: 1px solid var(--border); padding: 4px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+  /* Tool-Grid */
+  .tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 8px; }
+  .tool-btn { aspect-ratio: 1; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-base); display: flex; align-items: center; justify-content: center; transition: all 120ms; }
+  .tool-btn:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
+  .tool-btn.active { color: var(--accent); background: rgba(0,180,255,0.1); border-color: var(--accent); }
 
-  /* ─── Linkes Panel ─── */
-  .panel-left { width: 220px; flex-shrink: 0; background: var(--bg-card); border-right: 1px solid var(--border); padding: 10px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
-  .pl-section { padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; gap: 8px; }
-  .pl-title { font: 600 var(--fs-sm) var(--font); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+  .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .action-btn-sm { padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); cursor: pointer; font: 500 var(--fs-xs) var(--font); display: flex; align-items: center; gap: 4px; }
+  .action-btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+
   .pl-row { display: flex; align-items: center; gap: 8px; font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); }
   .pl-label { width: 55px; flex-shrink: 0; }
   .pl-row input[type=range] { flex: 1; }
   .pl-val { font: 600 var(--fs-sm) var(--mono); color: var(--text-primary); min-width: 32px; text-align: right; }
-  .pl-input { flex: 1; padding: 3px 6px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-primary); border-radius: 3px; font: 500 var(--fs-sm) var(--mono); }
-  .color-pair { display: flex; gap: 6px; align-items: center; }
-  .color-swatch { width: 28px; height: 28px; border-radius: var(--radius-sm); border: 2px solid var(--border); cursor: pointer; }
+  .pl-input { flex: 1; padding: 5px 8px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-primary); border-radius: var(--radius-sm); font: 500 var(--fs-sm) var(--mono); }
+  .color-pair { display: flex; gap: 8px; align-items: center; }
+  .color-swatch { width: 32px; height: 32px; border-radius: var(--radius-sm); border: 2px solid var(--border); cursor: pointer; }
   .color-swatch.white { background: #fff; }
   .color-swatch.black { background: #000; }
-  .color-swatch.active { border-color: var(--accent); box-shadow: 0 0 6px rgba(0,180,255,0.3); }
+  .color-swatch.active { border-color: var(--accent); box-shadow: 0 0 8px rgba(0,180,255,0.3); }
 
   .tog { width: 30px; height: 16px; border-radius: 8px; border: none; background: rgba(255,255,255,0.1); cursor: pointer; position: relative; transition: background 150ms; }
   .tog.on { background: var(--green); }
