@@ -4,15 +4,15 @@
   const handleSvg = '<svg width="10" height="16" viewBox="0 0 10 16"><circle cx="3" cy="3" r="1.5" fill="currentColor"/><circle cx="7" cy="3" r="1.5" fill="currentColor"/><circle cx="3" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="8" r="1.5" fill="currentColor"/><circle cx="3" cy="13" r="1.5" fill="currentColor"/><circle cx="7" cy="13" r="1.5" fill="currentColor"/></svg>';
 </script>
 
-<div class="pw" draggable="true" ondragstart={(e) => onDragStart?.(e, id)} data-panel-id={id}>
-  <button class="pw-bar" onclick={() => { if (collapsible) isOpen = !isOpen; }}>
-    <div class="pw-handle" title="Verschieben">{@html handleSvg}</div>
-    <div class="pw-title">
+<div class="pw" data-panel-id={id}>
+  <div class="pw-bar">
+    <div class="pw-handle" draggable="true" ondragstart={(e) => onDragStart?.(e, id)} title="Verschieben">{@html handleSvg}</div>
+    <button class="pw-title" onclick={() => { if (collapsible) isOpen = !isOpen; }}>
       <i class="fa-solid {icon}"></i>
       <span>{label}</span>
       {#if collapsible}<i class="fa-solid fa-chevron-down pw-chev" class:rotated={!isOpen}></i>{/if}
-    </div>
-  </button>
+    </button>
+  </div>
   {#if isOpen || !collapsible}
     <div class="pw-body">{@render children()}</div>
   {/if}

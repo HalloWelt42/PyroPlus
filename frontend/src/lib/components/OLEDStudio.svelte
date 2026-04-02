@@ -171,7 +171,7 @@
     </div>
     <div class="canvas-area">
       <div class="canvas-scroll"><canvas bind:this={canvasEl} width={W*zoom} height={H*zoom} onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} style="width:{W*zoom}px;height:{H*zoom}px"></canvas></div>
-      <div class="status-bar"><span>{cursorX>=0?`${cursorX}, ${cursorY}`:''}</span><span>128×64</span><span>{layers.length} Ebenen</span><span>Zoom {zoom}×</span></div>
+      <div class="status-bar"><span>{cursorX>=0?`${cursorX}, ${cursorY}`:''}</span><span>{zoom}×</span></div>
     </div>
     <div class="side-panel" ondragover={(e)=>sDragOver(e,'right')} ondragleave={sDragLeave} ondrop={(e)=>sDrop(e,'right')} class:drop-target={pdropSide==='right'}>
       {#each rpanels as pid (pid)}
