@@ -3,7 +3,7 @@
   let { state: s } = $props();
 
   /* ═══ TABS ═══ */
-  let activeTab = $state('temp');
+  let activeTab = $state('color');
   const tabs = [
     { id: 'temp', icon: 'fa-temperature-half', label: 'Temperatur' },
     { id: 'color', icon: 'fa-palette', label: 'Farben' },
@@ -31,15 +31,7 @@
   function toHex(c) { return c ? '#' + [c.r, c.g, c.b].map(v => (v || 0).toString(16).padStart(2, '0')).join('') : '#0064ff'; }
   function fromHex(h) { return { r: parseInt(h.slice(1, 3), 16), g: parseInt(h.slice(3, 5), 16), b: parseInt(h.slice(5, 7), 16) }; }
 
-  function spdLabel(v) {
-    if (v <= 20) return 'Sehr langsam';
-    if (v <= 50) return 'Langsam';
-    if (v <= 100) return 'Gemächlich';
-    if (v <= 250) return 'Normal';
-    if (v <= 500) return 'Schnell';
-    if (v <= 750) return 'Sehr schnell';
-    return 'Ultra';
-  }
+  function spdLabel(v) { return v; }
 
   /* Aktiver Tab basierend auf aktuellem Effekt */
   function tabForEffect(fx) {
@@ -162,15 +154,26 @@
         </div>
       </div>
 
-      <!-- Themen-Tabs -->
-      <div class="theme-tabs">
-        {#each tabs as tab}
-          <button class="theme-tab" class:active={activeTab === tab.id} onclick={() => activeTab = tab.id}>
-            <i class="fa-solid {tab.icon}"></i>
-            <span>{tab.label}</span>
-          </button>
-        {/each}
-      </div>
+      {#if ['temp_reactive','load_reactive'].includes(s.leds?.effect)}
+        <!-- Temperatur-Modus aktiv — keine Effekt-Auswahl nötig -->
+        <div class="temp-mode-info">
+          <div class="temp-mode-title"><i class="fa-solid fa-temperature-half"></i> Temperatur-Modus aktiv</div>
+          <div class="temp-mode-desc">Die LED-Farben werden automatisch anhand der CPU-Temperatur berechnet. Um manuelle Effekte zu nutzen, wechsle zu "LED-Steuerung".</div>
+          <div class="reactive-info">
+            <div class="reactive-chip"><i class="fa-solid fa-temperature-half"></i> {(s.stats?.cpu?.temp || 0).toFixed(1)}°C</div>
+            <div class="reactive-chip"><i class="fa-solid fa-microchip"></i> {(s.stats?.cpu?.percent || 0).toFixed(0)}% CPU</div>
+          </div>
+        </div>
+      {:else}
+        <!-- Themen-Tabs (nur bei manueller Steuerung) -->
+        <div class="theme-tabs">
+          {#each tabs.filter(t => t.id !== 'temp') as tab}
+            <button class="theme-tab" class:active={activeTab === tab.id} onclick={() => activeTab = tab.id}>
+              <i class="fa-solid {tab.icon}"></i>
+              <span>{tab.label}</span>
+            </button>
+          {/each}
+        </div>
 
       <!-- Effekt-Grid -->
       <div class="effect-area">
@@ -236,6 +239,7 @@
           </div>
         {/if}
       </div>
+      {/if}
     </div>
   </div>
 </div>
@@ -344,6 +348,12 @@
   .tog.on { background: var(--green); }
   .tog::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform var(--tr); box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
   .tog.on::after { transform: translateX(16px); }
+
+  /* Temperatur-Modus Info */
+  .temp-mode-info { flex: 1; display: flex; flex-direction: column; gap: 14px; justify-content: center; align-items: center; text-align: center; }
+  .temp-mode-title { font: 600 var(--fs-lg) var(--font); color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+  .temp-mode-title i { color: var(--accent); }
+  .temp-mode-desc { font: 500 var(--fs-sm) var(--font); color: var(--text-muted); max-width: 400px; line-height: 1.5; }
 
   /* LED-Zuordnung */
   .led-mode-switch { display: flex; align-items: center; gap: 10px; }
