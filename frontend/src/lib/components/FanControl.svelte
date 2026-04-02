@@ -63,10 +63,15 @@
     custom:      { on: 55, off: 48 },
   };
 
+  /* Nur einmalig initialisieren, nicht bei jedem Polling-Update überschreiben */
+  let _caseInitialized = false;
   $effect(() => {
-    if (s.fan?.threshold_on) thresholdOn = s.fan.threshold_on;
-    if (s.fan?.threshold_off) thresholdOff = s.fan.threshold_off;
-    if (s.fan?.case_profile) caseProfile = s.fan.case_profile;
+    if (!_caseInitialized && s.fan?.threshold_on) {
+      thresholdOn = s.fan.threshold_on;
+      thresholdOff = s.fan.threshold_off || 48;
+      caseProfile = s.fan.case_profile || 'balanced';
+      _caseInitialized = true;
+    }
   });
 
   function selectCaseProfile(name) {

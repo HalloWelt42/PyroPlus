@@ -101,6 +101,7 @@ class FanFineSettings(BaseModel):
     poll_interval: Optional[float] = Field(None, ge=0.5, le=10.0)
     threshold_on: Optional[float] = Field(None, ge=35, le=75)
     threshold_off: Optional[float] = Field(None, ge=30, le=70)
+    case_profile: Optional[str] = None
 
 class CurvePoint(BaseModel):
     temp: float = Field(ge=20.0, le=85.0)
@@ -220,7 +221,12 @@ def fan_set_manual_speed(req: FanManualSpeed):
 @app.post("/api/fan/settings", tags=["Lüfter"],
           summary="Feineinstellungen (Hysterese)")
 def fan_set_fine_settings(req: FanFineSettings):
-    fan.set_fine_settings(hysteresis=req.hysteresis)
+    fan.set_fine_settings(
+        hysteresis=req.hysteresis,
+        threshold_on=req.threshold_on,
+        threshold_off=req.threshold_off,
+        case_profile=req.case_profile,
+    )
     return {"ok": True, **fan.get_state()}
 
 @app.get("/api/fan/duty-for-temp", tags=["Lüfter"],
