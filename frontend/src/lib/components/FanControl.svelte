@@ -20,22 +20,43 @@
   /* Temperatur-Verlauf aus Stats-History */
   const tempHistory = $derived(s.stats?.history?.temp || []);
 
-  /* Temperatur → RGB-Farbe (fließender Verlauf) */
+  /* Temperatur → RGB-Farbe (kalt→warm Verlauf: blau → cyan → grün → gelb → rot) */
   function tempToRgb(t) {
-    const ratio = Math.max(0, Math.min(1, (t - 30) / 50));
+    const ratio = Math.max(0, Math.min(1, (t - 25) / 55));
     let r, g, b;
-    if (ratio < 0.33) {
-      const f = ratio / 0.33;
-      r = 0; g = Math.round(200 + 55 * (1 - f)); b = Math.round(255 * (1 - f));
-    } else if (ratio < 0.66) {
-      const f = (ratio - 0.33) / 0.33;
-      r = Math.round(255 * f); g = Math.round(200 * (1 - f * 0.3)); b = 0;
+    if (ratio < 0.25) {
+      const f = ratio / 0.25;
+      r = 0; g = Math.round(100 * f); b = Math.round(200 + 55 * (1 - f));
+    } else if (ratio < 0.5) {
+      const f = (ratio - 0.25) / 0.25;
+      r = 0; g = Math.round(100 + 155 * f); b = Math.round(255 * (1 - f));
+    } else if (ratio < 0.75) {
+      const f = (ratio - 0.5) / 0.25;
+      r = Math.round(255 * f); g = Math.round(220 - 80 * f); b = 0;
     } else {
-      const f = (ratio - 0.66) / 0.34;
-      r = 255; g = Math.round(140 * (1 - f)); b = Math.round(40 * f);
+      const f = (ratio - 0.75) / 0.25;
+      r = 255; g = Math.round(140 * (1 - f)); b = 0;
     }
     return { r, g, b };
   }
+
+  /* 4 LED-Farben berechnen — leicht versetzt wie echte Hardware-LEDs */
+  const ledColors = $derived(() => {
+    const base = currentTemp;
+    return [0, 1, 2, 3].map(i => {
+      const offset = (i - 1.5) * 2;
+      const c = tempToRgb(base + offset);
+      return `rgb(${c.r},${c.g},${c.b})`;
+    });
+  });
+  const ledGlows = $derived(() => {
+    const base = currentTemp;
+    return [0, 1, 2, 3].map(i => {
+      const offset = (i - 1.5) * 2;
+      const c = tempToRgb(base + offset);
+      return `rgba(${c.r},${c.g},${c.b},0.5)`;
+    });
+  });
 
   const tempRgb = $derived(tempToRgb(currentTemp));
   const tempColorStr = $derived(`rgb(${tempRgb.r},${tempRgb.g},${tempRgb.b})`);
@@ -150,6 +171,17 @@
         {/if}
       </div>
 
+
+      <!-- LED-Temperaturanzeige -->
+      <div class="led-strip">
+        {#each [0,1,2,3] as i}
+          <div class="led-housing">
+            <div class="led-glow" style="background:radial-gradient(circle, {ledGlows()[i]}, transparent 70%)"></div>
+            <div class="led-pixel" style="background:{ledColors()[i]};box-shadow:0 0 8px {ledGlows()[i]}, 0 0 20px {ledGlows()[i]}"></div>
+          </div>
+        {/each}
+        <span class="led-label">{currentTemp.toFixed(1)}°C</span>
+      </div>
 
       <!-- Temperatur-Diagramm -->
       <div class="chart" style="--temp-color:{tempColorStr};--temp-glow:{tempGlow}">
@@ -282,6 +314,34 @@
   .status-value { font: 700 var(--fs-base) var(--mono); }
   .status-divider { width: 1px; height: 32px; background: var(--border); }
 
+
+  /* ─── LED-Leiste ─── */
+  .led-strip {
+    display: flex; align-items: center; justify-content: center;
+    gap: 16px; padding: 12px 20px; flex-shrink: 0;
+    background: linear-gradient(180deg, #080808, #111);
+    border-radius: var(--radius-sm); border: 1px solid #222;
+  }
+  .led-housing {
+    position: relative; width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .led-glow {
+    position: absolute; width: 60px; height: 60px;
+    border-radius: 50%; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); pointer-events: none;
+  }
+  .led-pixel {
+    width: 20px; height: 20px; border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.15);
+    position: relative; z-index: 1;
+    transition: background 1s ease, box-shadow 1s ease;
+  }
+  .led-label {
+    font: 700 var(--fs-base) var(--mono);
+    color: var(--text-secondary);
+    margin-left: 8px;
+  }
 
   /* ─── Diagramm ─── */
   .chart {
