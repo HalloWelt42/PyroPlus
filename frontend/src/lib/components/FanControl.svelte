@@ -166,8 +166,8 @@
         <div class="status-divider"></div>
         <div class="status-item">
           <span class="status-label">Lüfter</span>
-          <span class="status-value" style="color:{currentSpeed > 0 ? 'var(--green)' : 'var(--text-muted)'}">
-            {currentSpeed > 0 ? 'Läuft' : 'Aus'}
+          <span class="status-value" style="color:{currentSpeed > 0 ? 'var(--green)' : mode === 'off' ? 'var(--red)' : 'var(--text-secondary)'}">
+            {currentSpeed > 0 ? 'Läuft' : mode === 'off' ? 'Deaktiviert' : 'Bereitschaft'}
           </span>
         </div>
         {#if estimatedRpm > 0}
