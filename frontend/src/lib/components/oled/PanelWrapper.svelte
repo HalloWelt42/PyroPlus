@@ -20,7 +20,8 @@
 
 <style>
   .pw { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-  .pw-bar { display: flex; align-items: stretch; background: var(--bg-elevated); user-select: none; flex-shrink: 0; border: none; cursor: pointer; width: 100%; text-align: left; }
+  .pw-bar { display: flex; align-items: stretch; background: var(--bg-elevated); user-select: none; flex-shrink: 0; width: 100%; }
+  .pw-title { background: none; border: none; cursor: pointer; text-align: left; }
   .pw-handle { width: 28px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; cursor: grab; color: var(--text-muted); position: relative; }
   .pw-handle::after { content:''; position:absolute; right:0; top:4px; bottom:4px; width:2px; border-radius:1px; background:var(--border); }
   .pw-handle:hover { background: rgba(0,232,138,0.08); color: var(--green); }

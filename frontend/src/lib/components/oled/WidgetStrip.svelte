@@ -1,49 +1,34 @@
 <script>
-  import { W, H, drawText, drawRect, composite, compositeToDataUrl } from './engine.js';
   let { widgets, onPlace } = $props();
-
-  /* Mini-Vorschau für jedes Widget generieren */
-  function widgetPreview(w) {
-    const px = new Uint8Array(W * H);
-    const tmpSet = (x, y, v) => { if (x >= 0 && x < W && y >= 0 && y < H) px[y * W + x] = v ? 1 : 0; };
-    // Draw-Funktion auf temporären Buffer umleiten
-    const oldPx = px;
-    w.draw(2, 2, tmpSet);
-    // Zu DataURL konvertieren (nur Widget-Bereich)
-    const c = document.createElement('canvas');
-    c.width = w.w + 4; c.height = w.h + 4;
-    const ctx = c.getContext('2d');
-    ctx.fillStyle = '#111'; ctx.fillRect(0, 0, c.width, c.height);
-    ctx.fillStyle = '#fff';
-    for (let y = 0; y < c.height && y < H; y++)
-      for (let x = 0; x < c.width && x < W; x++)
-        if (px[y * W + x]) ctx.fillRect(x, y, 1, 1);
-    return c.toDataURL();
-  }
+  const catIcons = { zeit: 'fa-clock', sys: 'fa-microchip', deko: 'fa-pen' };
 </script>
 
-<div class="widget-strip">
-  <div class="strip-scroll">
-    {#each widgets as w}
-      <button class="widget-item" onclick={() => onPlace(w)} title="{w.label} ({w.w}×{w.h})">
-        <span class="widget-label">{w.label}</span>
-        <span class="widget-size">{w.w}×{w.h}</span>
-      </button>
-    {/each}
-  </div>
+<div class="ws">
+  {#each ['zeit','sys','deko'] as cat}
+    {@const items = widgets.filter(w => w.cat === cat)}
+    {#if items.length > 0}
+      <div class="ws-group">
+        <span class="ws-cat"><i class="fa-solid {catIcons[cat]}"></i></span>
+        {#each items as w}
+          <button class="ws-item" onclick={() => onPlace(w)} title="{w.label} ({w.w}×{w.h})">
+            {w.label}
+          </button>
+        {/each}
+      </div>
+    {/if}
+  {/each}
 </div>
 
 <style>
-  .widget-strip { flex-shrink: 0; background: var(--bg-base); border-bottom: 1px solid var(--border); padding: 6px 10px; }
-  .strip-scroll { display: flex; gap: 6px; overflow-x: auto; align-items: center; }
-  .widget-item {
-    flex-shrink: 0; padding: 6px 12px; border-radius: var(--radius-sm);
-    border: 1px dashed var(--border); background: var(--bg-card);
+  .ws { flex-shrink: 0; background: var(--bg-base); border-bottom: 1px solid var(--border); padding: 4px 8px; display: flex; gap: 4px; overflow-x: auto; align-items: center; }
+  .ws-group { display: flex; gap: 3px; align-items: center; }
+  .ws-cat { color: var(--accent); font-size: var(--fs-xs); padding: 0 4px; }
+  .ws-item {
+    padding: 4px 10px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--bg-card);
     color: var(--text-secondary); cursor: pointer;
-    font: 500 var(--fs-sm) var(--font);
-    display: flex; align-items: center; gap: 8px;
-    transition: all 150ms; white-space: nowrap;
+    font: 500 var(--fs-xs) var(--font); white-space: nowrap;
+    transition: all 120ms;
   }
-  .widget-item:hover { border-color: var(--accent); color: var(--accent); border-style: solid; }
-  .widget-size { font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
+  .ws-item:hover { border-color: var(--accent); color: var(--accent); }
 </style>

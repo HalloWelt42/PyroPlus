@@ -171,7 +171,6 @@
     </div>
     <div class="canvas-area">
       <div class="canvas-scroll"><canvas bind:this={canvasEl} width={W*zoom} height={H*zoom} onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} style="width:{W*zoom}px;height:{H*zoom}px"></canvas></div>
-      <div class="status-bar"><span>{cursorX>=0?`${cursorX}, ${cursorY}`:''}</span><span>{zoom}×</span></div>
     </div>
     <div class="side-panel" ondragover={(e)=>sDragOver(e,'right')} ondragleave={sDragLeave} ondrop={(e)=>sDrop(e,'right')} class:drop-target={pdropSide==='right'}>
       {#each rpanels as pid (pid)}
@@ -196,11 +195,10 @@
   .canvas-area { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #1a1a22; }
   .canvas-scroll { flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; }
   .canvas-scroll canvas { image-rendering: pixelated; touch-action: none; cursor: crosshair; box-shadow: 0 0 0 1px var(--border), 0 4px 20px rgba(0,0,0,0.4); }
-  .status-bar { display: flex; gap: 16px; padding: 4px 12px; background: var(--bg-base); border-top: 1px solid var(--border); flex-shrink: 0; font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
 
   /* Tool Grid */
-  .tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 8px; }
-  .tool-btn { aspect-ratio: 1; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; font-size: var(--fs-sm); display: flex; align-items: center; justify-content: center; transition: all 120ms; }
+  .tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-bottom: 6px; }
+  .tool-btn { height: 34px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; font-size: var(--fs-xs); display: flex; align-items: center; justify-content: center; transition: all 120ms; }
   .tool-btn:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
   .tool-btn.active { color: var(--accent); background: rgba(0,180,255,0.1); border-color: var(--accent); }
   .ag { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; }
