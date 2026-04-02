@@ -14,19 +14,57 @@
   /* Temperatur-Verlauf aus Stats-History */
   const tempHistory = $derived(s.stats?.history?.temp || []);
 
-  function tempColor(t) {
-    if (t < 45) return 'var(--green)';
-    if (t < 60) return 'var(--amber)';
-    return 'var(--red)';
+  /* Temperatur → RGB-Farbe (fließender Verlauf) */
+  function tempToRgb(t) {
+    const ratio = Math.max(0, Math.min(1, (t - 30) / 50));
+    let r, g, b;
+    if (ratio < 0.33) {
+      const f = ratio / 0.33;
+      r = 0; g = Math.round(200 + 55 * (1 - f)); b = Math.round(255 * (1 - f));
+    } else if (ratio < 0.66) {
+      const f = (ratio - 0.33) / 0.33;
+      r = Math.round(255 * f); g = Math.round(200 * (1 - f * 0.3)); b = 0;
+    } else {
+      const f = (ratio - 0.66) / 0.34;
+      r = 255; g = Math.round(140 * (1 - f)); b = Math.round(40 * f);
+    }
+    return { r, g, b };
   }
 
-  /* Temperatur-Sparkline */
+  const tempRgb = $derived(tempToRgb(currentTemp));
+  const tempColorStr = $derived(`rgb(${tempRgb.r},${tempRgb.g},${tempRgb.b})`);
+  const tempGlow = $derived(`rgba(${tempRgb.r},${tempRgb.g},${tempRgb.b},0.15)`);
+  const tempGlowStrong = $derived(`rgba(${tempRgb.r},${tempRgb.g},${tempRgb.b},0.3)`);
+
+  function tempColor(t) {
+    const c = tempToRgb(t);
+    return `rgb(${c.r},${c.g},${c.b})`;
+  }
+
+  /* Temperatur-Sparkline (geglättete Kurve via Catmull-Rom → Cubic Bezier) */
   function sparkPath(arr, w, h) {
     if (!arr || arr.length < 2) return '';
     const min = Math.min(...arr) - 3, max = Math.max(...arr) + 3;
     const range = max - min || 1;
     const step = w / (arr.length - 1);
-    return arr.map((v, i) => `${i ? 'L' : 'M'}${(i * step).toFixed(1)},${(h - ((v - min) / range) * h).toFixed(1)}`).join(' ');
+    const pts = arr.map((v, i) => ({ x: i * step, y: h - ((v - min) / range) * h * 0.9 - h * 0.05 }));
+
+    if (pts.length === 2) return `M${pts[0].x},${pts[0].y}L${pts[1].x},${pts[1].y}`;
+
+    let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)];
+      const p1 = pts[i];
+      const p2 = pts[Math.min(pts.length - 1, i + 1)];
+      const p3 = pts[Math.min(pts.length - 1, i + 2)];
+      const tension = 0.3;
+      const cp1x = p1.x + (p2.x - p0.x) * tension;
+      const cp1y = p1.y + (p2.y - p0.y) * tension;
+      const cp2x = p2.x - (p3.x - p1.x) * tension;
+      const cp2y = p2.y - (p3.y - p1.y) * tension;
+      d += `C${cp1x.toFixed(1)},${cp1y.toFixed(1)},${cp2x.toFixed(1)},${cp2y.toFixed(1)},${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+    }
+    return d;
   }
 
   function updSetting(key, e) {
@@ -78,32 +116,48 @@
       </div>
 
       <!-- Temperatur-Visualisierung -->
-      <div class="temp-display">
-        <div class="temp-big" style="color:{tempColor(currentTemp)}">
-          {currentTemp.toFixed(1)}<span class="temp-unit">°C</span>
-        </div>
-        <div class="temp-gauge">
-          <div class="gauge-track">
-            <div class="gauge-fill" style="width:{Math.min(100, Math.max(0, (currentTemp - 25) / 55 * 100))}%; background:{tempColor(currentTemp)}"></div>
-            <!-- Schwellwert-Markierungen -->
-            {#if mode === 'auto'}
-              <div class="gauge-marker marker-off" style="left:{Math.max(0, (thresholdOff - 25) / 55 * 100)}%" title="Ausschalten bei {thresholdOff}°C"></div>
-              <div class="gauge-marker marker-on" style="left:{Math.max(0, (thresholdOn - 25) / 55 * 100)}%" title="Einschalten bei {thresholdOn}°C"></div>
-            {/if}
+      <div class="temp-display" style="--temp-color:{tempColorStr};--temp-glow:{tempGlow};--temp-glow-strong:{tempGlowStrong}">
+        <div class="temp-orb">
+          <div class="orb-ring"></div>
+          <div class="orb-core">
+            <span class="temp-big">{currentTemp.toFixed(1)}</span>
+            <span class="temp-unit">°C</span>
           </div>
-          <div class="gauge-labels">
-            <span>25°C</span>
-            <span>80°C</span>
+        </div>
+        <div class="temp-right">
+          <div class="temp-gauge">
+            <div class="gauge-track">
+              <div class="gauge-fill" style="width:{Math.min(100, Math.max(0, (currentTemp - 25) / 55 * 100))}%; background:linear-gradient(90deg, var(--green), {tempColorStr})"></div>
+              {#if mode === 'auto'}
+                <div class="gauge-marker marker-off" style="left:{Math.max(0, (thresholdOff - 25) / 55 * 100)}%" title="Ausschalten bei {thresholdOff}°C"></div>
+                <div class="gauge-marker marker-on" style="left:{Math.max(0, (thresholdOn - 25) / 55 * 100)}%" title="Einschalten bei {thresholdOn}°C"></div>
+              {/if}
+            </div>
+            <div class="gauge-labels">
+              <span>25°C</span>
+              <span>80°C</span>
+            </div>
+          </div>
+          <div class="temp-meta">
+            <span style="color:var(--text-muted)">Minimum {s.stats?.cpu?.temp_min || '—'}°C</span>
+            <span style="color:var(--text-muted)">Maximum {s.stats?.cpu?.temp_max || '—'}°C</span>
           </div>
         </div>
       </div>
 
       <!-- Temperatur-Verlauf -->
       {#if tempHistory.length > 2}
-        <div class="history">
-          <div class="history-label">Verlauf (letzte 60 Messungen)</div>
-          <svg class="sparkline" viewBox="0 0 400 60" preserveAspectRatio="none">
-            <path d={sparkPath(tempHistory, 400, 60)} fill="none" stroke="var(--cyan)" stroke-width="2" opacity="0.7"/>
+        <div class="history" style="--temp-color:{tempColorStr};--temp-glow:{tempGlow}">
+          <div class="history-label">Temperaturverlauf</div>
+          <svg class="sparkline" viewBox="0 0 400 80" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color={tempColorStr} stop-opacity="0.2"/>
+                <stop offset="100%" stop-color={tempColorStr} stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="{sparkPath(tempHistory, 400, 80)} L400,80 L0,80 Z" fill="url(#spark-grad)"/>
+            <path d={sparkPath(tempHistory, 400, 80)} fill="none" stroke={tempColorStr} stroke-width="2.5" stroke-linecap="round" filter="drop-shadow(0 0 4px {tempGlow})"/>
           </svg>
         </div>
       {/if}
@@ -198,17 +252,39 @@
   .status-divider { width: 1px; height: 32px; background: var(--border); }
 
   /* ─── Temperatur-Anzeige ─── */
-  .temp-display { display: flex; align-items: center; gap: 24px; flex-shrink: 0; }
-  .temp-big { font: 800 64px var(--mono); line-height: 1; letter-spacing: -2px; }
-  .temp-unit { font-size: 28px; font-weight: 400; color: var(--text-muted); }
-  .temp-gauge { flex: 1; }
-  .gauge-track {
-    height: 12px; background: rgba(255,255,255,0.06);
-    border-radius: 6px; overflow: visible; position: relative;
+  .temp-display { display: flex; align-items: center; gap: 28px; flex-shrink: 0; }
+
+  .temp-orb {
+    position: relative; width: 140px; height: 140px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
   }
-  .gauge-fill { height: 100%; border-radius: 6px; transition: width 1s ease, background 1s ease; }
+  .orb-ring {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 3px solid var(--temp-color);
+    box-shadow: 0 0 20px var(--temp-glow), 0 0 50px var(--temp-glow), inset 0 0 20px var(--temp-glow);
+    transition: border-color 1s, box-shadow 1s;
+  }
+  .orb-core {
+    display: flex; flex-direction: column; align-items: center;
+    position: relative; z-index: 1;
+  }
+  .temp-big { font: 800 42px var(--mono); color: var(--temp-color); line-height: 1; transition: color 1s; }
+  .temp-unit { font: 500 var(--fs-sm) var(--font); color: var(--text-muted); margin-top: 2px; }
+
+  .temp-right { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+  .temp-gauge { }
+  .gauge-track {
+    height: 10px; background: rgba(255,255,255,0.06);
+    border-radius: 5px; overflow: visible; position: relative;
+  }
+  .gauge-fill {
+    height: 100%; border-radius: 5px;
+    transition: width 1s ease;
+    box-shadow: 0 0 8px var(--temp-glow);
+  }
   .gauge-marker {
-    position: absolute; top: -4px; width: 3px; height: 20px;
+    position: absolute; top: -5px; width: 3px; height: 20px;
     border-radius: 2px; transform: translateX(-1px);
   }
   .marker-on { background: var(--red); }
@@ -217,6 +293,10 @@
     display: flex; justify-content: space-between;
     font: 500 var(--fs-xs) var(--mono); color: var(--text-muted);
     margin-top: 6px;
+  }
+  .temp-meta {
+    display: flex; justify-content: space-between;
+    font: 500 var(--fs-xs) var(--font);
   }
 
   /* ─── Verlauf ─── */
