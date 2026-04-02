@@ -209,11 +209,10 @@
 
 <style>
   .layout { display: flex; flex-direction: column; height: 100%; }
-  .content { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-height: 0; }
+  .content { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-height: 0; align-items: start; }
   .panel {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 14px; display: grid; gap: 10px; overflow: hidden;
-    grid-template-rows: auto 1fr auto auto;
+    padding: 14px; display: flex; flex-direction: column; gap: 10px;
   }
 
   /* Lüfter-Header */
@@ -230,7 +229,7 @@
   @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } }
 
   /* Diagramm */
-  .chart { flex: 1; min-height: 150px; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; }
+  .chart { height: 40vh; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; }
   .chart svg { width: 100%; height: 100%; display: block; }
   .ax { font: 10px var(--mono); fill: var(--text-muted); }
   .ax-on { font: 600 9px var(--mono); fill: var(--red); }
