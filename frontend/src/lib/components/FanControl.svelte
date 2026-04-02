@@ -53,7 +53,7 @@
   const ledGlows = $derived(() => [0,1,2,3].map(i => { const c = tempToRgb(currentTemp + (i - 1.5) * 2); return `rgba(${c.r},${c.g},${c.b},0.5)`; }));
 
   /* ═══ GEHÄUSELÜFTER — Profile mit Schwellwerten ═══ */
-  let caseFanOn = $derived(s.fan?.gpio_on || false);
+  let caseFanOn = $derived(s.fan?.case_on || false);
   let thresholdOn = $state(55);
   let thresholdOff = $state(48);
   let caseProfile = $state('balanced');
