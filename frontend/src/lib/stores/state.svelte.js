@@ -40,7 +40,7 @@ async function pollState() {
       if (s.fan) fan = { ...fan, ...s.fan };
       if (s.leds) {
         leds = { ...leds, ...s.leds };
-        if (s.leds.led_states) setLedDisplay(s.leds.led_states);
+        if (s.leds.led_states) setLedDisplay(s.leds.led_states);  // HW-Proxy ist die Wahrheit
       }
       if (s.oled) oled = { ...oled, ...s.oled };
       if (s.version) version = s.version;
@@ -70,24 +70,22 @@ function toast(msg, type = 'info') {
 
 function destroy() { ws?.close(); if (_pollTimer) clearInterval(_pollTimer); }
 
-/* Globaler LED-Zustand — eine einzige Quelle für alle Anzeigen */
+/* ═══ GLOBALER LED-STATE ═══
+   Ein State, ein Schreiber zur Zeit.
+   Wer schreiben darf bestimmt der aktive Modus. */
 let ledDisplay = $state([
   {r:0,g:0,b:0,rgb:'rgb(0,0,0)',glow:'rgba(0,0,0,0.5)'},
   {r:0,g:0,b:0,rgb:'rgb(0,0,0)',glow:'rgba(0,0,0,0.5)'},
   {r:0,g:0,b:0,rgb:'rgb(0,0,0)',glow:'rgba(0,0,0,0.5)'},
   {r:0,g:0,b:0,rgb:'rgb(0,0,0)',glow:'rgba(0,0,0,0.5)'},
 ]);
-let _simActive = false; // Wenn true: Simulation hat Vorrang, Polling überschreibt nicht
 
-function setLedDisplay(leds4, fromSim = false) {
-  if (!fromSim && _simActive) return; // Polling darf Simulation nicht überschreiben
+function setLedDisplay(leds4) {
   ledDisplay = leds4.map(l => {
     const r = l.r || 0, g = l.g || 0, b = l.b || 0;
     return { r, g, b, rgb: `rgb(${r},${g},${b})`, glow: `rgba(${r},${g},${b},0.5)` };
   });
 }
-
-function setSimActive(active) { _simActive = active; }
 
 export function getState() {
   return {
@@ -97,7 +95,6 @@ export function getState() {
     get leds() { return leds; },
     get ledColors() { return ledDisplay; },
     setLedDisplay,
-    setSimActive,
     get oled() { return oled; },
     get hwProxy() { return hwProxy; },
     get version() { return version; },

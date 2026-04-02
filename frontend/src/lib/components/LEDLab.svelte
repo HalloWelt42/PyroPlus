@@ -1,5 +1,4 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
   let { state: s } = $props();
 
   /* ═══ TABS ═══ */
@@ -67,19 +66,18 @@
         </div>
       </div>
 
-      <!-- LED-Visualisierung (lokale Simulation) -->
+      <!-- LED-Visualisierung (globaler State) -->
       <div class="led-preview">
         <div class="led-strip">
-          {#each simLeds as led, i}
+          {#each s.ledColors as c, i}
             <div class="led-mount">
-              <div class="led-glow" style="background:radial-gradient(circle, rgba({led.r},{led.g},{led.b},0.5), transparent 70%)"></div>
-              <div class="led-chip" style="background:rgb({led.r},{led.g},{led.b});box-shadow:0 0 12px rgba({led.r},{led.g},{led.b},0.6), 0 0 30px rgba({led.r},{led.g},{led.b},0.3)">
+              <div class="led-glow" style="background:radial-gradient(circle, {c.glow}, transparent 70%)"></div>
+              <div class="led-chip" style="background:{c.rgb};box-shadow:0 0 12px {c.glow}, 0 0 30px {c.glow}">
                 <span class="led-num">{i + 1}</span>
               </div>
             </div>
           {/each}
         </div>
-        <div class="led-fps">{simFps} FPS</div>
       </div>
 
       <!-- Globale Parameter -->
@@ -276,7 +274,6 @@
   .led-glow { position: absolute; width: 80px; height: 80px; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%,-50%); pointer-events: none; }
   .led-chip { width: 28px; height: 28px; border-radius: 6px; border: 2px solid #555; display: flex; align-items: center; justify-content: center; position: relative; z-index: 1; }
   .led-num { font: 700 9px var(--mono); color: rgba(255,255,255,0.4); }
-  .led-fps { font: 500 10px var(--mono); color: var(--text-muted); text-align: center; margin-top: 8px; }
 
   /* Steuerung */
   .ctrl { display: flex; flex-direction: column; gap: 8px; }
