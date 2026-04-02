@@ -231,7 +231,7 @@
   @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } }
 
   /* Diagramm */
-  .chart { flex: 1; min-height: 0; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; }
+  .chart { flex: 1; min-height: 100px; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; margin-bottom: 4px; }
   .chart svg { width: 100%; height: 100%; display: block; }
   .ax { font: 10px var(--mono); fill: var(--text-muted); }
   .ax-on { font: 600 9px var(--mono); fill: var(--red); }
@@ -258,20 +258,20 @@
   .dot.drag { cursor: grab; } .dot.drag:hover { r: 10; } .dot.act { fill: var(--cyan); r: 10; }
 
   /* Steuerung */
-  .ctrl { display: flex; flex-direction: column; gap: 6px; }
+  .ctrl { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
   .ctrl-row { display: flex; align-items: center; gap: 10px; font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); }
   .ctrl-row span:first-child { min-width: 110px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
   .ctrl-row input { flex: 1; }
   .ctrl-val { font: 600 var(--fs-sm) var(--mono); color: var(--text-primary); background: var(--bg-deep); padding: 3px 10px; border-radius: var(--radius-sm); min-width: 44px; text-align: center; }
 
   /* Modus */
-  .modes { display: flex; gap: 6px; }
+  .modes { display: flex; gap: 6px; flex-shrink: 0; }
   .mode { flex: 1; height: 38px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 var(--fs-sm) var(--font); cursor: pointer; transition: all 150ms; display: flex; align-items: center; justify-content: center; gap: 6px; }
   .mode:hover { border-color: var(--text-muted); }
   .mode.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
   /* Simulation */
-  .sim { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--bg-elevated); font: 500 var(--fs-sm) var(--font); color: var(--text-muted); }
+  .sim { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--bg-elevated); font: 500 var(--fs-sm) var(--font); color: var(--text-muted); flex-shrink: 0; }
   .sim input { flex: 1; }
   .sim-v { font: 700 var(--fs-sm) var(--mono); min-width: 32px; text-align: right; }
   .tog { width: 34px; height: 18px; border-radius: 9px; border: none; background: rgba(255,255,255,0.1); cursor: pointer; position: relative; transition: background var(--tr); flex-shrink: 0; }
