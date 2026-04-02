@@ -88,7 +88,7 @@ def _softlink_gpiochip0_to_gpiochip4():
 # ═════════════════════════════════════════════════════════════
 
 def _init_hardware():
-    global _fan_gpio, _fan_led_gpio, _fan_available, _fan_pwm_supported
+    global _fan_gpio, _fan_led_gpio, _fan_available, _fan_pwm_supported, _fan_hwmon_dir
     global _oled_device, _oled_available
     global _strip, _led_available, _led_engine
 
@@ -112,11 +112,9 @@ def _init_hardware():
         logger.warning(f"Fan LED Init: {e}")
 
     # Fan PWM über Kernel
-    _fan_pwm_supported = (
-        os.path.exists("/sys/class/thermal/cooling_device0/cur_state")
-        and os.path.exists("/sys/devices/platform/cooling_fan")
-    )
-    logger.info(f"Fan PWM Kernel: {'ja' if _fan_pwm_supported else 'nein'}")
+    _fan_pwm_supported = os.path.exists("/sys/devices/platform/cooling_fan")
+    _fan_hwmon_dir = _find_fan_hwmon()
+    logger.info(f"Fan PWM: {'ja' if _fan_pwm_supported else 'nein'}, hwmon: {_fan_hwmon_dir or 'nicht gefunden'}")
 
     # ─── OLED (SSD1306 I2C 0x3C) ──────────────────────
     try:
@@ -268,101 +266,86 @@ def get_temp():
 
 
 # ─── Fan ────────────────────────────────────────────────────
+# Der Lüfter wird über zwei Wege gesteuert:
+# 1. PWM über /sys/.../pwm1 (0-255) = echte Geschwindigkeitssteuerung
+# 2. GPIO Pin 6 = zusätzlicher An/Aus-Schalter
+# Beide steuern denselben physischen Lüfter.
 
-def _duty_to_level(duty: float) -> int:
-    if duty <= 0:
+_fan_hwmon_dir: str = ""
+
+def _find_fan_hwmon() -> str:
+    """Findet den hwmon-Pfad für den Lüfter."""
+    base = "/sys/devices/platform/cooling_fan/hwmon/"
+    if os.path.exists(base):
+        subs = os.listdir(base)
+        if subs:
+            return f"{base}{subs[0]}"
+    return ""
+
+def _fan_read_rpm() -> int:
+    if not _fan_hwmon_dir:
         return 0
-    elif duty <= 40:
-        return 1
-    elif duty <= 70:
-        return 2
-    else:
-        return 3
-
-def _get_fan_rpm() -> int:
     try:
-        hwmon_dir = "/sys/devices/platform/cooling_fan/hwmon/"
-        if os.path.exists(hwmon_dir):
-            sub = os.listdir(hwmon_dir)[0]
-            with open(f"{hwmon_dir}/{sub}/fan1_input") as f:
-                return int(f.read().strip())
+        with open(f"{_fan_hwmon_dir}/fan1_input") as f:
+            return int(f.read().strip())
     except Exception:
-        pass
-    return 0
+        return 0
+
+def _fan_read_pwm() -> int:
+    if not _fan_hwmon_dir:
+        return 0
+    try:
+        with open(f"{_fan_hwmon_dir}/pwm1") as f:
+            return int(f.read().strip())
+    except Exception:
+        return 0
+
+def _fan_write_pwm(value: int):
+    """PWM-Wert setzen (0-255). Setzt vorher pwm1_enable auf manuell."""
+    if not _fan_hwmon_dir:
+        return
+    try:
+        with open(f"{_fan_hwmon_dir}/pwm1_enable", "w") as f:
+            f.write("1")
+        with open(f"{_fan_hwmon_dir}/pwm1", "w") as f:
+            f.write(str(max(0, min(255, value))))
+    except Exception as e:
+        logger.error(f"PWM schreiben: {e}")
+
+# ─── Fan Endpoints ──────────────────────────────────────────
 
 @app.post("/fan/pwm")
 def fan_set_pwm(req: FanPWM):
-    """Legacy: Steuert beide Lüfter gleichzeitig."""
-    results = {}
-    if _fan_pwm_supported:
-        level = _duty_to_level(req.duty)
-        try:
-            with open("/sys/class/thermal/cooling_device0/cur_state", "w") as f:
-                f.write(str(level))
-            results["pwm_level"] = level
-        except Exception as e:
-            results["pwm_error"] = str(e)
+    """Lüfter-PWM setzen (duty 0-100% → PWM 0-255)."""
+    pwm_value = int(req.duty / 100.0 * 255)
+    _fan_write_pwm(pwm_value)
+    # GPIO synchron schalten (An/Aus-Schalter)
     if _fan_available and _fan_gpio:
         try:
-            fan_on = req.duty > 0
-            _fan_gpio.value = 1 if fan_on else 0
-            results["gpio"] = fan_on
+            _fan_gpio.value = 1 if req.duty > 0 else 0
             if _fan_led_gpio:
-                _fan_led_gpio.value = 1 if fan_on else 0
-                results["fan_led"] = fan_on
-        except Exception as e:
-            results["gpio_error"] = str(e)
-    if not _fan_available and not _fan_pwm_supported:
-        return {"ok": False, "error": "Fan nicht verfügbar"}
-    return {"ok": True, "duty": req.duty, **results}
-
-# ─── Getrennte Steuerung ─────────────────────────────────────
-
-@app.post("/fan/cpu")
-def fan_cpu_set(req: FanPWM):
-    """CPU-Lüfter: Kernel PWM, 4 Stufen (0=Aus, 1=Leise, 2=Mittel, 3=Voll)."""
-    if not _fan_pwm_supported:
-        return {"ok": False, "error": "Kernel PWM nicht verfügbar"}
-    level = _duty_to_level(req.duty)
-    try:
-        with open("/sys/class/thermal/cooling_device0/cur_state", "w") as f:
-            f.write(str(level))
-        return {"ok": True, "duty": req.duty, "level": level}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-@app.get("/fan/cpu")
-def fan_cpu_get():
-    """CPU-Lüfter Status."""
-    result = {"available": _fan_pwm_supported, "type": "pwm", "max_level": 4}
-    if _fan_pwm_supported:
-        try:
-            with open("/sys/class/thermal/cooling_device0/cur_state") as f:
-                result["level"] = int(f.read().strip())
+                _fan_led_gpio.value = 1 if req.duty > 0 else 0
         except Exception:
-            result["level"] = 0
-    result["rpm"] = _get_fan_rpm()
-    return result
+            pass
+    return {
+        "ok": True,
+        "duty": req.duty,
+        "pwm": pwm_value,
+        "rpm": _fan_read_rpm(),
+    }
 
-@app.post("/fan/case")
-def fan_case_set(req: dict):
-    """Gehäuselüfter: GPIO Pin 6, nur An/Aus."""
-    if not _fan_available or not _fan_gpio:
-        return {"ok": False, "error": "Gehäuselüfter nicht verfügbar"}
-    on = bool(req.get("on", False))
-    try:
-        _fan_gpio.value = 1 if on else 0
-        if _fan_led_gpio:
-            _fan_led_gpio.value = 1 if on else 0
-        return {"ok": True, "on": on}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-@app.get("/fan/case")
-def fan_case_get():
-    """Gehäuselüfter Status."""
-    on = bool(_fan_gpio.value) if _fan_gpio else False
-    return {"available": _fan_available, "type": "gpio", "on": on}
+@app.get("/fan/pwm")
+def fan_get_pwm():
+    """Aktuellen Lüfter-Status lesen."""
+    pwm = _fan_read_pwm()
+    rpm = _fan_read_rpm()
+    return {
+        "available": _fan_pwm_supported or _fan_available,
+        "pwm": pwm,
+        "duty": round(pwm / 255 * 100, 1),
+        "rpm": rpm,
+        "gpio_on": bool(_fan_gpio.value) if _fan_gpio else False,
+    }
 
 @app.get("/fan/pwm")
 def fan_get_pwm():

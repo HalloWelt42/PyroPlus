@@ -2,7 +2,9 @@
 PyroPlus v3.0.0 — Lüfter-Controller
 © HalloWelt42 - Nur für private Nutzung
 
-Präzisions-PWM-Steuerung über Hardware-Proxy.
+PWM-Steuerung über Temperaturkurve.
+Überschreibt den Kernel-Governor alle 500ms.
+Notfall-Sicherheit: Vollgas ab 80°C.
 """
 
 import time
@@ -14,12 +16,14 @@ from typing import Optional
 import hw_client
 from config import (
     FAN_DEFAULT_CURVE, FAN_DEFAULT_HYSTERESIS,
-    FAN_DEFAULT_RAMP_UP, FAN_DEFAULT_RAMP_DOWN, FAN_DEFAULT_MIN_SPEED,
-    FAN_DEFAULT_POLL_INTERVAL, FAN_DEFAULT_MODE, FAN_PROFILES, DATA_DIR,
+    FAN_DEFAULT_MODE, FAN_PROFILES, DATA_DIR,
 )
 from stats import fan_speed_history
 
 logger = logging.getLogger("fan")
+
+SAFETY_TEMP = 80.0  # Ab dieser Temperatur: Vollgas erzwungen
+POLL_INTERVAL = 0.5  # 500ms — schneller als der Kernel-Governor
 
 
 class FanController:
@@ -30,25 +34,23 @@ class FanController:
         self.custom_curve: list[dict] = [dict(p) for p in FAN_DEFAULT_CURVE]
         self.manual_speed: float = 50.0
         self.hysteresis: float = FAN_DEFAULT_HYSTERESIS
-        self.ramp_up: float = FAN_DEFAULT_RAMP_UP
-        self.ramp_down: float = FAN_DEFAULT_RAMP_DOWN
-        self.min_speed: float = FAN_DEFAULT_MIN_SPEED
-        self.poll_interval: float = FAN_DEFAULT_POLL_INTERVAL
-        self.threshold_on: float = 50.0
-        self.threshold_off: float = 45.0
-        self.current_speed: float = 0.0
-        self.target_speed: float = 0.0
+        self.current_duty: float = 0.0  # Aktueller PWM-Wert in % (0-100)
         self.current_temp: float = 0.0
-        self.sim_temp: float | None = None  # Simulierte Temperatur (überschreibt Echtdaten)
-        self.last_direction: str = "down"
+        self.current_rpm: int = 0
+        self.sim_temp: float | None = None
         self.available: bool = hw_client.fan_available()
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
         self._load_settings()
-        logger.info(f"Fan verfügbar: {self.available}")
+        logger.info(f"Lüfter verfügbar: {self.available}")
 
-    def get_speed_for_temp(self, temp: float) -> float:
+    # ═══════════════════════════════════════════════════════
+    #  KURVEN-BERECHNUNG
+    # ═══════════════════════════════════════════════════════
+
+    def get_duty_for_temp(self, temp: float) -> float:
+        """Berechne PWM-Duty (0-100%) für eine Temperatur anhand der Kurve."""
         if not self.curve or len(self.curve) < 2:
             return 0.0
         if temp <= self.curve[0]["temp"]:
@@ -60,161 +62,107 @@ class FanController:
             if p1["temp"] <= temp <= p2["temp"]:
                 dt = p2["temp"] - p1["temp"]
                 if dt == 0:
-                    return p1["speed"]
+                    return p2["speed"]
                 ratio = (temp - p1["temp"]) / dt
-                return p1["speed"] + ratio * (p2["speed"] - p1["speed"])
+                return p1["speed"] + (p2["speed"] - p1["speed"]) * ratio
         return 0.0
 
-    def set_curve(self, points: list[dict]) -> list[dict]:
-        validated = []
-        for p in points:
-            temp = round(max(20.0, min(85.0, float(p["temp"]))) * 2) / 2
-            speed = round(max(0.0, min(100.0, float(p["speed"]))))
-            validated.append({"temp": temp, "speed": speed})
-        validated.sort(key=lambda x: x["temp"])
-        if len(validated) < 2:
-            return self.curve
-        with self._lock:
-            self.curve = validated
-            self.custom_curve = [dict(p) for p in validated]
-            self.profile = "custom"
-        self._save_settings()
-        return self.curve
-
-    def add_point(self, temp: float, speed: float) -> list[dict]:
-        temp = round(max(20.0, min(85.0, temp)) * 2) / 2
-        speed = round(max(0.0, min(100.0, speed)))
-        with self._lock:
-            for p in self.curve:
-                if abs(p["temp"] - temp) < 0.25:
-                    p["speed"] = speed
-                    self._save_settings()
-                    return self.curve
-            self.curve.append({"temp": temp, "speed": speed})
-            self.curve.sort(key=lambda x: x["temp"])
-            self.profile = "custom"
-            self.custom_curve = [dict(p) for p in self.curve]
-        self._save_settings()
-        return self.curve
-
-    def remove_point(self, index: int) -> list[dict]:
-        with self._lock:
-            if len(self.curve) <= 2:
-                return self.curve
-            if 0 <= index < len(self.curve):
-                self.curve.pop(index)
-                self.profile = "custom"
-                self.custom_curve = [dict(p) for p in self.curve]
-        self._save_settings()
-        return self.curve
-
-    def update_point(self, index: int, temp: float, speed: float) -> list[dict]:
-        with self._lock:
-            if 0 <= index < len(self.curve):
-                self.curve[index]["temp"] = round(max(20.0, min(85.0, temp)) * 2) / 2
-                self.curve[index]["speed"] = round(max(0.0, min(100.0, speed)))
-                self.curve.sort(key=lambda x: x["temp"])
-                self.profile = "custom"
-                self.custom_curve = [dict(p) for p in self.curve]
-        self._save_settings()
-        return self.curve
-
-    def set_profile(self, name: str) -> dict:
-        if name == "custom":
-            with self._lock:
-                self.curve = [dict(p) for p in self.custom_curve]
-                self.profile = "custom"
-        elif name in FAN_PROFILES:
-            with self._lock:
-                self.curve = [dict(p) for p in FAN_PROFILES[name]]
-                self.profile = name
-        else:
-            return {"error": f"Unbekanntes Profil: {name}"}
-        self._save_settings()
-        return {"ok": True, "profile": name, "curve": self.curve}
+    # ═══════════════════════════════════════════════════════
+    #  KONFIGURATION
+    # ═══════════════════════════════════════════════════════
 
     def set_mode(self, mode: str):
         if mode not in ("auto", "manual", "off"):
             return
         with self._lock:
             self.mode = mode
-            if mode == "off":
-                self.target_speed = 0
-                self.current_speed = 0.0
-                self._apply_fan(False)
-            elif mode == "manual":
-                self.target_speed = self.manual_speed
-                self.current_speed = 100.0
-                self._apply_fan(True)
         self._save_settings()
+
+    def set_profile(self, name: str) -> dict:
+        if name == "custom":
+            self.profile = "custom"
+            self.curve = [dict(p) for p in self.custom_curve]
+        elif name in FAN_PROFILES:
+            self.profile = name
+            self.curve = [dict(p) for p in FAN_PROFILES[name]]
+        self._save_settings()
+        return self.get_state()
+
+    def set_curve(self, points: list[dict]) -> dict:
+        validated = []
+        for p in points:
+            temp = round(max(20.0, min(85.0, float(p["temp"]))) * 2) / 2
+            speed = round(max(0.0, min(100.0, float(p["speed"]))))
+            validated.append({"temp": temp, "speed": speed})
+        validated.sort(key=lambda x: x["temp"])
+        if len(validated) >= 2:
+            self.curve = validated
+            self.custom_curve = [dict(p) for p in validated]
+            self.profile = "custom"
+            self._save_settings()
+        return {"curve": self.curve}
 
     def set_manual_speed(self, speed: float):
         self.manual_speed = round(max(0.0, min(100.0, speed)))
-        if self.mode == "manual":
-            self.target_speed = self.manual_speed
         self._save_settings()
 
-    def set_fine_settings(self, hysteresis=None, ramp_up=None, ramp_down=None,
-                          min_speed=None, poll_interval=None,
-                          threshold_on=None, threshold_off=None):
+    def set_hysteresis(self, value: float):
+        self.hysteresis = round(max(0.5, min(10.0, value)) * 2) / 2
+        self._save_settings()
+
+    def set_fine_settings(self, hysteresis=None, **kwargs):
         if hysteresis is not None:
             self.hysteresis = round(max(0.5, min(10.0, hysteresis)) * 2) / 2
-        if ramp_up is not None:
-            self.ramp_up = round(max(0.0, min(15.0, ramp_up)) * 2) / 2
-        if ramp_down is not None:
-            self.ramp_down = round(max(0.0, min(30.0, ramp_down)), 1)
-        if min_speed is not None:
-            self.min_speed = round(max(0.0, min(40.0, min_speed)))
-        if poll_interval is not None:
-            self.poll_interval = round(max(0.5, min(10.0, poll_interval)) * 2) / 2
-        if threshold_on is not None:
-            self.threshold_on = round(max(35, min(75, threshold_on)))
-        if threshold_off is not None:
-            self.threshold_off = round(max(30, min(70, threshold_off)))
         self._save_settings()
+
+    # ═══════════════════════════════════════════════════════
+    #  CONTROL LOOP (500ms, überschreibt Kernel-Governor)
+    # ═══════════════════════════════════════════════════════
 
     def start(self):
         self._running = True
         self._thread = threading.Thread(target=self._control_loop, daemon=True)
         self._thread.start()
-        logger.info("Lüfter-Controller gestartet")
+        logger.info("Lüfter-Controller gestartet (500ms Loop)")
 
     def stop(self):
         self._running = False
         if self._thread:
-            self._thread.join(timeout=5)
-        self._apply_speed(0)
+            self._thread.join(timeout=2)
+        hw_client.fan_set_pwm(0)
 
     def _control_loop(self):
-        """An/Aus-Steuerung basierend auf Temperaturschwellen."""
         while self._running:
+            # Temperatur lesen
             self.current_temp = self.sim_temp if self.sim_temp is not None else hw_client.get_temp()
 
-            if self.mode == "auto":
-                # Einschalten wenn Temperatur über threshold_on steigt
-                if self.current_temp >= self.threshold_on and self.current_speed == 0:
-                    self.current_speed = 100.0
-                    self._apply_fan(True)
-                    logger.info(f"Lüfter EIN bei {self.current_temp:.1f}°C (Schwelle: {self.threshold_on}°C)")
-                # Ausschalten wenn Temperatur unter threshold_off fällt
-                elif self.current_temp <= self.threshold_off and self.current_speed > 0:
-                    self.current_speed = 0.0
-                    self._apply_fan(False)
-                    logger.info(f"Lüfter AUS bei {self.current_temp:.1f}°C (Schwelle: {self.threshold_off}°C)")
+            # Sicherheit: Ab 80°C immer Vollgas
+            if self.current_temp >= SAFETY_TEMP:
+                target = 100.0
+            elif self.mode == "auto":
+                target = self.get_duty_for_temp(self.current_temp)
+                # Hysterese: nur runterregeln wenn Differenz groß genug
+                if target < self.current_duty:
+                    temp_with_hyst = self.current_temp + self.hysteresis
+                    hyst_target = self.get_duty_for_temp(temp_with_hyst)
+                    if hyst_target >= self.current_duty:
+                        target = self.current_duty  # Halten
             elif self.mode == "manual":
-                if self.current_speed == 0:
-                    self.current_speed = 100.0
-                    self._apply_fan(True)
-            elif self.mode == "off":
-                if self.current_speed > 0:
-                    self.current_speed = 0.0
-                    self._apply_fan(False)
+                target = self.manual_speed
+            else:  # off
+                target = 0.0
 
-            time.sleep(self.poll_interval)
+            # PWM setzen (überschreibt Kernel-Governor)
+            self.current_duty = round(target, 1)
+            result = hw_client.fan_set_pwm(self.current_duty)
+            if result and isinstance(result, dict):
+                self.current_rpm = result.get("rpm", 0)
 
-    def _apply_fan(self, on: bool):
-        """Lüfter ein- oder ausschalten (GPIO Digital)."""
-        hw_client.fan_set_pwm(100.0 if on else 0.0)
+            time.sleep(POLL_INTERVAL)
+
+    # ═══════════════════════════════════════════════════════
+    #  STATE
+    # ═══════════════════════════════════════════════════════
 
     def get_state(self) -> dict:
         return {
@@ -222,34 +170,30 @@ class FanController:
             "mode": self.mode,
             "profile": self.profile,
             "curve": self.curve,
-            "fan_on": self.current_speed > 0,
-            "current_speed": round(self.current_speed, 1),
+            "current_duty": self.current_duty,
             "current_temp": round(self.current_temp, 1),
-            "settings": {
-                "hysteresis": self.hysteresis,
-                "ramp_up": self.ramp_up,
-                "ramp_down": self.ramp_down,
-                "min_speed": self.min_speed,
-                "poll_interval": self.poll_interval,
-                "threshold_on": self.threshold_on,
-                "threshold_off": self.threshold_off,
-            },
+            "current_rpm": self.current_rpm,
+            "manual_speed": self.manual_speed,
+            "hysteresis": self.hysteresis,
             "profiles": list(FAN_PROFILES.keys()) + ["custom"],
+            "safety_temp": SAFETY_TEMP,
         }
+
+    # ═══════════════════════════════════════════════════════
+    #  PERSISTENZ
+    # ═══════════════════════════════════════════════════════
 
     def _save_settings(self):
         try:
             data = {
                 "mode": self.mode, "profile": self.profile,
                 "curve": self.curve, "custom_curve": self.custom_curve,
-                "manual_speed": self.manual_speed, "hysteresis": self.hysteresis,
-                "ramp_up": self.ramp_up, "ramp_down": self.ramp_down,
-                "min_speed": self.min_speed, "poll_interval": self.poll_interval,
-                "threshold_on": self.threshold_on, "threshold_off": self.threshold_off,
+                "manual_speed": self.manual_speed,
+                "hysteresis": self.hysteresis,
             }
             (DATA_DIR / "fan_settings.json").write_text(json.dumps(data, indent=2))
         except Exception as e:
-            logger.error(f"Fan-Settings speichern: {e}")
+            logger.error(f"Lüfter-Einstellungen speichern: {e}")
 
     def _load_settings(self):
         path = DATA_DIR / "fan_settings.json"
@@ -261,15 +205,10 @@ class FanController:
             self.profile = data.get("profile", self.profile)
             self.manual_speed = data.get("manual_speed", self.manual_speed)
             self.hysteresis = data.get("hysteresis", self.hysteresis)
-            self.ramp_up = data.get("ramp_up", self.ramp_up)
-            self.ramp_down = data.get("ramp_down", self.ramp_down)
-            self.min_speed = data.get("min_speed", self.min_speed)
-            self.poll_interval = data.get("poll_interval", self.poll_interval)
-            self.threshold_on = data.get("threshold_on", self.threshold_on)
-            self.threshold_off = data.get("threshold_off", self.threshold_off)
             if "curve" in data and len(data["curve"]) >= 2:
                 self.curve = data["curve"]
             if "custom_curve" in data and len(data["custom_curve"]) >= 2:
                 self.custom_curve = data["custom_curve"]
+            logger.info(f"Lüfter-Einstellungen geladen: Modus={self.mode}, Profil={self.profile}")
         except Exception as e:
-            logger.error(f"Fan-Settings laden: {e}")
+            logger.error(f"Lüfter-Einstellungen laden: {e}")

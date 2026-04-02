@@ -217,20 +217,15 @@ def fan_set_manual_speed(req: FanManualSpeed):
     return {"ok": True, "speed": req.speed}
 
 @app.post("/api/fan/settings", tags=["Lüfter"],
-          summary="Feineinstellungen (Hysterese, Rampe, etc.)")
+          summary="Feineinstellungen (Hysterese)")
 def fan_set_fine_settings(req: FanFineSettings):
-    fan.set_fine_settings(
-        hysteresis=req.hysteresis, ramp_up=req.ramp_up,
-        ramp_down=req.ramp_down, min_speed=req.min_speed,
-        poll_interval=req.poll_interval,
-        threshold_on=req.threshold_on, threshold_off=req.threshold_off,
-    )
-    return {"ok": True, "settings": fan.get_state()["settings"]}
+    fan.set_fine_settings(hysteresis=req.hysteresis)
+    return {"ok": True, **fan.get_state()}
 
-@app.get("/api/fan/speed-for-temp", tags=["Lüfter"],
-         summary="Berechne Fan-Speed für eine Temperatur")
-def fan_speed_for_temp(temp: float = Query()):
-    return {"temp": temp, "speed": round(fan.get_speed_for_temp(temp), 1)}
+@app.get("/api/fan/duty-for-temp", tags=["Lüfter"],
+         summary="Berechne PWM-Duty für eine Temperatur")
+def fan_duty_for_temp(temp: float = Query()):
+    return {"temp": temp, "duty": round(fan.get_duty_for_temp(temp), 1)}
 
 
 # ─── SIMULATION ─────────────────────────────────────────────

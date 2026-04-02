@@ -62,19 +62,28 @@ def get_temp() -> float:
 
 # ─── Fan ────────────────────────────────────────────────────
 
-def fan_set_pwm(duty: float) -> bool:
+def fan_set_pwm(duty: float) -> dict:
+    """PWM setzen (0-100%). Gibt dict mit duty, pwm, rpm zurück."""
     try:
         r = _get_client().post("/fan/pwm", json={"duty": round(duty, 1)})
-        return r.json().get("ok", False)
+        return r.json()
     except Exception as e:
-        logger.error(f"Fan PWM: {e}")
-        return False
+        logger.error(f"Lüfter PWM: {e}")
+        return {"ok": False}
+
+
+def fan_get_status() -> dict:
+    """Aktuellen Lüfter-Status lesen (PWM, RPM, GPIO)."""
+    try:
+        r = _get_client().get("/fan/pwm")
+        return r.json()
+    except Exception:
+        return {"available": False}
 
 
 def fan_available() -> bool:
     try:
-        r = _get_client().get("/fan/pwm")
-        return r.json().get("available", False)
+        return fan_get_status().get("available", False)
     except Exception:
         return False
 
