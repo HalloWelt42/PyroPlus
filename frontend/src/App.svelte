@@ -26,6 +26,15 @@ function selectView(id) {
   s.currentView = id;
   viewKey++;
 }
+
+function tempToColor(t) {
+  if (t <= 25) return 'rgb(0,60,255)';
+  if (t <= 30) { const f = (t-25)/5; return `rgb(${Math.round(255*f)},${Math.round(60+180*f)},${Math.round(255*(1-f))})`; }
+  if (t <= 40) { const f = (t-30)/10; return `rgb(255,${Math.round(240-100*f)},0)`; }
+  if (t <= 55) { const f = (t-40)/15; return `rgb(255,${Math.round(140-100*f)},0)`; }
+  return `rgb(255,${Math.round(40*Math.max(0,1-(t-55)/5))},0)`;
+}
+const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
 </script>
 
 <!-- Toasts -->
@@ -45,6 +54,15 @@ function selectView(id) {
       <button class="sb-collapse" onclick={() => sidebarOpen = !sidebarOpen} aria-label="Seitenleiste umschalten">
         <i class="fa-solid" class:fa-angles-left={sidebarOpen} class:fa-angles-right={!sidebarOpen}></i>
       </button>
+    </div>
+
+    <!-- Temperatur -->
+    <div class="sb-temp" style="color:{tempColor}">
+      {#if sidebarOpen}
+        <span class="sb-temp-val">{(s.stats?.cpu?.temp || 0).toFixed(1)}</span><span class="sb-temp-unit">°C</span>
+      {:else}
+        <span class="sb-temp-mini">{(s.stats?.cpu?.temp || 0).toFixed(0)}°</span>
+      {/if}
     </div>
 
     <nav class="sb-nav">
@@ -154,6 +172,13 @@ function selectView(id) {
     font-size: var(--fs-xs); transition: all var(--tr); flex-shrink: 0;
   }
   .sb-collapse:hover { color: var(--text-primary); border-color: var(--border-accent); }
+
+  /* Temperatur in Sidebar */
+  .sb-temp { text-align: center; margin-bottom: 16px; transition: color 1s; }
+  .sb-temp-val { font: 800 48px var(--mono); line-height: 1; }
+  .sb-temp-unit { font: 400 20px var(--font); color: var(--text-muted); }
+  .sb-temp-mini { font: 700 24px var(--mono); }
+  .sidebar-collapsed .sb-temp { margin-bottom: 12px; }
 
   .sb-nav { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
   .nav-btn {

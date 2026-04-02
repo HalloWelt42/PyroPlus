@@ -102,9 +102,6 @@
         <div class="fan-badge" class:on={caseFanOn}><i class="fa-solid fa-fan" class:spinning={caseFanOn} style="animation-duration:1.5s"></i> {caseFanOn ? 'Läuft' : 'Aus'}</div>
       </div>
 
-      <!-- Temperatur -->
-      <div class="temp-big" style="color:{tempColorStr}">{currentTemp.toFixed(1)}<span class="temp-u">°C</span></div>
-
       <!-- Diagramm mit Schwellwerten -->
       <div class="chart">
         <svg viewBox="0 0 {CHART.w} {CHART.h}">
@@ -220,10 +217,6 @@
   .led-px { width: 20px; height: 20px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.12); position: relative; z-index: 1; transition: background 1s, box-shadow 1s; }
   .led-px.blink, .led-glow.blink { animation: blink 0.33s steps(1) infinite; }
   @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } }
-
-  /* Temperatur */
-  .temp-big { font: 800 44px var(--mono); text-align: center; line-height: 1; transition: color 1s; }
-  .temp-u { font-size: 20px; font-weight: 400; color: var(--text-muted); }
 
   /* Diagramm */
   .chart { flex: 1; min-height: 150px; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; }
