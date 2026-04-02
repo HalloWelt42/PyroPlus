@@ -226,8 +226,9 @@
             {#each profiles as p}<button class="pill" class:active={profile===p} onclick={()=>s.setFanProfile(p)}><i class="fa-solid {profIcons[p]||'fa-circle'}"></i> {profLabels[p]||p}</button>{/each}
           </div>
           <div class="chart-leds">
-            {#each [0,1,2,3] as i}
-              <div class="led-sm" class:blink={isBlinking} style="background:{ledColors()[i]};box-shadow:0 0 6px {ledGlows()[i]}"></div>
+            {#each (s.leds?.led_states || [{r:0,g:0,b:0},{r:0,g:0,b:0},{r:0,g:0,b:0},{r:0,g:0,b:0}]) as led}
+              {@const br = Math.pow((s.leds?.brightness || 500) / 1000, 0.6)}
+              <div class="led-sm" style="background:rgb({Math.round((led.r||0)*br)},{Math.round((led.g||0)*br)},{Math.round((led.b||0)*br)});box-shadow:0 0 6px rgba({Math.round((led.r||0)*br)},{Math.round((led.g||0)*br)},{Math.round((led.b||0)*br)},0.5)"></div>
             {/each}
           </div>
         </div>
