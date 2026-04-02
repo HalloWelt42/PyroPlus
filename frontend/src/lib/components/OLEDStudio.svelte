@@ -281,7 +281,7 @@
         wt.draw(px, w.x, w.y, w.props);
       } else {
         const text = wt.getText(w.props);
-        E.drawText(px, text, w.x, w.y, w.props.scale || 1);
+        E.drawText(px, text, w.x, w.y, w.props.scaleX || w.props.scale || 1, w.props.scaleY || w.props.scale || 1);
       }
     }
     layers = [...layers];
@@ -306,8 +306,8 @@
         const w = placedWidgets[selectedWidget];
         const wt = widgetTypes[w.type];
         if (wt) {
-          const ww = wt.isShape ? (w.props.width || wt.w) : wt.w * (w.props.scale || 1);
-          const wh = wt.isShape ? (w.props.height || wt.h) : wt.h * (w.props.scale || 1);
+          const ww = wt.isShape ? (w.props.width || wt.w) : wt.w * (w.props.scaleX || w.props.scale || 1);
+          const wh = wt.isShape ? (w.props.height || wt.h) : wt.h * (w.props.scaleY || w.props.scale || 1);
           ctx.strokeStyle = 'rgba(0,180,255,0.7)';
           ctx.lineWidth = 1;
           ctx.setLineDash([4, 2]);
@@ -328,8 +328,8 @@
       const w = placedWidgets[i];
       const wt = widgetTypes[w.type];
       if (!wt) continue;
-      const ww = wt.isShape ? (w.props.width || wt.w) : wt.w * (w.props.scale || 1);
-      const wh = wt.isShape ? (w.props.height || wt.h) : wt.h * (w.props.scale || 1);
+      const ww = wt.isShape ? (w.props.width || wt.w) : wt.w * (w.props.scaleX || w.props.scale || 1);
+      const wh = wt.isShape ? (w.props.height || wt.h) : wt.h * (w.props.scaleY || w.props.scale || 1);
       if (x >= w.x && x < w.x + ww && y >= w.y && y < w.y + wh) return i;
     }
     return -1;
@@ -396,42 +396,72 @@
   function clearLayer(){pushH();ap()?.fill(0);render();}
   function invertLayer(){pushH();const px=ap();if(px)for(let i=0;i<px.length;i++)px[i]=px[i]?0:1;render();}
   async function sendToOled() {
-    // Widgets als Screen-Konfiguration ans Backend senden
-    const screenData = {
-      type: 'system',
-      name: 'Editor',
-      widgets: placedWidgets.map(w => ({
-        type: w.type,
-        x: w.x,
-        y: w.y,
-        font: w.props.scale === 3 ? 'xl' : w.props.scale === 2 ? 'lg' : 'sm',
-        ...(w.props.text !== undefined ? { text: w.props.text } : {}),
-        ...(w.props.prefix !== undefined ? { prefix: w.props.prefix } : {}),
-        ...(w.props.width !== undefined ? { w: w.props.width } : {}),
-        ...(w.props.height !== undefined ? { h: w.props.height } : {}),
-      })),
-    };
-    // Auch das gerenderte Bild als Pixel-Art senden (Fallback)
-    const comp = E.composite(layers);
-    const c = document.createElement('canvas');
-    c.width = W; c.height = H;
-    const ctx = c.getContext('2d');
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#fff';
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (comp[y * W + x]) ctx.fillRect(x, y, 1, 1);
-    const base64 = c.toDataURL().split(',')[1];
-
-    // An Backend senden
+    saveCurrentScreen();
+    // Alle Screens als gerenderte Bilder ans Backend schicken
+    const screenConfigs = [];
+    for (const sc of screens) {
+      const scLayers = sc.layers ? sc.layers.map(l => ({ ...l, pixels: new Uint8Array(l.pixels) })) : [];
+      // Widgets rendern
+      const px = new Uint8Array(W * H);
+      if (sc.widgets) {
+        for (const w of sc.widgets) {
+          const wt = widgetTypes[w.type];
+          if (!wt) continue;
+          if (wt.isShape) wt.draw(px, w.x, w.y, w.props);
+          else { const text = wt.getText(w.props); E.drawText(px, text, w.x, w.y, w.props.scaleX||w.props.scale||1, w.props.scaleY||w.props.scale||1); }
+        }
+      }
+      // Layer darüber compositen
+      for (const l of scLayers) { if (l.visible) for (let i = 0; i < W*H; i++) if (l.pixels[i]) px[i] = 1; }
+      // Zu Base64 PNG
+      const c = document.createElement('canvas'); c.width = W; c.height = H;
+      const ctx = c.getContext('2d'); ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#fff';
+      for (let y=0;y<H;y++) for(let x=0;x<W;x++) if(px[y*W+x]) ctx.fillRect(x,y,1,1);
+      screenConfigs.push({ name: sc.name, image: c.toDataURL().split(',')[1], widgets: sc.widgets || [] });
+    }
     try {
-      await s.updateOledScreen(0, screenData);
-      s.toast('An OLED gesendet', 'ok');
+      const { api } = await import('../api/client.js');
+      // Alle Screens als Bilder ans Backend senden
+      for (let i = 0; i < screenConfigs.length; i++) {
+        if (i === 0) await s.updateOledScreen(0, { type: 'pixel_art', name: screenConfigs[i].name, pixels: screenConfigs[i].image });
+        else await s.addOledScreen({ type: 'pixel_art', name: screenConfigs[i].name, pixels: screenConfigs[i].image });
+      }
+      if (rotation) await s.setOledRotation(rotationInterval);
+      await s.setOledMode('auto');
+      s.toast(`${screenConfigs.length} Screen(s) an OLED gesendet`, 'ok');
     } catch (e) {
-      s.toast('Fehler: ' + e.message, 'err');
+      s.toast('Fehler: ' + (e.message||e), 'err');
+    }
+  }
+
+  async function loadFromOled() {
+    try {
+      // Preview-Bild vom Backend holen
+      if (s.oled?.preview) {
+        // Base64 PNG zu Pixel-Array
+        const img = new Image();
+        img.src = 'data:image/png;base64,' + s.oled.preview;
+        await new Promise(r => { img.onload = r; });
+        const c = document.createElement('canvas'); c.width = W; c.height = H;
+        const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, W, H);
+        const data = ctx.getImageData(0, 0, W, H);
+        const px = layers[0]?.pixels;
+        if (px) {
+          for (let i = 0; i < W * H; i++) px[i] = (data.data[i*4] > 128 || data.data[i*4+1] > 128 || data.data[i*4+2] > 128) ? 1 : 0;
+          layers = [...layers];
+          renderWidgets();
+          s.toast('Von OLED geladen', 'ok');
+        }
+      } else {
+        s.toast('Kein OLED-Preview verfügbar', 'info');
+      }
+    } catch (e) {
+      s.toast('Fehler: ' + (e.message||e), 'err');
     }
   }
 
   /* ═══ PANEL D&D ═══ */
-  let lpanels=$state(['preview','props','layers','widgets']), rpanels=$state(['tools','display','color','weather']);
+  let lpanels=$state(['preview','props','layers','widgets','templates']), rpanels=$state(['tools','display','color','weather']);
   let pdragId=$state(null), pdropSide=$state(null);
   function pDragStart(e,id){pdragId=id;e.dataTransfer.setData('application/x-oled-panel',id);e.dataTransfer.effectAllowed='move';}
   function pDragEnd(){pdragId=null;pdropSide=null;}
@@ -442,7 +472,62 @@
   function onKey(e){if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;if(e.ctrlKey&&e.key==='z'){undo();e.preventDefault();}if(e.ctrlKey&&e.key==='y'){redo();e.preventDefault();}if((e.key==='Delete'||e.key==='Backspace')&&selectedWidget>=0){removeWidget(selectedWidget);e.preventDefault();return;}if(e.key==='g'){showGrid=!showGrid;render();}if(e.key==='+')zoom=Math.min(16,zoom+1);if(e.key==='-')zoom=Math.max(2,zoom-1);const t=drawTools.find(t=>t.key===e.key.toUpperCase());if(t&&!e.ctrlKey)tool=t.id;}
 
   /* Panel-Metadaten */
-  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, color:{icon:'palette',label:'Farbe',c:false}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, widgets:{icon:'puzzle-piece',label:'Widgets',c:true}, weather:{icon:'cloud-sun',label:'Wetter-Ort',c:true} };
+  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, color:{icon:'palette',label:'Farbe',c:false}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, widgets:{icon:'puzzle-piece',label:'Widgets',c:true}, weather:{icon:'cloud-sun',label:'Wetter-Ort',c:true}, templates:{icon:'bookmark',label:'Vorlagen',c:true} };
+
+  /* Vordefinierte Vorlagen */
+  const templates = [
+    { name: 'Uhr + System', widgets: [
+      {type:'clock',x:0,y:0,props:{scale:2}},
+      {type:'weekday',x:0,y:18,props:{scale:1}},
+      {type:'date',x:16,y:18,props:{scale:1}},
+      {type:'cpu_temp',x:0,y:30,props:{scale:1,prefix:'CPU '}},
+      {type:'ram_pct',x:0,y:40,props:{scale:1,prefix:'RAM '}},
+      {type:'net_ip',x:0,y:50,props:{scale:1,prefix:''}},
+    ]},
+    { name: 'Wetter', widgets: [
+      {type:'w_icon',x:2,y:2,props:{}},
+      {type:'w_temp',x:14,y:0,props:{scale:2}},
+      {type:'w_cond',x:2,y:20,props:{scale:1}},
+      {type:'w_hum',x:2,y:30,props:{scale:1}},
+      {type:'w_wind',x:2,y:40,props:{scale:1}},
+      {type:'w_loc',x:2,y:54,props:{scale:1,text:''}},
+      {type:'clock_s',x:76,y:2,props:{scale:1}},
+    ]},
+    { name: 'Große Uhr', widgets: [
+      {type:'clock_l',x:4,y:4,props:{scale:3}},
+      {type:'weekday',x:4,y:32,props:{scale:1}},
+      {type:'date',x:20,y:32,props:{scale:1}},
+      {type:'cpu_temp',x:4,y:50,props:{scale:1,prefix:''}},
+      {type:'ram_pct',x:40,y:50,props:{scale:1,prefix:''}},
+    ]},
+    { name: 'System-Monitor', widgets: [
+      {type:'cpu_temp',x:0,y:0,props:{scale:1,prefix:'CPU '}},
+      {type:'cpu_bar',x:0,y:10,props:{width:60,height:6}},
+      {type:'ram_pct',x:0,y:20,props:{scale:1,prefix:'RAM '}},
+      {type:'ram_bar',x:0,y:30,props:{width:60,height:6}},
+      {type:'disk_pct',x:0,y:40,props:{scale:1,prefix:'DSK ',diskIdx:0}},
+      {type:'disk_bar',x:0,y:50,props:{width:60,height:6,diskIdx:0}},
+      {type:'uptime',x:66,y:0,props:{scale:1,prefix:''}},
+      {type:'net_ip',x:66,y:10,props:{scale:1,prefix:''}},
+      {type:'net_rx',x:66,y:24,props:{scale:1,prefix:'Rx '}},
+      {type:'net_tx',x:66,y:34,props:{scale:1,prefix:'Tx '}},
+    ]},
+    { name: 'Netzwerk', widgets: [
+      {type:'net_ip',x:0,y:0,props:{scale:2,prefix:''}},
+      {type:'net_if',x:0,y:18,props:{scale:1,prefix:''}},
+      {type:'net_rx',x:0,y:30,props:{scale:1,prefix:'DL '}},
+      {type:'net_tx',x:0,y:40,props:{scale:1,prefix:'UL '}},
+      {type:'uptime',x:0,y:54,props:{scale:1,prefix:'Up '}},
+    ]},
+  ];
+
+  function loadTemplate(t) {
+    placedWidgets = t.widgets.map(w => ({ id: Date.now()+Math.random(), ...w }));
+    selectedWidget = -1;
+    tool = 'move';
+    renderWidgets();
+    s.toast(`Vorlage "${t.name}" geladen`, 'ok');
+  }
   function panelIcon(id) { return _pd[id]?.icon || 'circle'; }
   function panelLabel(id) { return _pd[id]?.label || id; }
   function panelCollapsible(id) { return _pd[id]?.c ?? true; }
@@ -508,7 +593,8 @@
     <div class="cp"><div class="cs white" class:active={tool!=='eraser'} onclick={()=>{if(tool==='eraser')tool='pencil';}} title="Weiß"></div><div class="cs black" class:active={tool==='eraser'} onclick={()=>tool='eraser'} title="Schwarz"></div></div>
   {:else if id==='preview'}
     <div class="pv-box"><div class="pv-bezel"><canvas bind:this={previewEl} width={W} height={H} class="pv-canvas"></canvas></div></div>
-    <button class="send-btn" onclick={sendToOled}><i class="fa-solid fa-paper-plane"></i> An OLED senden</button>
+    <button class="send-btn" onclick={sendToOled}><i class="fa-solid fa-paper-plane"></i> An OLED senden ({screens.length})</button>
+    <button class="send-btn" style="margin-top:4px;border-color:var(--green);color:var(--green)" onclick={loadFromOled}><i class="fa-solid fa-download"></i> Von OLED laden</button>
   {:else if id==='props'}
     {#if selectedWidget >= 0 && placedWidgets[selectedWidget]}
       {@const sw = placedWidgets[selectedWidget]}
@@ -518,7 +604,8 @@
       <div class="pr"><span>X</span><input type="range" min="0" max={W-1} value={sw.x} oninput={(e)=>{sw.x=+e.target.value;placedWidgets=[...placedWidgets];renderWidgets();}}><span class="pv">{sw.x}</span></div>
       <div class="pr"><span>Y</span><input type="range" min="0" max={H-1} value={sw.y} oninput={(e)=>{sw.y=+e.target.value;placedWidgets=[...placedWidgets];renderWidgets();}}><span class="pv">{sw.y}</span></div>
       {#if sw.props.scale !== undefined}
-        <div class="pr"><span>Größe</span><input type="range" min="1" max="5" value={sw.props.scale} oninput={(e)=>updateWidgetProp(selectedWidget,'scale',+e.target.value)}><span class="pv">{sw.props.scale}×</span></div>
+        <div class="pr"><span>Breite</span><input type="range" min="1" max="8" value={sw.props.scaleX||sw.props.scale} oninput={(e)=>updateWidgetProp(selectedWidget,'scaleX',+e.target.value)}><span class="pv">{sw.props.scaleX||sw.props.scale}×</span></div>
+        <div class="pr"><span>Höhe</span><input type="range" min="1" max="8" value={sw.props.scaleY||sw.props.scale} oninput={(e)=>updateWidgetProp(selectedWidget,'scaleY',+e.target.value)}><span class="pv">{sw.props.scaleY||sw.props.scale}×</span></div>
       {/if}
       {#if sw.props.text !== undefined}
         <div class="pr"><span>Text</span><input type="text" class="ti" value={sw.props.text} oninput={(e)=>updateWidgetProp(selectedWidget,'text',e.target.value)}></div>
@@ -567,6 +654,10 @@
         </div>
       {/if}
     </div>
+  {:else if id==='templates'}
+    {#each templates as t}
+      <button class="wc-btn" onclick={() => loadTemplate(t)}><i class="fa-solid fa-download"></i> <span class="wc-name">{t.name}</span><span class="wc-size">{t.widgets.length} Widgets</span></button>
+    {/each}
   {:else if id==='widgets'}
     {#each ['zeit','cpu','ram','disk','net','sys','wetter','deko'] as cat}
       {@const items = widgetList.filter(w => w.cat === cat)}

@@ -8,7 +8,7 @@ import secrets
 import logging
 from pathlib import Path
 
-VERSION = "3.0.0"
+VERSION = "3.1.0"
 APP_NAME = "PyroPlus"
 
 # ─── Pfade ──────────────────────────────────────────────────

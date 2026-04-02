@@ -133,23 +133,24 @@ const FONT = {
   ')':'01000,00100,00010,00010,00010,00100,01000','%':'10001,00010,00010,00100,01000,01000,10001',
 };
 
-export function drawText(pixels, str, sx, sy, scale = 1) {
+export function drawText(pixels, str, sx, sy, scaleX = 1, scaleY) {
+  if (scaleY === undefined) scaleY = scaleX;
   let cx = sx;
   for (const ch of str) {
     const g = FONT[ch] || FONT[ch.toUpperCase()];
-    if (!g) { cx += 4 * scale; continue; }
+    if (!g) { cx += 4 * scaleX; continue; }
     g.split(',').forEach((row, ry) => {
       for (let rx = 0; rx < row.length; rx++) {
         if (row[rx] === '1') {
-          for (let dy = 0; dy < scale; dy++)
-            for (let dx = 0; dx < scale; dx++) {
-              const px = cx + rx * scale + dx, py = sy + ry * scale + dy;
+          for (let dy = 0; dy < scaleY; dy++)
+            for (let dx = 0; dx < scaleX; dx++) {
+              const px = cx + rx * scaleX + dx, py = sy + ry * scaleY + dy;
               if (px >= 0 && px < W && py >= 0 && py < H) pixels[py * W + px] = 1;
             }
         }
       }
     });
-    cx += 6 * scale;
+    cx += 6 * scaleX;
   }
 }
 
