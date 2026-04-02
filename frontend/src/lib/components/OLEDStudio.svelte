@@ -826,13 +826,13 @@
   .sg-item.active { border-color: var(--accent); }
   .sg-item.drag-over { border-color: var(--green); border-style: dashed; }
   .sg-item:hover { border-color: var(--text-muted); }
-  .sg-thumb { width: 96px; height: 48px; background: #000; border-radius: 2px; overflow: hidden; }
-  .sg-thumb img { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+  .sg-thumb { width: 128px; height: 64px; background: #000; border-radius: 2px; overflow: hidden; }
+  .sg-thumb img { width: 128px; height: 64px; image-rendering: pixelated; display: block; }
   .sg-empty { width: 100%; height: 100%; }
-  .sg-name { display: block; font: 500 var(--fs-xs) var(--font); color: var(--text-muted); text-align: center; margin-top: 2px; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sg-name { display: block; font: 500 var(--fs-xs) var(--font); color: var(--text-muted); text-align: center; margin-top: 2px; max-width: 128px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sg-del { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; border: none; background: var(--bg-elevated); color: var(--red); cursor: pointer; font-size: 8px; display: none; align-items: center; justify-content: center; }
   .sg-item:hover .sg-del { display: flex; }
-  .sg-add, .sg-dup { width: 96px; height: 48px; flex-shrink: 0; border-radius: var(--radius-sm); border: 2px dashed var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-base); display: flex; align-items: center; justify-content: center; }
+  .sg-add, .sg-dup { width: 128px; height: 64px; flex-shrink: 0; border-radius: var(--radius-sm); border: 2px dashed var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-base); display: flex; align-items: center; justify-content: center; }
   .sg-add:hover, .sg-dup:hover { border-color: var(--accent); color: var(--accent); }
   .sg-controls { display: flex; gap: 12px; align-items: center; }
   .sg-ctrl { display: flex; align-items: center; gap: 6px; font: 500 var(--fs-xs) var(--font); color: var(--text-muted); }
