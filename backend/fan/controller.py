@@ -34,11 +34,16 @@ class FanController:
         self.custom_curve: list[dict] = [dict(p) for p in FAN_DEFAULT_CURVE]
         self.manual_speed: float = 50.0
         self.hysteresis: float = FAN_DEFAULT_HYSTERESIS
-        self.current_duty: float = 0.0  # Aktueller PWM-Wert in % (0-100)
+        self.current_duty: float = 0.0
         self.current_temp: float = 0.0
         self.current_rpm: int = 0
         self.sim_temp: float | None = None
         self.available: bool = hw_client.fan_available()
+        # Gehäuselüfter (GPIO An/Aus mit Schwellwerten)
+        self.case_on: bool = False
+        self.case_profile: str = "balanced"
+        self.threshold_on: float = 55.0
+        self.threshold_off: float = 48.0
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
@@ -114,9 +119,15 @@ class FanController:
         self.hysteresis = round(max(0.5, min(10.0, value)) * 2) / 2
         self._save_settings()
 
-    def set_fine_settings(self, hysteresis=None, **kwargs):
+    def set_fine_settings(self, hysteresis=None, threshold_on=None, threshold_off=None, case_profile=None, **kwargs):
         if hysteresis is not None:
             self.hysteresis = round(max(0.5, min(10.0, hysteresis)) * 2) / 2
+        if threshold_on is not None:
+            self.threshold_on = round(max(35, min(80, threshold_on)))
+        if threshold_off is not None:
+            self.threshold_off = round(max(30, min(75, threshold_off)))
+        if case_profile is not None:
+            self.case_profile = case_profile
         self._save_settings()
 
     # ═══════════════════════════════════════════════════════
@@ -160,12 +171,26 @@ class FanController:
             self.current_duty = round(target, 1)
             hw_client.fan_set_pwm(self.current_duty)
 
-            # RPM separat lesen (aktueller Wert, nicht aus Set-Antwort)
+            # RPM lesen
             try:
                 status = hw_client.fan_get_status()
                 self.current_rpm = status.get("rpm", 0)
             except Exception:
                 self.current_rpm = 0
+
+            # ─── Gehäuselüfter (GPIO An/Aus mit Schwellwert) ───
+            if self.current_temp >= SAFETY_TEMP:
+                if not self.case_on:
+                    hw_client.case_fan_set(True)
+                    self.case_on = True
+            elif self.current_temp >= self.threshold_on and not self.case_on:
+                hw_client.case_fan_set(True)
+                self.case_on = True
+                logger.info(f"Gehäuselüfter EIN bei {self.current_temp:.1f}°C")
+            elif self.current_temp <= self.threshold_off and self.case_on:
+                hw_client.case_fan_set(False)
+                self.case_on = False
+                logger.info(f"Gehäuselüfter AUS bei {self.current_temp:.1f}°C")
 
             time.sleep(POLL_INTERVAL)
 
@@ -185,6 +210,10 @@ class FanController:
             "manual_speed": self.manual_speed,
             "hysteresis": self.hysteresis,
             "profiles": list(FAN_PROFILES.keys()) + ["custom"],
+            "case_on": self.case_on,
+            "case_profile": self.case_profile,
+            "threshold_on": self.threshold_on,
+            "threshold_off": self.threshold_off,
             "safety_temp": SAFETY_TEMP,
         }
 
@@ -199,6 +228,9 @@ class FanController:
                 "curve": self.curve, "custom_curve": self.custom_curve,
                 "manual_speed": self.manual_speed,
                 "hysteresis": self.hysteresis,
+                "case_profile": self.case_profile,
+                "threshold_on": self.threshold_on,
+                "threshold_off": self.threshold_off,
             }
             (DATA_DIR / "fan_settings.json").write_text(json.dumps(data, indent=2))
         except Exception as e:
@@ -214,6 +246,9 @@ class FanController:
             self.profile = data.get("profile", self.profile)
             self.manual_speed = data.get("manual_speed", self.manual_speed)
             self.hysteresis = data.get("hysteresis", self.hysteresis)
+            self.case_profile = data.get("case_profile", self.case_profile)
+            self.threshold_on = data.get("threshold_on", self.threshold_on)
+            self.threshold_off = data.get("threshold_off", self.threshold_off)
             if "curve" in data and len(data["curve"]) >= 2:
                 self.curve = data["curve"]
             if "custom_curve" in data and len(data["custom_curve"]) >= 2:

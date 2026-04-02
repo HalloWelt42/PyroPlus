@@ -81,6 +81,25 @@ def fan_get_status() -> dict:
         return {"available": False}
 
 
+def case_fan_set(on: bool) -> dict:
+    """Gehäuselüfter An/Aus über GPIO."""
+    try:
+        r = _get_client().post("/fan/case", json={"on": on})
+        return r.json()
+    except Exception as e:
+        logger.error(f"Gehäuselüfter: {e}")
+        return {"ok": False}
+
+
+def case_fan_get() -> dict:
+    """Gehäuselüfter Status."""
+    try:
+        r = _get_client().get("/fan/case")
+        return r.json()
+    except Exception:
+        return {"available": False, "on": False}
+
+
 def fan_available() -> bool:
     try:
         return fan_get_status().get("available", False)

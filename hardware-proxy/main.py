@@ -339,19 +339,28 @@ def fan_get_pwm():
         "gpio_on": bool(_fan_gpio.value) if _fan_gpio else False,
     }
 
-@app.get("/fan/pwm")
-def fan_get_pwm():
-    result = {"available": _fan_available or _fan_pwm_supported}
-    if _fan_pwm_supported:
-        try:
-            with open("/sys/class/thermal/cooling_device0/cur_state") as f:
-                result["pwm_level"] = int(f.read().strip())
-        except Exception:
-            pass
-        result["rpm"] = _get_fan_rpm()
-    if _fan_available and _fan_gpio:
-        result["gpio_state"] = bool(_fan_gpio.value)
-    return result
+# ─── Gehäuselüfter (GPIO An/Aus) ────────────────────────────
+
+@app.post("/fan/case")
+def fan_case_set(req: dict):
+    """Gehäuselüfter: GPIO Pin 6, nur An/Aus."""
+    if not _fan_available or not _fan_gpio:
+        return {"ok": False, "error": "Gehäuselüfter nicht verfügbar"}
+    on = bool(req.get("on", False))
+    try:
+        _fan_gpio.value = 1 if on else 0
+        if _fan_led_gpio:
+            _fan_led_gpio.value = 1 if on else 0
+        return {"ok": True, "on": on}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+@app.get("/fan/case")
+def fan_case_get():
+    """Gehäuselüfter Status."""
+    on = bool(_fan_gpio.value) if _fan_gpio else False
+    return {"available": _fan_available, "on": on}
+
 
 
 # ─── OLED ───────────────────────────────────────────────────

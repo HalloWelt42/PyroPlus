@@ -116,7 +116,22 @@
 
   let dragging = $state(-1);
   let curveEl = $state(null);
-  function startDrag(i, e) { if (profile !== 'custom') { s.toast('Wechsle zu Benutzerdefiniert', 'info'); return; } e.preventDefault(); dragging = i; window.addEventListener('mousemove', onDrag); window.addEventListener('mouseup', stopDrag); window.addEventListener('touchmove', onDrag, { passive: false }); window.addEventListener('touchend', stopDrag); }
+
+  async function addCurvePoint() {
+    if (profile !== 'custom') await s.setFanProfile('custom');
+    const pts = [...curve];
+    pts.push({ temp: 50, speed: 50 });
+    s.updateFan({ curve: pts });
+    s.setFanCurve(pts);
+  }
+  function removeCurvePoint(i) {
+    if (curve.length <= 2) return;
+    const pts = curve.filter((_, k) => k !== i);
+    s.updateFan({ curve: pts });
+    s.setFanCurve(pts);
+  }
+
+  function startDrag(i, e) { if (profile !== 'custom') { s.toast('Wechsle zu Eigene um Punkte zu bewegen', 'info'); return; } e.preventDefault(); dragging = i; window.addEventListener('mousemove', onDrag); window.addEventListener('mouseup', stopDrag); window.addEventListener('touchmove', onDrag, { passive: false }); window.addEventListener('touchend', stopDrag); }
   function onDrag(e) { if (dragging < 0 || !curveEl) return; e.preventDefault(); const pt = curveEl.createSVGPoint(); pt.x = e.touches ? e.touches[0].clientX : e.clientX; pt.y = e.touches ? e.touches[0].clientY : e.clientY; const svgPt = pt.matrixTransform(curveEl.getScreenCTM().inverse()); const pts = [...curve]; pts[dragging] = { temp: kxt(svgPt.x), speed: kys(svgPt.y) }; s.updateFan({ curve: pts }); }
   function stopDrag() { if (dragging >= 0) { s.setFanCurve(curve); dragging = -1; } window.removeEventListener('mousemove', onDrag); window.removeEventListener('mouseup', stopDrag); window.removeEventListener('touchmove', onDrag); window.removeEventListener('touchend', stopDrag); }
 
@@ -224,6 +239,17 @@
       </div>
 
       <div class="panel-footer">
+        {#if profile === 'custom'}
+          <div class="point-actions">
+            <button class="btn-point" onclick={addCurvePoint}><i class="fa-solid fa-plus"></i> Punkt</button>
+            <span class="point-count">{curve.length} Punkte</span>
+            <div class="point-chips">
+              {#each [...curve].sort((a,b)=>a.temp-b.temp) as pt, i}
+                <span class="chip">{pt.temp}°→{pt.speed}%{#if curve.length > 2}<button class="chip-x" onclick={()=>removeCurvePoint(curve.indexOf(pt))} aria-label="Entfernen"><i class="fa-solid fa-xmark"></i></button>{/if}</span>
+              {/each}
+            </div>
+          </div>
+        {/if}
         <div class="ctrl">
           <div class="ctrl-row"><span>Hysterese</span><input type="range" min="1" max="10" step="0.5" value={hysteresis} onchange={(e)=>s.setFanSettings({hysteresis:parseFloat(e.target.value)})}><span class="ctrl-val">{hysteresis}°C</span></div>
         </div>
@@ -271,6 +297,14 @@
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
   @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } }
+
+  /* Punkt-Aktionen */
+  .point-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .btn-point { padding: 4px 12px; border-radius: 99px; border: 1px dashed var(--accent); background: var(--accent-dim); color: var(--accent); font: 500 var(--fs-xs) var(--font); cursor: pointer; display: flex; align-items: center; gap: 4px; }
+  .point-count { font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
+  .point-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+  .chip { display: flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 99px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); font: 500 var(--fs-xs) var(--mono); color: var(--text-secondary); }
+  .chip-x { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-xs); padding: 0 2px; display: flex; } .chip-x:hover { color: var(--red); }
 
   /* Diagramm */
   .chart { min-height: 0; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; touch-action: none; }
