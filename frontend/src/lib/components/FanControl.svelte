@@ -229,6 +229,9 @@
             {#each s.ledColors as c}
               <div class="led-sm" style="background:{c.rgb};box-shadow:0 0 6px {c.glow}"></div>
             {/each}
+            {#if !['temp_reactive','load_reactive'].includes(s.leds?.effect)}
+              <button class="led-takeover" onclick={() => s.setLedEffect('temp_reactive')} title="Temperaturfarbe übernehmen"><i class="fa-solid fa-temperature-half"></i></button>
+            {/if}
           </div>
         </div>
         <svg bind:this={curveEl} viewBox="0 0 {CURVE.w} {CURVE.h}">
@@ -242,8 +245,11 @@
           {#if cpuFanTemp > TMIN}<line x1={ktx(cpuFanTemp)} y1={CURVE.pt} x2={ktx(cpuFanTemp)} y2={CURVE.pt+KH} stroke={tempColorStr} stroke-width="1.5" stroke-dasharray="6 4" opacity="0.6"/><text x={ktx(cpuFanTemp)} y={CURVE.pt-4} text-anchor="middle" class="ax-now">{cpuFanTemp.toFixed(1)}°</text>{/if}
           <path d={curveFill(curve)} fill="url(#cg)"/>
           <path d={curveLine(curve)} fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="drop-shadow(0 0 4px rgba(0,180,255,0.3))"/>
-          {#each curve as pt, i}<circle cx={ktx(pt.temp)} cy={ksy(pt.speed)} r={dragging===i?10:7} class="dot" class:drag={profile==='custom'} class:act={dragging===i} onmousedown={(e)=>startDrag(i,e)} ontouchstart={(e)=>startDrag(i,e)}/><text x={ktx(pt.temp)} y={ksy(pt.speed)-12} text-anchor="middle" class="ax-pt">{pt.temp}°/{pt.speed}%</text>{/each}
+          {#each curve as pt, i}<circle cx={ktx(pt.temp)} cy={ksy(pt.speed)} r={dragging===i?10:7} class="dot" class:drag={profile==='custom'} class:act={dragging===i} onmousedown={(e)=>startDrag(i,e)} ontouchstart={(e)=>startDrag(i,e)} ondblclick={()=>removeCurvePoint(i)}/><text x={ktx(pt.temp)} y={ksy(pt.speed)-12} text-anchor="middle" class="ax-pt">{pt.temp}°/{pt.speed}%</text>{/each}
         </svg>
+        {#if profile === 'custom'}
+          <button class="curve-add" onclick={addCurvePoint} title="Punkt hinzufügen"><i class="fa-solid fa-plus"></i></button>
+        {/if}
       </div>
 
       <div class="panel-footer">
@@ -305,6 +311,14 @@
 
   /* Profile + LEDs (im Chart-Bereich) */
   .chart-with-profiles { position: relative; }
+  .curve-add {
+    position: absolute; bottom: 8px; right: 8px; z-index: 2;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px dashed var(--accent); background: rgba(10,14,24,0.85);
+    color: var(--accent); cursor: pointer; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .curve-add:hover { background: var(--accent); color: #fff; border-style: solid; }
   .chart-topbar {
     position: absolute; top: 10px; left: 12px; right: 12px; z-index: 2;
     display: flex; align-items: center; justify-content: space-between;
@@ -319,6 +333,13 @@
     box-shadow: 0 0 8px var(--glow, transparent), 0 0 20px var(--glow, transparent);
   }
   .led-sm.blink { animation: blink 0.33s steps(1) infinite; }
+  .led-takeover {
+    width: 26px; height: 26px; border-radius: 6px; border: 1px dashed var(--accent);
+    background: var(--accent-dim); color: var(--accent); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+    transition: all 150ms;
+  }
+  .led-takeover:hover { background: var(--accent); color: #fff; border-style: solid; }
   .pill { padding: 8px 16px; background: rgba(10,14,24,0.85); backdrop-filter: blur(4px); border: 1px solid var(--border); border-radius: 99px; font: 500 var(--fs-xs) var(--font); cursor: pointer; color: var(--text-muted); transition: all 150ms; display: flex; align-items: center; gap: 8px; }
   .pill:hover { border-color: var(--text-muted); }
   .pill.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
