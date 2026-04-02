@@ -78,7 +78,7 @@
   function areaPath(arr) { const l = smoothPath(arr); return l ? `${l}L${chx(arr.length-1,arr.length).toFixed(1)},${CHART.pt+CH}L${chx(0,arr.length).toFixed(1)},${CHART.pt+CH}Z` : ''; }
 
   /* ═══ KURVEN-EDITOR ═══ */
-  const CURVE = { w: 460, h: 300, pl: 36, pr: 50, pt: 40, pb: 24 };
+  const CURVE = { w: 460, h: 300, pl: 36, pr: 50, pt: 50, pb: 24 };
   const KW = CURVE.w - CURVE.pl - CURVE.pr, KH = CURVE.h - CURVE.pt - CURVE.pb;
   const TMIN = 25, TMAX = 80;
   function ktx(t) { return CURVE.pl + ((t - TMIN) / (TMAX - TMIN)) * KW; }
@@ -247,14 +247,18 @@
   /* Profile + LEDs (im Chart-Bereich) */
   .chart-with-profiles { position: relative; }
   .chart-topbar {
-    position: absolute; top: 6px; left: 6px; right: 6px; z-index: 2;
+    position: absolute; top: 8px; left: 8px; right: 8px; z-index: 2;
     display: flex; align-items: center; justify-content: space-between;
   }
-  .chart-profiles { display: flex; gap: 4px; flex-wrap: wrap; }
-  .chart-leds { display: flex; gap: 6px; align-items: center; }
-  .led-sm { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.1); transition: background 1s, box-shadow 1s; }
+  .chart-profiles { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chart-leds { display: flex; gap: 10px; align-items: center; }
+  .led-sm {
+    width: 22px; height: 22px; border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: background 1s, box-shadow 1s;
+  }
   .led-sm.blink { animation: blink 0.33s steps(1) infinite; }
-  .pill { padding: 4px 10px; background: rgba(10,14,24,0.85); backdrop-filter: blur(4px); border: 1px solid var(--border); border-radius: 99px; font: 500 var(--fs-xs) var(--font); cursor: pointer; color: var(--text-muted); transition: all 150ms; display: flex; align-items: center; gap: 4px; }
+  .pill { padding: 8px 14px; background: rgba(10,14,24,0.85); backdrop-filter: blur(4px); border: 1px solid var(--border); border-radius: 99px; font: 500 var(--fs-xs) var(--font); cursor: pointer; color: var(--text-muted); transition: all 150ms; display: flex; align-items: center; gap: 6px; }
   .pill:hover { border-color: var(--text-muted); }
   .pill.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
