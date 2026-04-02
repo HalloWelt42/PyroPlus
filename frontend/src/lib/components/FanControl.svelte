@@ -7,9 +7,15 @@
   const estimatedRpm = $derived(s.fan?.estimated_rpm || 0);
   const settings = $derived(s.fan?.settings || {});
 
-  /* Schwellwerte aus den Fan-Settings ableiten */
-  const thresholdOn = $derived(settings.threshold_on || 50);
-  const thresholdOff = $derived(settings.threshold_off || 45);
+  /* Schwellwerte — lokal getrackt für sofortige UI-Reaktion */
+  let thresholdOn = $state(50);
+  let thresholdOff = $state(45);
+
+  /* Sync vom Backend wenn Settings sich ändern */
+  $effect(() => {
+    if (settings.threshold_on) thresholdOn = settings.threshold_on;
+    if (settings.threshold_off) thresholdOff = settings.threshold_off;
+  });
 
   /* Temperatur-Verlauf aus Stats-History */
   const tempHistory = $derived(s.stats?.history?.temp || []);
@@ -71,14 +77,19 @@
     s.setFanSettings({ [key]: parseFloat(e.target.value) });
   }
 
-  /* Schwellwert-Slider */
-  function setThresholdOn(e) {
+  /* Schwellwert-Slider — live lokale Aktualisierung, Backend bei Loslassen */
+  function onThresholdOnInput(e) {
     const val = parseInt(e.target.value);
-    s.setFanSettings({ threshold_on: val, threshold_off: Math.min(thresholdOff, val - 3) });
+    thresholdOn = val;
+    if (thresholdOff >= val - 2) thresholdOff = val - 3;
   }
-  function setThresholdOff(e) {
+  function onThresholdOffInput(e) {
     const val = parseInt(e.target.value);
-    s.setFanSettings({ threshold_off: val, threshold_on: Math.max(thresholdOn, val + 3) });
+    thresholdOff = val;
+    if (thresholdOn <= val + 2) thresholdOn = val + 3;
+  }
+  function commitThresholds() {
+    s.setFanSettings({ threshold_on: thresholdOn, threshold_off: thresholdOff });
   }
 </script>
 
@@ -174,14 +185,14 @@
               <span><i class="fa-solid fa-arrow-up" style="color:var(--red)"></i> Einschalten bei</span>
               <span class="threshold-val">{thresholdOn}°C</span>
             </div>
-            <input type="range" min="35" max="75" step="1" value={thresholdOn} oninput={setThresholdOn} />
+            <input type="range" min="35" max="75" step="1" value={thresholdOn} oninput={onThresholdOnInput} onchange={commitThresholds} />
           </div>
           <div class="threshold-group">
             <div class="threshold-head">
               <span><i class="fa-solid fa-arrow-down" style="color:var(--green)"></i> Ausschalten bei</span>
               <span class="threshold-val">{thresholdOff}°C</span>
             </div>
-            <input type="range" min="30" max="70" step="1" value={thresholdOff} oninput={setThresholdOff} />
+            <input type="range" min="30" max="70" step="1" value={thresholdOff} oninput={onThresholdOffInput} onchange={commitThresholds} />
           </div>
           <div class="threshold-info">
             Hysterese: {thresholdOn - thresholdOff}°C
