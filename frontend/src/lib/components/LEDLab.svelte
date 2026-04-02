@@ -31,7 +31,12 @@
   function toHex(c) { return c ? '#' + [c.r, c.g, c.b].map(v => (v || 0).toString(16).padStart(2, '0')).join('') : '#0064ff'; }
   function fromHex(h) { return { r: parseInt(h.slice(1, 3), 16), g: parseInt(h.slice(3, 5), 16), b: parseInt(h.slice(5, 7), 16) }; }
 
-  function spdLabel(v) { return v; }
+  /* Speed-Wert (1-1000) in lesbare Zyklusdauer umrechnen */
+  function spdLabel(v) {
+    const hz = Math.pow(v / 100, 1.5) * 25;
+    if (hz < 1) return (1 / hz).toFixed(1) + ' Sekunden/Zyklus';
+    return hz.toFixed(0) + ' Zyklen/Sekunde';
+  }
 
   /* Aktiver Tab basierend auf aktuellem Effekt */
   function tabForEffect(fx) {
@@ -60,7 +65,6 @@
   let _step = 0;
   let _frameCount = 0;
   let _fpsTime = 0;
-  let _lastFrame = 0;
 
 
   function hsv(h,sat,v) {
