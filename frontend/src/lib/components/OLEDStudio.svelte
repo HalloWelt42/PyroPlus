@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import PanelWrapper from './oled/PanelWrapper.svelte';
   import WidgetStrip from './oled/WidgetStrip.svelte';
   import * as E from './oled/engine.js';
