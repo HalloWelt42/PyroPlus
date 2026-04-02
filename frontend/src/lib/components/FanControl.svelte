@@ -150,35 +150,6 @@
         {/if}
       </div>
 
-      <!-- Temperatur-Visualisierung -->
-      <div class="temp-display" style="--temp-color:{tempColorStr};--temp-glow:{tempGlow};--temp-glow-strong:{tempGlowStrong}">
-        <div class="temp-orb">
-          <div class="orb-ring"></div>
-          <div class="orb-core">
-            <span class="temp-big">{currentTemp.toFixed(1)}</span>
-            <span class="temp-unit">°C</span>
-          </div>
-        </div>
-        <div class="temp-right">
-          <div class="temp-gauge">
-            <div class="gauge-track">
-              <div class="gauge-fill" style="width:{Math.min(100, Math.max(0, (currentTemp - 25) / 55 * 100))}%; background:linear-gradient(90deg, var(--green), {tempColorStr})"></div>
-              {#if mode === 'auto'}
-                <div class="gauge-marker marker-off" style="left:{Math.max(0, (thresholdOff - 25) / 55 * 100)}%" title="Ausschalten bei {thresholdOff}°C"></div>
-                <div class="gauge-marker marker-on" style="left:{Math.max(0, (thresholdOn - 25) / 55 * 100)}%" title="Einschalten bei {thresholdOn}°C"></div>
-              {/if}
-            </div>
-            <div class="gauge-labels">
-              <span>25°C</span>
-              <span>80°C</span>
-            </div>
-          </div>
-          <div class="temp-meta">
-            <span style="color:var(--text-muted)">Minimum {s.stats?.cpu?.temp_min || '—'}°C</span>
-            <span style="color:var(--text-muted)">Maximum {s.stats?.cpu?.temp_max || '—'}°C</span>
-          </div>
-        </div>
-      </div>
 
       <!-- Temperatur-Diagramm -->
       <div class="chart" style="--temp-color:{tempColorStr};--temp-glow:{tempGlow}">
@@ -311,53 +282,6 @@
   .status-value { font: 700 var(--fs-base) var(--mono); }
   .status-divider { width: 1px; height: 32px; background: var(--border); }
 
-  /* ─── Temperatur-Anzeige ─── */
-  .temp-display { display: flex; align-items: center; gap: 28px; flex-shrink: 0; }
-
-  .temp-orb {
-    position: relative; width: 140px; height: 140px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .orb-ring {
-    position: absolute; inset: 0;
-    border-radius: 50%;
-    border: 3px solid var(--temp-color);
-    box-shadow: 0 0 20px var(--temp-glow), 0 0 50px var(--temp-glow), inset 0 0 20px var(--temp-glow);
-    transition: border-color 1s, box-shadow 1s;
-  }
-  .orb-core {
-    display: flex; flex-direction: column; align-items: center;
-    position: relative; z-index: 1;
-  }
-  .temp-big { font: 800 42px var(--mono); color: var(--temp-color); line-height: 1; transition: color 1s; }
-  .temp-unit { font: 500 var(--fs-sm) var(--font); color: var(--text-muted); margin-top: 2px; }
-
-  .temp-right { flex: 1; display: flex; flex-direction: column; gap: 10px; }
-  .temp-gauge { }
-  .gauge-track {
-    height: 10px; background: rgba(255,255,255,0.06);
-    border-radius: 5px; overflow: visible; position: relative;
-  }
-  .gauge-fill {
-    height: 100%; border-radius: 5px;
-    transition: width 1s ease;
-    box-shadow: 0 0 8px var(--temp-glow);
-  }
-  .gauge-marker {
-    position: absolute; top: -5px; width: 3px; height: 20px;
-    border-radius: 2px; transform: translateX(-1px);
-  }
-  .marker-on { background: var(--red); }
-  .marker-off { background: var(--green); }
-  .gauge-labels {
-    display: flex; justify-content: space-between;
-    font: 500 var(--fs-xs) var(--mono); color: var(--text-muted);
-    margin-top: 6px;
-  }
-  .temp-meta {
-    display: flex; justify-content: space-between;
-    font: 500 var(--fs-xs) var(--font);
-  }
 
   /* ─── Diagramm ─── */
   .chart {
