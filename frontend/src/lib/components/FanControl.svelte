@@ -48,7 +48,7 @@
   }
 
   /* ─── Diagramm-Konfiguration ─── */
-  const CHART = { w: 500, h: 140, pl: 40, pr: 10, pt: 10, pb: 20 };
+  const CHART = { w: 500, h: 140, pl: 40, pr: 50, pt: 14, pb: 20 };
   const CW = CHART.w - CHART.pl - CHART.pr;
   const CH = CHART.h - CHART.pt - CHART.pb;
 
@@ -199,9 +199,9 @@
           <!-- Schwellwert-Linien im Automatik-Modus -->
           {#if mode === 'auto'}
             <line x1={CHART.pl} y1={cy(thresholdOn)} x2={CHART.pl + CW} y2={cy(thresholdOn)} stroke="var(--red)" stroke-width="0.8" stroke-dasharray="4 3" opacity="0.5"/>
-            <text x={CHART.pl + CW + 2} y={cy(thresholdOn) + 3.5} class="chart-label-on">Ein</text>
+            <text x={CHART.pl + CW + 6} y={cy(thresholdOn) + 3.5} class="chart-label-on">{thresholdOn}° Ein</text>
             <line x1={CHART.pl} y1={cy(thresholdOff)} x2={CHART.pl + CW} y2={cy(thresholdOff)} stroke="var(--green)" stroke-width="0.8" stroke-dasharray="4 3" opacity="0.5"/>
-            <text x={CHART.pl + CW + 2} y={cy(thresholdOff) + 3.5} class="chart-label-off">Aus</text>
+            <text x={CHART.pl + CW + 6} y={cy(thresholdOff) + 3.5} class="chart-label-off">{thresholdOff}° Aus</text>
           {/if}
 
           <!-- Y-Achse und Grundlinie -->
@@ -215,7 +215,7 @@
             <!-- Aktueller Punkt (letzter Wert) -->
             <circle cx={cx(tempHistory.length - 1, tempHistory.length)} cy={cy(tempHistory[tempHistory.length - 1])} r="4" fill={tempColorStr} stroke="var(--bg-card)" stroke-width="2"/>
             <!-- Aktueller Wert als Label -->
-            <text x={cx(tempHistory.length - 1, tempHistory.length)} y={cy(tempHistory[tempHistory.length - 1]) - 8} text-anchor="middle" class="chart-value">{tempHistory[tempHistory.length - 1].toFixed(1)}°C</text>
+            <text x={cx(tempHistory.length - 1, tempHistory.length)} y={cy(tempHistory[tempHistory.length - 1]) - 10} text-anchor="end" class="chart-value">{tempHistory[tempHistory.length - 1].toFixed(1)}°C</text>
           {:else}
             <text x={CHART.pl + CW / 2} y={CHART.pt + CH / 2} text-anchor="middle" class="chart-empty">Warte auf Messdaten…</text>
           {/if}
