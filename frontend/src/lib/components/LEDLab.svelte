@@ -49,6 +49,96 @@
       _initialized = true;
     }
   });
+
+  /* ═══════════════════════════════════════════════════════
+     LOKALE LED-SIMULATION (~20 FPS, gleiche Formeln wie HW-Proxy)
+     ═══════════════════════════════════════════════════════ */
+  const N = 4;
+  let simLeds = $state([{r:0,g:0,b:0},{r:0,g:0,b:0},{r:0,g:0,b:0},{r:0,g:0,b:0}]);
+  let simFps = $state(0);
+  let _rafId = 0;
+  let _step = 0;
+  let _frameCount = 0;
+  let _fpsTime = 0;
+  let _lastFrame = 0;
+
+
+  function hsv(h,sat,v) {
+    h=((h%360)+360)%360;
+    const c=v*sat, x=c*(1-Math.abs((h/60)%2-1)), m=v-c;
+    let r,g,b;
+    if(h<60){r=c;g=x;b=0;}else if(h<120){r=x;g=c;b=0;}else if(h<180){r=0;g=c;b=x;}
+    else if(h<240){r=0;g=x;b=c;}else if(h<300){r=x;g=0;b=c;}else{r=c;g=0;b=x;}
+    return{r:Math.round((r+m)*255),g:Math.round((g+m)*255),b:Math.round((b+m)*255)};
+  }
+
+  function simTick(now) {
+    _rafId = requestAnimationFrame(simTick);
+
+    const fx = s.leds?.effect || 'off';
+    const br = Math.pow((s.leds?.brightness || 500) / 1000, 0.6);
+    const spd = Math.pow((s.leds?.speed || 50) / 100, 1.5);
+    const c = s.leds?.color || {r:0,g:100,b:255};
+    const c2 = s.leds?.color2 || {r:255,g:0,b:0};
+    const step = _step;
+
+    // Hardware-States bevorzugen bei reaktiven Effekten
+    const hw = s.leds?.led_states;
+    if (tempEffects.includes(fx) && hw?.length === N) {
+      simLeds = hw.map(l => ({r:l.r||0, g:l.g||0, b:l.b||0}));
+      _step++; countFps(now); return;
+    }
+
+    let L = Array.from({length:N}, ()=>({r:0,g:0,b:0}));
+
+    if (fx === 'off') { /* schwarz */ }
+    else if (fx === 'static') { L = L.map(() => ({...c})); }
+    else if (fx === 'breathing') {
+      const f = (Math.sin(step*0.04*spd)+1)/2;
+      L = L.map(()=>({r:Math.round(c.r*f),g:Math.round(c.g*f),b:Math.round(c.b*f)}));
+    }
+    else if (fx === 'rainbow') { for(let i=0;i<N;i++) L[i]=hsv(((step*2*spd)+(i*90))%360,1,1); }
+    else if (fx === 'gradient') {
+      for(let i=0;i<N;i++){const t=i/(N-1);const ph=Math.sin(step*0.03*spd)*0.3+0.7;L[i]={r:Math.round((c.r+(c2.r-c.r)*t)*ph),g:Math.round((c.g+(c2.g-c.g)*t)*ph),b:Math.round((c.b+(c2.b-c.b)*t)*ph)};}
+    }
+    else if (fx === 'candle') { for(let i=0;i<N;i++){const fl=0.6+Math.random()*0.4;L[i]={r:Math.round(255*fl),g:Math.round(120*fl),b:Math.round(20*fl*0.5)};} }
+    else if (fx === 'lava') {
+      const t=step*0.01*spd;
+      for(let i=0;i<N;i++) L[i]=hsv(Math.abs((Math.sin(t+i*1.2)*30+Math.sin(t*0.7+i*0.8)*20)%360),0.9,0.5+Math.sin(t+i)*0.3);
+    }
+    else if (fx === 'aurora') {
+      const t=step*0.015*spd;
+      const pal=[{r:0,g:255,b:100},{r:0,g:180,b:255},{r:80,g:0,b:255},{r:0,g:255,b:180}];
+      for(let i=0;i<N;i++){const idx=(Math.sin(t+i*0.8)+1)/2*(pal.length-1);const lo=Math.floor(idx),hi=Math.min(lo+1,pal.length-1),frac=idx-lo;const bright=0.4+Math.sin(t*1.3+i*2)*0.3;L[i]={r:Math.round((pal[lo].r+(pal[hi].r-pal[lo].r)*frac)*bright),g:Math.round((pal[lo].g+(pal[hi].g-pal[lo].g)*frac)*bright),b:Math.round((pal[lo].b+(pal[hi].b-pal[lo].b)*frac)*bright)};}
+    }
+    else if (fx === 'fire') { for(let i=0;i<N;i++){const h=120+Math.floor(Math.random()*136);L[i]={r:h,g:Math.max(0,h-100),b:Math.max(0,h-200)};} }
+    else if (fx === 'ocean') { const t=step*0.02*spd; for(let i=0;i<N;i++){const w=Math.sin(t+i*1.5)*0.5+0.5;L[i]={r:0,g:Math.round(80*w),b:Math.round(180+75*w)};} }
+    else if (fx === 'pulse') { const t=step*0.06*spd,pos=t%(N+2); for(let i=0;i<N;i++){const b2=Math.max(0,1-Math.abs(i-pos)*0.7);L[i]={r:Math.round(c.r*b2),g:Math.round(c.g*b2),b:Math.round(c.b*b2)};} }
+    else if (fx === 'strobe') { const on=(step%Math.max(1,Math.floor(20/spd)))<Math.max(1,Math.floor(5/spd)); L=L.map(()=>on?{...c}:{r:0,g:0,b:0}); }
+    else if (fx === 'police') { const ph=(Math.floor(step/Math.max(1,Math.floor(8/spd))))%4; if(ph===0){L[0]={r:255,g:0,b:0};L[1]={r:255,g:0,b:0};}else if(ph===2){L[2]={r:0,g:0,b:255};L[3]={r:0,g:0,b:255};} }
+    else if (fx === 'disco') { if(step%Math.max(1,Math.floor(6/spd))===0) for(let i=0;i<N;i++) L[i]=hsv(Math.random()*360,1,1); }
+    else if (fx === 'chase') { const pos=Math.floor(step/Math.max(1,Math.floor(4/spd)))%N; for(let i=0;i<N;i++) L[i]=i===pos?{...c}:{r:0,g:0,b:0}; }
+    else if (fx === 'sparkle') { for(let i=0;i<N;i++) L[i]=Math.random()<0.15*spd?{...c}:{r:Math.round(c.r*0.1),g:Math.round(c.g*0.1),b:Math.round(c.b*0.1)}; }
+    else if (fx === 'firework') { const cycle=Math.max(1,Math.floor(60/spd)),phase=step%cycle; if(phase===0)L=L.map(()=>({r:255,g:255,b:255}));else if(phase<cycle*0.3){const h=hsv(Math.random()*360,1,1);L=L.map(()=>({...h}));}else{const fade=Math.max(0,1-(phase-cycle*0.3)/(cycle*0.7));L=L.map(()=>({r:Math.round(c.r*fade),g:Math.round(c.g*fade),b:Math.round(c.b*fade)}));} }
+    else if (fx === 'sunset') { const t=step*0.008*spd; const pal=[{r:255,g:60,b:0},{r:255,g:120,b:0},{r:255,g:80,b:50},{r:200,g:40,b:80}]; for(let i=0;i<N;i++){const idx=(Math.sin(t+i*0.5)+1)/2*(pal.length-1),lo=Math.floor(idx),hi=Math.min(lo+1,pal.length-1),frac=idx-lo;L[i]={r:Math.round(pal[lo].r+(pal[hi].r-pal[lo].r)*frac),g:Math.round(pal[lo].g+(pal[hi].g-pal[lo].g)*frac),b:Math.round(pal[lo].b+(pal[hi].b-pal[lo].b)*frac)};} }
+    else if (fx === 'forest') { const t=step*0.01*spd; for(let i=0;i<N;i++){const g=Math.round(80+Math.sin(t+i*1.5)*40);L[i]={r:Math.round(g*0.1),g:g,b:Math.round(g*0.2)};} }
+    else if (fx === 'neon') { const t=step*0.02*spd; const nc=[{r:255,g:0,b:255},{r:0,g:255,b:255},{r:255,g:0,b:100},{r:100,g:0,b:255}]; for(let i=0;i<N;i++){const ci=Math.floor((t+i*2)%nc.length),fl=0.7+Math.random()*0.3;L[i]={r:Math.round(nc[ci].r*fl),g:Math.round(nc[ci].g*fl),b:Math.round(nc[ci].b*fl)};} }
+    else if (fx === 'warm_white') { L=L.map(()=>({r:255,g:180,b:100})); }
+    else if (fx === 'night_light') { const v=0.05+Math.sin(step*0.01)*0.02; L=L.map(()=>({r:Math.round(255*v),g:Math.round(200*v),b:Math.round(120*v)})); }
+    else { L=L.map(()=>({...c})); }
+
+    simLeds = L.map(l => ({r:Math.round(l.r*br),g:Math.round(l.g*br),b:Math.round(l.b*br)}));
+    _step++;
+    countFps(now);
+  }
+
+  function countFps(now) {
+    _frameCount++;
+    if (now - _fpsTime >= 1000) { simFps = _frameCount; _frameCount = 0; _fpsTime = now; }
+  }
+
+  onMount(() => { _fpsTime = performance.now(); _rafId = requestAnimationFrame(simTick); });
+  onDestroy(() => { if (_rafId) cancelAnimationFrame(_rafId); });
 </script>
 
 <div class="layout">
@@ -66,18 +156,19 @@
         </div>
       </div>
 
-      <!-- LED-Visualisierung -->
+      <!-- LED-Visualisierung (lokale Simulation) -->
       <div class="led-preview">
         <div class="led-strip">
-          {#each s.ledColors as c, i}
+          {#each simLeds as led, i}
             <div class="led-mount">
-              <div class="led-glow" style="background:radial-gradient(circle, {c.glow}, transparent 70%)"></div>
-              <div class="led-chip" style="background:{c.rgb};box-shadow:0 0 12px {c.glow}, 0 0 30px {c.glow}">
+              <div class="led-glow" style="background:radial-gradient(circle, rgba({led.r},{led.g},{led.b},0.5), transparent 70%)"></div>
+              <div class="led-chip" style="background:rgb({led.r},{led.g},{led.b});box-shadow:0 0 12px rgba({led.r},{led.g},{led.b},0.6), 0 0 30px rgba({led.r},{led.g},{led.b},0.3)">
                 <span class="led-num">{i + 1}</span>
               </div>
             </div>
           {/each}
         </div>
+        <div class="led-fps">{simFps} FPS</div>
       </div>
 
       <!-- Globale Parameter -->
@@ -274,6 +365,7 @@
   .led-glow { position: absolute; width: 80px; height: 80px; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%,-50%); pointer-events: none; }
   .led-chip { width: 28px; height: 28px; border-radius: 6px; border: 2px solid #555; display: flex; align-items: center; justify-content: center; position: relative; z-index: 1; }
   .led-num { font: 700 9px var(--mono); color: rgba(255,255,255,0.4); }
+  .led-fps { font: 500 10px var(--mono); color: var(--text-muted); text-align: center; margin-top: 8px; }
 
   /* Steuerung */
   .ctrl { display: flex; flex-direction: column; gap: 8px; }
