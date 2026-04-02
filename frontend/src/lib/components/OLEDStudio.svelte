@@ -105,6 +105,8 @@
 
   /* Zahl rechtsbündig mit führenden Leerzeichen */
   function pad(n, len=3) { const s = String(n); return s.length >= len ? s : ' '.repeat(len - s.length) + s; }
+  /* Tausenderpunkt: 24214 → 24.214 */
+  function tsd(n) { return Math.round(n).toLocaleString('de-DE'); }
 
   /* ═══ WIDGETS MIT LIVE-DATEN ═══ */
   const widgetTypes = {
@@ -128,10 +130,10 @@
     cpu_bar:   { cat:'cpu',  label:'Balken',         w:60, h:6, props:{ width:60, height:6 }, isShape: true,
                  draw: (px,x,y,p) => E.drawBar(px, x, y, p.width||60, p.height||6, s.stats?.cpu?.percent||0) },
     /* ─── RAM ─── */
-    ram_used:  { cat:'ram',  label:'Benutzt',        w:24, h:7, props:{ scale:1, prefix:'' },
-                 getText: (p) => (p.prefix||'')+(s.stats?.ram?.used_gb||0)+' G' },
-    ram_total: { cat:'ram',  label:'Gesamt',         w:24, h:7, props:{ scale:1, prefix:'' },
-                 getText: (p) => (p.prefix||'')+(s.stats?.ram?.total_gb||0)+' G' },
+    ram_used:  { cat:'ram',  label:'Benutzt',        w:30, h:7, props:{ scale:1, prefix:'', tsep:true },
+                 getText: (p) => (p.prefix||'')+(p.tsep?tsd(s.stats?.ram?.used_gb||0):Math.round(s.stats?.ram?.used_gb||0))+' G' },
+    ram_total: { cat:'ram',  label:'Gesamt',         w:30, h:7, props:{ scale:1, prefix:'', tsep:true },
+                 getText: (p) => (p.prefix||'')+(p.tsep?tsd(s.stats?.ram?.total_gb||0):Math.round(s.stats?.ram?.total_gb||0))+' G' },
     ram_pct:   { cat:'ram',  label:'Prozent',        w:24, h:7, props:{ scale:1, prefix:'' },
                  getText: (p) => (p.prefix||'')+pad(Math.round(s.stats?.ram?.percent||0))+'%' },
     ram_bar:   { cat:'ram',  label:'Balken',         w:60, h:6, props:{ width:60, height:6 }, isShape: true,
@@ -139,11 +141,11 @@
     /* ─── Disk ─── */
     disk_name: { cat:'disk', label:'Name',           w:48, h:7, props:{ scale:1, prefix:'', diskIdx:0 },
                  getText: (p) => (p.prefix||'')+(s.stats?.disks?.[p.diskIdx||0]?.label||s.stats?.disks?.[p.diskIdx||0]?.mount||'?') },
-    disk_used: { cat:'disk', label:'Benutzt',        w:36, h:7, props:{ scale:1, prefix:'', diskIdx:0 },
-                 getText: (p) => { const d=s.stats?.disks?.[p.diskIdx||0]; return (p.prefix||'')+(d?Math.round(d.used_gb)+' G':'?'); }},
-    disk_total:{ cat:'disk', label:'Gesamt',         w:36, h:7, props:{ scale:1, prefix:'', diskIdx:0 },
-                 getText: (p) => { const d=s.stats?.disks?.[p.diskIdx||0]; return (p.prefix||'')+(d?Math.round(d.total_gb)+' G':'?'); }},
-    disk_pct:  { cat:'disk', label:'Prozent',        w:24, h:7, props:{ scale:1, prefix:'', diskIdx:0 },
+    disk_used: { cat:'disk', label:'Benutzt',        w:48, h:7, props:{ scale:1, prefix:'', diskIdx:0, tsep:true },
+                 getText: (p) => { const d=s.stats?.disks?.[p.diskIdx||0]; return (p.prefix||'')+(d?(p.tsep?tsd(d.used_gb):Math.round(d.used_gb))+' G':'?'); }},
+    disk_total:{ cat:'disk', label:'Gesamt',         w:48, h:7, props:{ scale:1, prefix:'', diskIdx:0, tsep:true },
+                 getText: (p) => { const d=s.stats?.disks?.[p.diskIdx||0]; return (p.prefix||'')+(d?(p.tsep?tsd(d.total_gb):Math.round(d.total_gb))+' G':'?'); }},
+    disk_pct:  { cat:'disk', label:'Prozent',        w:30, h:7, props:{ scale:1, prefix:'', diskIdx:0 },
                  getText: (p) => (p.prefix||'')+pad(Math.round(s.stats?.disks?.[p.diskIdx||0]?.percent||0))+'%' },
     disk_bar:  { cat:'disk', label:'Balken',         w:60, h:6, props:{ width:60, height:6, diskIdx:0 }, isShape: true,
                  draw: (px,x,y,p) => E.drawBar(px, x, y, p.width||60, p.height||6, s.stats?.disks?.[p.diskIdx||0]?.percent||0) },
@@ -458,6 +460,9 @@
       {/if}
       {#if sw.props.prefix !== undefined}
         <div class="pr"><span>Präfix</span><input type="text" class="ti" value={sw.props.prefix} oninput={(e)=>updateWidgetProp(selectedWidget,'prefix',e.target.value)}></div>
+      {/if}
+      {#if sw.props.tsep !== undefined}
+        <div class="pr"><span>1.000er</span><button class="tog" class:on={sw.props.tsep} onclick={()=>updateWidgetProp(selectedWidget,'tsep',!sw.props.tsep)}></button></div>
       {/if}
       {#if sw.props.diskIdx !== undefined}
         <div class="pr"><span>Disk</span><input type="range" min="0" max={Math.max(0,(s.stats?.disks?.length||1)-1)} value={sw.props.diskIdx} oninput={(e)=>updateWidgetProp(selectedWidget,'diskIdx',+e.target.value)}><span class="pv">{s.stats?.disks?.[sw.props.diskIdx]?.mount||'?'}</span></div>
