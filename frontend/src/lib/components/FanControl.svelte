@@ -3,8 +3,7 @@
   let { state: s } = $props();
 
   /* ═══ GEMEINSAMER STATE ═══ */
-  let simTemp = $state(null);
-  const currentTemp = $derived(simTemp !== null ? simTemp : (s.fan?.current_temp || s.stats?.cpu?.temp || 0));
+  const realTemp = $derived(s.fan?.current_temp || s.stats?.cpu?.temp || 0);
   const currentDuty = $derived(s.fan?.current_duty || 0);
   const currentRpm = $derived(s.fan?.current_rpm || 0);
   const mode = $derived(s.fan?.mode || 'auto');
@@ -15,9 +14,23 @@
   const safetyTemp = $derived(s.fan?.safety_temp || 80);
   const tempHistory = $derived(s.stats?.history?.temp || []);
 
-  /* Simulation */
+  /* Simulationen — getrennt für jeden Lüfter */
+  let simCaseTemp = $state(null);   // Gehäuselüfter: lokale Simulation (nur Anzeige)
+  let simCpuTemp = $state(null);    // CPU-Lüfter: echte Simulation (wirkt auf Hardware)
   let _simTimer = 0;
-  function simTempLive(val) { simTemp = val; clearTimeout(_simTimer); _simTimer = setTimeout(() => api.simulate.temp(val), 200); }
+
+  /* Temperatur die der jeweilige Bereich sieht */
+  const caseFanTemp = $derived(simCaseTemp !== null ? simCaseTemp : realTemp);
+  const cpuFanTemp = $derived(simCpuTemp !== null ? simCpuTemp : realTemp);
+  /* currentTemp für gemeinsame Elemente (LEDs, Farbe) — CPU-Sim hat Vorrang */
+  const currentTemp = $derived(simCpuTemp !== null ? simCpuTemp : (simCaseTemp !== null ? simCaseTemp : realTemp));
+
+  function simCaseLive(val) { simCaseTemp = val; }
+  function simCpuLive(val) {
+    simCpuTemp = val;
+    clearTimeout(_simTimer);
+    _simTimer = setTimeout(() => api.simulate.temp(val), 200);
+  }
 
   /* ═══ TEMPERATUR → FARBE ═══ */
   function tempToRgb(t) {
@@ -128,11 +141,11 @@
         <div class="ctrl-row"><span><i class="fa-solid fa-arrow-down" style="color:var(--green)"></i> Ausschalten</span><input type="range" min="30" max="70" step="1" value={thresholdOff} oninput={onThresholdOffInput} onchange={commitCaseFan}><span class="ctrl-val">{thresholdOff}°C</span></div>
       </div>
 
-      <!-- Simulation -->
+      <!-- Gehäuse-Simulation (nur lokal, zeigt Schwellwert-Reaktion) -->
       <div class="sim">
         <span>Simulation</span>
-        <button class="tog" class:on={simTemp!==null} onclick={()=>{if(simTemp!==null){simTemp=null;api.simulate.stop();}else{simTemp=40;api.simulate.temp(40);}}} aria-label="Simulation"></button>
-        {#if simTemp!==null}<input type="range" min="20" max="85" step="0.5" value={simTemp} oninput={(e)=>simTempLive(parseFloat(e.target.value))}><span class="sim-v" style="color:{tempColorStr}">{simTemp.toFixed(0)}°</span>{/if}
+        <button class="tog" class:on={simCaseTemp!==null} onclick={()=>{ simCaseTemp = simCaseTemp !== null ? null : 40; }} aria-label="Simulation"></button>
+        {#if simCaseTemp!==null}<input type="range" min="20" max="85" step="0.5" value={simCaseTemp} oninput={(e)=>simCaseLive(parseFloat(e.target.value))}><span class="sim-v" style="color:{tempColorStr}">{simCaseTemp.toFixed(0)}°</span>{/if}
       </div>
     </div>
 
@@ -166,7 +179,7 @@
           <line x1={CURVE.pl} y1={CURVE.pt+KH} x2={CURVE.pl+KW} y2={CURVE.pt+KH} stroke="rgba(255,255,255,0.08)"/>
           <line x1={ktx(safetyTemp)} y1={CURVE.pt} x2={ktx(safetyTemp)} y2={CURVE.pt+KH} stroke="var(--red)" stroke-width="1" stroke-dasharray="4 3" opacity="0.4"/>
           <text x={ktx(safetyTemp)} y={CURVE.pt-4} text-anchor="middle" class="ax-on">Notfall</text>
-          {#if currentTemp > TMIN}<line x1={ktx(currentTemp)} y1={CURVE.pt} x2={ktx(currentTemp)} y2={CURVE.pt+KH} stroke={tempColorStr} stroke-width="1.5" stroke-dasharray="6 4" opacity="0.6"/><text x={ktx(currentTemp)} y={CURVE.pt-4} text-anchor="middle" class="ax-now">{currentTemp.toFixed(1)}°</text>{/if}
+          {#if cpuFanTemp > TMIN}<line x1={ktx(cpuFanTemp)} y1={CURVE.pt} x2={ktx(cpuFanTemp)} y2={CURVE.pt+KH} stroke={tempColorStr} stroke-width="1.5" stroke-dasharray="6 4" opacity="0.6"/><text x={ktx(cpuFanTemp)} y={CURVE.pt-4} text-anchor="middle" class="ax-now">{cpuFanTemp.toFixed(1)}°</text>{/if}
           <path d={curveFill(curve)} fill="url(#cg)"/>
           <path d={curveLine(curve)} fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="drop-shadow(0 0 4px rgba(0,180,255,0.3))"/>
           {#each curve as pt, i}<circle cx={ktx(pt.temp)} cy={ksy(pt.speed)} r={dragging===i?10:7} class="dot" class:drag={profile==='custom'} class:act={dragging===i} onmousedown={(e)=>startDrag(i,e)} ontouchstart={(e)=>startDrag(i,e)}/><text x={ktx(pt.temp)} y={ksy(pt.speed)-12} text-anchor="middle" class="ax-pt">{pt.temp}°/{pt.speed}%</text>{/each}
@@ -184,11 +197,11 @@
       </div>
       {#if mode==='manual'}<div class="ctrl"><div class="ctrl-row"><span>Geschwindigkeit</span><input type="range" min="0" max="100" step="5" value={s.fan?.manual_speed||50} oninput={(e)=>s.setFanManualSpeed(parseInt(e.target.value))}><span class="ctrl-val">{s.fan?.manual_speed||50}%</span></div></div>{/if}
 
-      <!-- Simulation -->
+      <!-- CPU-Simulation (wirkt auf echte Hardware: PWM + LEDs) -->
       <div class="sim">
         <span>Simulation</span>
-        <button class="tog" class:on={simTemp!==null} onclick={()=>{if(simTemp!==null){simTemp=null;api.simulate.stop();}else{simTemp=40;api.simulate.temp(40);}}} aria-label="Simulation"></button>
-        {#if simTemp!==null}<input type="range" min="20" max="85" step="0.5" value={simTemp} oninput={(e)=>simTempLive(parseFloat(e.target.value))}><span class="sim-v" style="color:{tempColorStr}">{simTemp.toFixed(0)}°</span>{/if}
+        <button class="tog" class:on={simCpuTemp!==null} onclick={()=>{if(simCpuTemp!==null){simCpuTemp=null;api.simulate.stop();}else{simCpuTemp=40;api.simulate.temp(40);}}} aria-label="Simulation"></button>
+        {#if simCpuTemp!==null}<input type="range" min="20" max="85" step="0.5" value={simCpuTemp} oninput={(e)=>simCpuLive(parseFloat(e.target.value))}><span class="sim-v" style="color:{tempColorStr}">{simCpuTemp.toFixed(0)}°</span>{/if}
       </div>
     </div>
   </div>
