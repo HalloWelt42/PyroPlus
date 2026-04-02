@@ -220,6 +220,7 @@
     }
     layers = [...layers];
     render();
+    autoSave();
   }
 
   /* Widget-Rendering alle Sekunde aktualisieren (für Uhr etc.) */
@@ -347,9 +348,42 @@
   function panelLabel(id) { return _pd[id]?.label || id; }
   function panelCollapsible(id) { return _pd[id]?.c ?? true; }
 
-  onMount(()=>{pushH();render();startWidgetTimer();fetchWeather();setInterval(fetchWeather,300000);});
-  onDestroy(()=>{stopWidgetTimer();});
-  $effect(()=>{zoom;showGrid;render();});
+  /* ═══ PERSISTENZ (localStorage Auto-Save) ═══ */
+  function saveState() {
+    try {
+      const data = {
+        placedWidgets: placedWidgets.map(w => ({ type: w.type, x: w.x, y: w.y, props: w.props })),
+        layers: layers.map(l => ({ id: l.id, name: l.name, visible: l.visible, pixels: Array.from(l.pixels) })),
+        zoom, showGrid,
+      };
+      localStorage.setItem('pp-oled-state', JSON.stringify(data));
+    } catch {}
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem('pp-oled-state');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data.placedWidgets) {
+        placedWidgets = data.placedWidgets.map(w => ({ id: Date.now() + Math.random(), ...w }));
+      }
+      if (data.layers?.length > 0) {
+        layers = data.layers.map(l => ({ ...l, pixels: new Uint8Array(l.pixels) }));
+        activeLayer = layers[0].id;
+        _nid = Math.max(...layers.map(l => l.id)) + 1;
+      }
+      if (data.zoom) zoom = data.zoom;
+      if (data.showGrid !== undefined) showGrid = data.showGrid;
+    } catch {}
+  }
+
+  let _saveTimer = 0;
+  function autoSave() { clearTimeout(_saveTimer); _saveTimer = setTimeout(saveState, 1000); }
+
+  onMount(()=>{loadState();pushH();renderWidgets();startWidgetTimer();fetchWeather();setInterval(fetchWeather,300000);});
+  onDestroy(()=>{stopWidgetTimer();saveState();});
+  $effect(()=>{zoom;showGrid;render();autoSave();});
 </script>
 
 <svelte:window onkeydown={onKey} />
