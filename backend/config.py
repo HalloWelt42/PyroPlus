@@ -85,11 +85,6 @@ FAN_PROFILES = {
         {"temp": 50.0, "speed": 70}, {"temp": 55.0, "speed": 85},
         {"temp": 60.0, "speed": 100},
     ],
-    "night": [
-        {"temp": 30.0, "speed": 0}, {"temp": 55.0, "speed": 0},
-        {"temp": 60.0, "speed": 10}, {"temp": 65.0, "speed": 20},
-        {"temp": 70.0, "speed": 35}, {"temp": 80.0, "speed": 60},
-    ],
 }
 
 # ─── WebSocket ──────────────────────────────────────────────

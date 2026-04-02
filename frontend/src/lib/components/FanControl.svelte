@@ -292,18 +292,14 @@
 
 <style>
   .layout { display: flex; flex-direction: column; height: 100%; }
-  .layout { display: flex; flex-direction: column; height: 100%; }
   .content {
     display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
     flex: 1; min-height: 0;
-    /* Gleiche Zeilen für beide Spalten */
-    grid-template-rows: auto 1fr auto;
   }
   .panel {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 14px; display: grid; gap: 8px;
-    grid-template-rows: subgrid; grid-row: span 3;
-    overflow: visible;
+    padding: 14px; display: flex; flex-direction: column; gap: 8px;
+    overflow-y: auto;
   }
 
   /* Lüfter-Header */
@@ -342,8 +338,8 @@
   .chip-x { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-xs); padding: 0 2px; display: flex; } .chip-x:hover { color: var(--red); }
 
   /* Diagramm */
-  .chart { min-height: 0; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; touch-action: none; }
-  .panel-footer { display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; padding-top: 1em; }
+  .chart { flex: 1; min-height: 120px; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; touch-action: none; }
+  .panel-footer { flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; padding-top: 1em; }
   .chart svg { width: 100%; height: 100%; display: block; }
   .ax { font: 10px var(--mono); fill: var(--text-muted); }
   .ax-on { font: 600 9px var(--mono); fill: var(--red); }
