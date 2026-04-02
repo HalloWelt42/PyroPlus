@@ -236,7 +236,7 @@
 
   /* Diagramm */
   .chart { min-height: 0; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; touch-action: none; }
-  .panel-footer { display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; }
+  .panel-footer { display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; padding-top: 1em; }
   .chart svg { width: 100%; height: 100%; display: block; }
   .ax { font: 10px var(--mono); fill: var(--text-muted); }
   .ax-on { font: 600 9px var(--mono); fill: var(--red); }
