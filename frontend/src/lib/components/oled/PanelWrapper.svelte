@@ -30,5 +30,5 @@
   .pw-title i:first-child { color: var(--accent); }
   .pw-chev { font-size: var(--fs-xs); color: var(--text-muted); transition: transform 150ms; margin-left: auto; }
   .pw-chev.rotated { transform: rotate(-90deg); }
-  .pw-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .pw-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
 </style>

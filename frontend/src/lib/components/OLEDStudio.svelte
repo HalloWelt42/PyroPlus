@@ -48,6 +48,28 @@
     {id:'move',icon:'fa-up-down-left-right',label:'Verschieben',key:'V'},
   ];
 
+  /* ═══ WETTER (Open-Meteo API) ═══ */
+  let weather = $state(null);
+  async function fetchWeather() {
+    try {
+      const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=51.05&longitude=12.13&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,surface_pressure&timezone=Europe/Berlin');
+      const d = await r.json();
+      weather = d.current;
+    } catch {}
+  }
+  function weatherCodeToText(code) {
+    if (code == null) return '—';
+    if (code === 0) return 'Klar';
+    if (code <= 3) return 'Bewölkt';
+    if (code <= 49) return 'Nebel';
+    if (code <= 59) return 'Nieselregen';
+    if (code <= 69) return 'Regen';
+    if (code <= 79) return 'Schnee';
+    if (code <= 84) return 'Schauer';
+    if (code <= 94) return 'Schneesch.';
+    return 'Gewitter';
+  }
+
   /* ═══ WIDGETS MIT LIVE-DATEN ═══ */
   const widgetTypes = {
     clock:     { cat:'zeit', label:'Uhr HH:MM',    w:58, h:14, props:{ scale:2, format:'HH:MM' },
@@ -72,6 +94,20 @@
                  getText: () => 'IP '+(s.stats?.network?.ip||'0.0.0.0') },
     uptime:    { cat:'sys',  label:'Uptime',         w:60, h:7, props:{ scale:1 },
                  getText: () => 'Up '+(s.stats?.uptime?.formatted||'0:00') },
+    w_temp:    { cat:'wetter', label:'Temperatur',    w:36, h:14, props:{ scale:2 },
+                 getText: () => Math.round(weather?.temperature_2m ?? 0)+'°' },
+    w_temp_s:  { cat:'wetter', label:'Temperatur klein', w:30, h:7, props:{ scale:1 },
+                 getText: () => (weather?.temperature_2m ?? 0).toFixed(1)+'°C' },
+    w_hum:     { cat:'wetter', label:'Feuchtigkeit',  w:36, h:7, props:{ scale:1 },
+                 getText: () => (weather?.relative_humidity_2m ?? 0)+'% Feuchte' },
+    w_wind:    { cat:'wetter', label:'Wind',           w:42, h:7, props:{ scale:1 },
+                 getText: () => Math.round(weather?.wind_speed_10m ?? 0)+' km/h' },
+    w_cond:    { cat:'wetter', label:'Wetterlage',     w:48, h:7, props:{ scale:1 },
+                 getText: () => weatherCodeToText(weather?.weather_code) },
+    w_press:   { cat:'wetter', label:'Luftdruck',      w:48, h:7, props:{ scale:1 },
+                 getText: () => Math.round(weather?.surface_pressure ?? 1013)+'hPa' },
+    w_loc:     { cat:'wetter', label:'Ort',            w:48, h:7, props:{ scale:1, text:'Zeitz' },
+                 getText: (p) => p.text || 'Ort' },
     label:     { cat:'deko', label:'Textfeld',       w:48, h:7, props:{ scale:1, text:'Text' },
                  getText: (p) => p.text || 'Text' },
     line_h:    { cat:'deko', label:'Linie ─',        w:60, h:1, props:{ width:60 }, isShape: true,
@@ -265,7 +301,7 @@
   function panelLabel(id) { return _pd[id]?.label || id; }
   function panelCollapsible(id) { return _pd[id]?.c ?? true; }
 
-  onMount(()=>{pushH();render();startWidgetTimer();});
+  onMount(()=>{pushH();render();startWidgetTimer();fetchWeather();setInterval(fetchWeather,300000);});
   onDestroy(()=>{stopWidgetTimer();});
   $effect(()=>{zoom;showGrid;render();});
 </script>
@@ -317,10 +353,10 @@
     <div class="ll">{#each [...layers].reverse() as layer, ri}{@const idx=layers.length-1-ri}<div class="li" class:active={layer.id===activeLayer} class:drag-over={ldOver===idx} draggable="true" onclick={()=>activeLayer=layer.id} ondragstart={(e)=>ldStart(e,idx)} ondragover={(e)=>ldDragOver(e,idx)} ondrop={(e)=>ldDrop(e,idx)} ondragend={ldEnd}><span class="lh"><i class="fa-solid fa-grip-vertical"></i></span><button class="lv" onclick={(e)=>{e.stopPropagation();toggleVis(layer.id);render();}}><i class="fa-solid {layer.visible?'fa-eye':'fa-eye-slash'}"></i></button><span class="ln" contenteditable="false" ondblclick={(e)=>{e.target.contentEditable='true';e.target.focus();}} onblur={(e)=>{e.target.contentEditable='false';layers=layers.map(l=>l.id===layer.id?{...l,name:e.target.textContent}:l);}} onkeydown={(e)=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}}}>{layer.name}</span></div>{/each}</div>
     <div class="la"><button class="lab" onclick={()=>addLayer()}><i class="fa-solid fa-plus"></i></button><button class="lab" onclick={()=>dupLayer(activeLayer)}><i class="fa-solid fa-copy"></i></button><button class="lab" onclick={()=>rmLayer(activeLayer)}><i class="fa-solid fa-trash"></i></button></div>
   {:else if id==='widgets'}
-    {#each ['zeit','sys','deko'] as cat}
+    {#each ['zeit','sys','wetter','deko'] as cat}
       {@const items = widgetList.filter(w => w.cat === cat)}
       {#if items.length > 0}
-        <div class="wc-cat"><i class="fa-solid {cat==='zeit'?'fa-clock':cat==='sys'?'fa-microchip':'fa-pen'}"></i> {cat==='zeit'?'Zeit':cat==='sys'?'System':'Dekoration'}</div>
+        <div class="wc-cat"><i class="fa-solid {cat==='zeit'?'fa-clock':cat==='sys'?'fa-microchip':cat==='wetter'?'fa-cloud-sun':'fa-pen'}"></i> {cat==='zeit'?'Zeit':cat==='sys'?'System':cat==='wetter'?'Wetter':'Dekoration'}</div>
         <div class="wc-grid">
           {#each items as w}
             <button class="wc-btn" onclick={() => placeWidget(w)} title="{w.label} ({w.w}×{w.h})">
