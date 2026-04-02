@@ -162,7 +162,7 @@
       <div class="fan-header">
         <i class="fa-solid fa-hard-drive fan-icon"></i>
         <div><div class="fan-title">Gehäuselüfter</div><div class="fan-sub">GPIO Pin 6 · An/Aus · Schwellwert</div></div>
-        <div class="fan-badge" class:on={caseFanOn}><i class="fa-solid fa-fan" class:spinning={caseFanOn} style="animation-duration:1.5s"></i> {caseFanOn ? 'Läuft' : 'Aus'}</div>
+        <div class="fan-badge" class:on={caseFanOn}><i class="fa-solid fa-fan" class:spinning={caseFanOn} style="animation-duration:0.4s"></i> {caseFanOn ? 'Läuft' : 'Aus'}</div>
       </div>
 
       <!-- Diagramm mit Schwellwerten und Profilen -->
