@@ -397,38 +397,24 @@
   function invertLayer(){pushH();const px=ap();if(px)for(let i=0;i<px.length;i++)px[i]=px[i]?0:1;render();}
   async function sendToOled() {
     saveCurrentScreen();
-    // Alle Screens als gerenderte Bilder ans Backend schicken
-    const screenConfigs = [];
-    for (const sc of screens) {
-      const scLayers = sc.layers ? sc.layers.map(l => ({ ...l, pixels: new Uint8Array(l.pixels) })) : [];
-      // Widgets rendern
-      const px = new Uint8Array(W * H);
-      if (sc.widgets) {
-        for (const w of sc.widgets) {
-          const wt = widgetTypes[w.type];
-          if (!wt) continue;
-          if (wt.isShape) wt.draw(px, w.x, w.y, w.props);
-          else { const text = wt.getText(w.props); E.drawText(px, text, w.x, w.y, w.props.scaleX||w.props.scale||1, w.props.scaleY||w.props.scale||1); }
-        }
-      }
-      // Layer darüber compositen
-      for (const l of scLayers) { if (l.visible) for (let i = 0; i < W*H; i++) if (l.pixels[i]) px[i] = 1; }
-      // Zu Base64 PNG
-      const c = document.createElement('canvas'); c.width = W; c.height = H;
-      const ctx = c.getContext('2d'); ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#fff';
-      for (let y=0;y<H;y++) for(let x=0;x<W;x++) if(px[y*W+x]) ctx.fillRect(x,y,1,1);
-      screenConfigs.push({ name: sc.name, image: c.toDataURL().split(',')[1], widgets: sc.widgets || [] });
-    }
+    // Aktuellen Screen rendern und direkt als Bild an HW-Proxy schicken
+    renderWidgets();
+    const comp = E.composite(layers);
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const ctx = c.getContext('2d'); ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#fff';
+    for (let y=0;y<H;y++) for(let x=0;x<W;x++) if(comp[y*W+x]) ctx.fillRect(x,y,1,1);
+    const base64 = c.toDataURL('image/png').split(',')[1];
+
     try {
+      // Direkt an HW-Proxy senden (über Backend-Proxy)
       const { api } = await import('../api/client.js');
-      // Alle Screens als Bilder ans Backend senden
-      for (let i = 0; i < screenConfigs.length; i++) {
-        if (i === 0) await s.updateOledScreen(0, { type: 'pixel_art', name: screenConfigs[i].name, pixels: screenConfigs[i].image });
-        else await s.addOledScreen({ type: 'pixel_art', name: screenConfigs[i].name, pixels: screenConfigs[i].image });
-      }
-      if (rotation) await s.setOledRotation(rotationInterval);
-      await s.setOledMode('auto');
-      s.toast(`${screenConfigs.length} Screen(s) an OLED gesendet`, 'ok');
+      const r = await fetch('/api/oled/display-raw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Token': s.apiToken },
+        body: JSON.stringify({ image_base64: base64 }),
+      });
+      if (r.ok) s.toast(`An OLED gesendet`, 'ok');
+      else s.toast('Fehler beim Senden', 'err');
     } catch (e) {
       s.toast('Fehler: ' + (e.message||e), 'err');
     }

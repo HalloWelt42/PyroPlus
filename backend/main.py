@@ -275,6 +275,15 @@ def oled_widget_catalog():
     from oled.engine import OLEDEngine
     return OLEDEngine.WIDGET_CATALOG
 
+@app.post("/api/oled/display-raw", tags=["OLED Display"],
+          summary="Bild direkt an OLED senden (Base64 PNG)")
+def oled_display_raw(req: dict):
+    image_base64 = req.get("image_base64", "")
+    if not image_base64:
+        return {"error": "Kein Bild"}
+    result = hw_client.oled_display(image_base64)
+    return {"ok": result}
+
 @app.post("/api/oled/mode/{mode}", tags=["OLED Display"],
           summary="Display-Modus: auto | manual | off")
 def oled_set_mode(mode: str):
