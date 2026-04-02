@@ -115,43 +115,47 @@
                  getText: () => new Date().toLocaleDateString('de-DE') },
     weekday:   { cat:'zeit', label:'Wochentag',     w:14, h:7, props:{ scale:1 },
                  getText: () => ['So','Mo','Di','Mi','Do','Fr','Sa'][new Date().getDay()] },
-    cpu_temp:  { cat:'sys',  label:'CPU Temperatur', w:30, h:7, props:{ scale:1, prefix:'' },
-                 getText: (p) => (p.prefix||'')+Math.round(s.stats?.cpu?.temp||0)+'°C' },
-    cpu_pct:   { cat:'sys',  label:'CPU Auslastung', w:42, h:7, props:{ scale:1, prefix:'CPU ' },
-                 getText: (p) => (p.prefix??'CPU ')+Math.round(s.stats?.cpu?.percent||0)+'%' },
-    ram:       { cat:'sys',  label:'RAM',            w:54, h:7, props:{ scale:1, prefix:'RAM ' },
-                 getText: (p) => (p.prefix??'RAM ')+(s.stats?.ram?.used_gb||0)+'/'+(s.stats?.ram?.total_gb||0)+'G' },
-    ram_pct:   { cat:'sys',  label:'RAM %',          w:36, h:7, props:{ scale:1, prefix:'RAM ' },
-                 getText: (p) => (p.prefix??'RAM ')+(s.stats?.ram?.percent||0)+'%' },
-    ip:        { cat:'sys',  label:'IP-Adresse',     w:72, h:7, props:{ scale:1, prefix:'IP ' },
-                 getText: (p) => (p.prefix??'IP ')+(s.stats?.network?.ip||'0.0.0.0') },
-    uptime:    { cat:'sys',  label:'Uptime',         w:60, h:7, props:{ scale:1, prefix:'Up ' },
-                 getText: (p) => (p.prefix??'Up ')+(s.stats?.uptime?.formatted||'0:00') },
-    w_temp:    { cat:'wetter', label:'Temperatur',    w:36, h:14, props:{ scale:2 },
-                 getText: () => Math.round(weather?.temperature_2m ?? 0)+'°' },
-    w_temp_s:  { cat:'wetter', label:'Temperatur klein', w:30, h:7, props:{ scale:1 },
-                 getText: () => (weather?.temperature_2m ?? 0).toFixed(1)+'°C' },
-    w_hum:     { cat:'wetter', label:'Feuchtigkeit',  w:36, h:7, props:{ scale:1 },
-                 getText: () => (weather?.relative_humidity_2m ?? 0)+'% Feuchte' },
-    w_wind:    { cat:'wetter', label:'Wind',           w:42, h:7, props:{ scale:1 },
-                 getText: () => Math.round(weather?.wind_speed_10m ?? 0)+' km/h' },
-    w_cond:    { cat:'wetter', label:'Wetterlage',     w:48, h:7, props:{ scale:1 },
-                 getText: () => weatherCodeToText(weather?.weather_code) },
-    w_press:   { cat:'wetter', label:'Luftdruck',      w:48, h:7, props:{ scale:1 },
-                 getText: () => Math.round(weather?.surface_pressure ?? 1013)+'hPa' },
-    w_icon:    { cat:'wetter', label:'Wetter-Symbol',   w:8, h:8, props:{}, isShape: true,
-                 draw: (px,x,y) => E.drawWeatherIcon(px, x, y, weather?.weather_code) },
-    w_loc:     { cat:'wetter', label:'Ort',            w:48, h:7, props:{ scale:1, text: 'Zeitz' },
-                 getText: (p) => p.text || weatherLocation?.name || 'Ort' },
-    cpu_bar:   { cat:'sys',  label:'CPU Balken',      w:60, h:6, props:{ width:60, height:6 }, isShape: true,
+    /* ─── CPU ─── */
+    cpu_temp:  { cat:'cpu',  label:'Temperatur °C',  w:24, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+Math.round(s.stats?.cpu?.temp||0)+'°' },
+    cpu_pct:   { cat:'cpu',  label:'Auslastung %',   w:24, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+Math.round(s.stats?.cpu?.percent||0)+'%' },
+    cpu_cores: { cat:'cpu',  label:'Kerne',          w:12, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+(s.stats?.cpu?.cores||4) },
+    cpu_bar:   { cat:'cpu',  label:'Balken',         w:60, h:6, props:{ width:60, height:6 }, isShape: true,
                  draw: (px,x,y,p) => E.drawBar(px, x, y, p.width||60, p.height||6, s.stats?.cpu?.percent||0) },
-    ram_bar:   { cat:'sys',  label:'RAM Balken',     w:60, h:6, props:{ width:60, height:6 }, isShape: true,
+    /* ─── RAM ─── */
+    ram_used:  { cat:'ram',  label:'Benutzt',        w:24, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+(s.stats?.ram?.used_gb||0)+'G' },
+    ram_total: { cat:'ram',  label:'Gesamt',         w:24, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+(s.stats?.ram?.total_gb||0)+'G' },
+    ram_pct:   { cat:'ram',  label:'Prozent',        w:24, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+(s.stats?.ram?.percent||0)+'%' },
+    ram_bar:   { cat:'ram',  label:'Balken',         w:60, h:6, props:{ width:60, height:6 }, isShape: true,
                  draw: (px,x,y,p) => E.drawBar(px, x, y, p.width||60, p.height||6, s.stats?.ram?.percent||0) },
-    disk:      { cat:'sys',  label:'Disk',           w:72, h:7, props:{ scale:1 },
-                 getText: () => { const d=s.stats?.disks?.[0]; return d ? 'DSK '+d.used_gb+'/'+d.total_gb+'G' : 'DSK --'; }},
-    net_rx:    { cat:'sys',  label:'Download',       w:52, h:7, props:{ scale:1 },
-                 getText: () => { const n=s.stats?.network; const b=n?.rx_bytes_sec||0; return b>1048576?(b/1048576).toFixed(1)+'MB/s':b>1024?(b/1024).toFixed(0)+'KB/s':b+'B/s'; }},
-    net_tx:    { cat:'sys',  label:'Upload',         w:52, h:7, props:{ scale:1 },
+    /* ─── Disk ─── */
+    disk_name: { cat:'disk', label:'Name',           w:48, h:7, props:{ scale:1, prefix:'', diskIdx:0 },
+                 getText: (p) => (p.prefix||'')+(s.stats?.disks?.[p.diskIdx||0]?.label||s.stats?.disks?.[p.diskIdx||0]?.mount||'?') },
+    disk_used: { cat:'disk', label:'Benutzt',        w:36, h:7, props:{ scale:1, prefix:'', diskIdx:0 },
+                 getText: (p) => { const d=s.stats?.disks?.[p.diskIdx||0]; return (p.prefix||'')+(d?Math.round(d.used_gb)+'G':'?'); }},
+    disk_total:{ cat:'disk', label:'Gesamt',         w:36, h:7, props:{ scale:1, prefix:'', diskIdx:0 },
+                 getText: (p) => { const d=s.stats?.disks?.[p.diskIdx||0]; return (p.prefix||'')+(d?Math.round(d.total_gb)+'G':'?'); }},
+    disk_pct:  { cat:'disk', label:'Prozent',        w:24, h:7, props:{ scale:1, prefix:'', diskIdx:0 },
+                 getText: (p) => (p.prefix||'')+(s.stats?.disks?.[p.diskIdx||0]?.percent||0)+'%' },
+    disk_bar:  { cat:'disk', label:'Balken',         w:60, h:6, props:{ width:60, height:6, diskIdx:0 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawBar(px, x, y, p.width||60, p.height||6, s.stats?.disks?.[p.diskIdx||0]?.percent||0) },
+    /* ─── Netzwerk ─── */
+    net_ip:    { cat:'net',  label:'IP-Adresse',     w:60, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+(s.stats?.network?.ip||'0.0.0.0') },
+    net_if:    { cat:'net',  label:'Interface',      w:36, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+(s.stats?.network?.interface||'?') },
+    net_rx:    { cat:'net',  label:'Download',       w:48, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => { const b=s.stats?.network?.rx_bytes_sec||0; return (p.prefix||'')+(b>1048576?(b/1048576).toFixed(1)+'M':b>1024?Math.round(b/1024)+'K':b+'B')+'/s'; }},
+    net_tx:    { cat:'net',  label:'Upload',         w:48, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => { const b=s.stats?.network?.tx_bytes_sec||0; return (p.prefix||'')+(b>1048576?(b/1048576).toFixed(1)+'M':b>1024?Math.round(b/1024)+'K':b+'B')+'/s'; }},
+    /* ─── System ─── */
+    uptime:    { cat:'sys',  label:'Uptime',         w:48, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+(s.stats?.uptime?.formatted||'0:00') },
                  getText: () => { const n=s.stats?.network; const b=n?.tx_bytes_sec||0; return b>1048576?(b/1048576).toFixed(1)+'MB/s':b>1024?(b/1024).toFixed(0)+'KB/s':b+'B/s'; }},
     label:     { cat:'deko', label:'Textfeld',       w:48, h:7, props:{ scale:1, text:'Text' },
                  getText: (p) => p.text || 'Text' },
@@ -453,6 +457,9 @@
       {#if sw.props.prefix !== undefined}
         <div class="pr"><span>Präfix</span><input type="text" class="ti" value={sw.props.prefix} oninput={(e)=>updateWidgetProp(selectedWidget,'prefix',e.target.value)}></div>
       {/if}
+      {#if sw.props.diskIdx !== undefined}
+        <div class="pr"><span>Disk</span><input type="range" min="0" max={Math.max(0,(s.stats?.disks?.length||1)-1)} value={sw.props.diskIdx} oninput={(e)=>updateWidgetProp(selectedWidget,'diskIdx',+e.target.value)}><span class="pv">{s.stats?.disks?.[sw.props.diskIdx]?.mount||'?'}</span></div>
+      {/if}
       {#if sw.props.width !== undefined}
         <div class="pr"><span>Breite</span><input type="range" min="4" max="128" value={sw.props.width} oninput={(e)=>updateWidgetProp(selectedWidget,'width',+e.target.value)}><span class="pv">{sw.props.width}</span></div>
       {/if}
@@ -489,10 +496,11 @@
       {/if}
     </div>
   {:else if id==='widgets'}
-    {#each ['zeit','sys','wetter','deko'] as cat}
+    {#each ['zeit','cpu','ram','disk','net','sys','wetter','deko'] as cat}
       {@const items = widgetList.filter(w => w.cat === cat)}
       {#if items.length > 0}
-        <div class="wc-cat"><i class="fa-solid {cat==='zeit'?'fa-clock':cat==='sys'?'fa-microchip':cat==='wetter'?'fa-cloud-sun':'fa-pen'}"></i> {cat==='zeit'?'Zeit':cat==='sys'?'System':cat==='wetter'?'Wetter':'Dekoration'}</div>
+        {@const catInfo = {zeit:['fa-clock','Zeit'],cpu:['fa-microchip','CPU'],ram:['fa-memory','RAM'],disk:['fa-hard-drive','Festplatten'],net:['fa-network-wired','Netzwerk'],sys:['fa-server','System'],wetter:['fa-cloud-sun','Wetter'],deko:['fa-pen','Dekoration']}[cat] || ['fa-circle',cat]}
+        <div class="wc-cat"><i class="fa-solid {catInfo[0]}"></i> {catInfo[1]}</div>
         <div class="wc-grid">
           {#each items as w}
             <button class="wc-btn" onclick={() => placeWidget(w)} title="{w.label} ({w.w}×{w.h})">
