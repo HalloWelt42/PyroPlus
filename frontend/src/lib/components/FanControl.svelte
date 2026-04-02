@@ -83,7 +83,11 @@
 
   const profIcons = { silent: 'fa-volume-xmark', balanced: 'fa-scale-balanced', performance: 'fa-rocket', night: 'fa-moon', custom: 'fa-sliders' };
   const profLabels = { silent: 'Leise', balanced: 'Ausgewogen', performance: 'Leistung', night: 'Nacht', custom: 'Eigene' };
-  const fanSpinDuration = $derived(currentRpm > 0 ? Math.max(0.1, 60 / currentRpm) + 's' : '0s');
+  /* Fan-Animation: proportional zu RPM aber immer wahrnehmbar.
+     0 RPM = steht, 500 RPM = 3s/Umdrehung, 3500 RPM = 0.4s/Umdrehung */
+  const fanSpinDuration = $derived(currentRpm > 0
+    ? (3.0 - Math.min(2.6, (currentRpm / 3500) * 2.6)).toFixed(1) + 's'
+    : '0s');
 </script>
 
 <div class="layout">
@@ -95,7 +99,7 @@
       <div class="fan-header">
         <i class="fa-solid fa-hard-drive fan-icon"></i>
         <div><div class="fan-title">Gehäuselüfter</div><div class="fan-sub">GPIO Pin 6 · An/Aus · Schwellwert</div></div>
-        <div class="fan-badge" class:on={caseFanOn}><i class="fa-solid fa-fan" class:spinning={caseFanOn}></i> {caseFanOn ? 'Läuft' : 'Aus'}</div>
+        <div class="fan-badge" class:on={caseFanOn}><i class="fa-solid fa-fan" class:spinning={caseFanOn} style="animation-duration:1.5s"></i> {caseFanOn ? 'Läuft' : 'Aus'}</div>
       </div>
 
       <!-- Temperatur -->
@@ -206,8 +210,8 @@
   .fan-badge { margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 99px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); font: 500 var(--fs-sm) var(--mono); color: var(--text-muted); }
   .fan-badge.on { color: var(--green); border-color: rgba(0,232,138,0.2); background: rgba(0,232,138,0.06); }
   .fan-badge i { font-size: var(--fs-lg); }
-  .spinning { animation: spin 1s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinning { animation: spin 1s linear infinite; animation-duration: inherit; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
   /* LEDs */
   .led-strip { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 14px 20px; background: #000; border-radius: var(--radius); border: 1px solid #222; }
