@@ -2,7 +2,8 @@
   let { state: s } = $props();
 
   const mode = $derived(s.fan?.mode || 'auto');
-  const currentTemp = $derived(s.fan?.current_temp || s.stats?.cpu?.temp || 0);
+  let simTemp = $state(null);
+  const currentTemp = $derived(simTemp !== null ? simTemp : (s.fan?.current_temp || s.stats?.cpu?.temp || 0));
   const currentSpeed = $derived(s.fan?.current_speed || 0);
   const estimatedRpm = $derived(s.fan?.estimated_rpm || 0);
   const settings = $derived(s.fan?.settings || {});
@@ -20,25 +21,31 @@
   /* Temperatur-Verlauf aus Stats-History */
   const tempHistory = $derived(s.stats?.history?.temp || []);
 
-  /* Temperatur → RGB-Farbe (kalt→warm Verlauf: blau → cyan → grün → gelb → rot) */
+  /* Temperatur → RGB-Farbe
+     25-30°C → Blau
+     30-40°C → Gelb
+     40-55°C → Orange
+     55-60°C → Rot
+     60°C+   → Rot (blinkend) */
   function tempToRgb(t) {
-    const ratio = Math.max(0, Math.min(1, (t - 25) / 55));
-    let r, g, b;
-    if (ratio < 0.25) {
-      const f = ratio / 0.25;
-      r = 0; g = Math.round(100 * f); b = Math.round(200 + 55 * (1 - f));
-    } else if (ratio < 0.5) {
-      const f = (ratio - 0.25) / 0.25;
-      r = 0; g = Math.round(100 + 155 * f); b = Math.round(255 * (1 - f));
-    } else if (ratio < 0.75) {
-      const f = (ratio - 0.5) / 0.25;
-      r = Math.round(255 * f); g = Math.round(220 - 80 * f); b = 0;
-    } else {
-      const f = (ratio - 0.75) / 0.25;
-      r = 255; g = Math.round(140 * (1 - f)); b = 0;
+    if (t <= 25) return { r: 0, g: 60, b: 255 };
+    if (t <= 30) {
+      const f = (t - 25) / 5;
+      return { r: Math.round(255 * f), g: Math.round(60 + 180 * f), b: Math.round(255 * (1 - f)) };
     }
-    return { r, g, b };
+    if (t <= 40) {
+      const f = (t - 30) / 10;
+      return { r: 255, g: Math.round(240 - 100 * f), b: 0 };
+    }
+    if (t <= 55) {
+      const f = (t - 40) / 15;
+      return { r: 255, g: Math.round(140 - 100 * f), b: 0 };
+    }
+    return { r: 255, g: Math.round(40 * Math.max(0, 1 - (t - 55) / 5)), b: 0 };
   }
+
+  /* Blinken ab 60°C */
+  const isBlinking = $derived(currentTemp >= 60);
 
   /* 4 LED-Farben berechnen — leicht versetzt wie echte Hardware-LEDs */
   const ledColors = $derived(() => {
@@ -176,11 +183,12 @@
       <div class="led-strip">
         {#each [0,1,2,3] as i}
           <div class="led-housing">
-            <div class="led-glow" style="background:radial-gradient(circle, {ledGlows()[i]}, transparent 70%)"></div>
-            <div class="led-pixel" style="background:{ledColors()[i]};box-shadow:0 0 8px {ledGlows()[i]}, 0 0 20px {ledGlows()[i]}"></div>
+            <div class="led-glow" class:blink={isBlinking} style="background:radial-gradient(circle, {ledGlows()[i]}, transparent 70%)"></div>
+            <div class="led-pixel" class:blink={isBlinking} style="background:{ledColors()[i]};box-shadow:0 0 8px {ledGlows()[i]}, 0 0 20px {ledGlows()[i]}"></div>
           </div>
         {/each}
-        <span class="led-label">{currentTemp.toFixed(1)}°C</span>
+        <span class="led-title">LEDs</span>
+        <span class="led-label" style="color:{tempColorStr}">{currentTemp.toFixed(1)}°C</span>
       </div>
 
       <!-- Temperatur-Diagramm -->
@@ -267,6 +275,21 @@
         </div>
       </div>
 
+      <!-- Simulation -->
+      <div class="side-section">
+        <div class="side-title"><i class="fa-solid fa-flask"></i> Simulation</div>
+        <label class="sim-toggle">
+          <input type="checkbox" checked={simTemp !== null} onchange={(e) => { simTemp = e.target.checked ? 40 : null; }}>
+          <span>Temperatur simulieren</span>
+        </label>
+        {#if simTemp !== null}
+          <div class="sim-slider">
+            <input type="range" min="20" max="85" step="0.5" value={simTemp} oninput={(e) => simTemp = parseFloat(e.target.value)}>
+            <span class="sim-val" style="color:{tempColorStr}">{simTemp.toFixed(1)}°C</span>
+          </div>
+        {/if}
+      </div>
+
       <!-- Betriebsmodus -->
       <div class="side-section side-mode">
         <div class="side-title"><i class="fa-solid fa-power-off"></i> Betriebsmodus</div>
@@ -337,10 +360,22 @@
     position: relative; z-index: 1;
     transition: background 1s ease, box-shadow 1s ease;
   }
+  .led-title {
+    font: 600 var(--fs-xs) var(--font);
+    color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.08em; margin-left: 12px;
+  }
   .led-label {
     font: 700 var(--fs-base) var(--mono);
-    color: var(--text-secondary);
-    margin-left: 8px;
+    margin-left: 4px;
+    transition: color 1s;
+  }
+  .led-pixel.blink, .led-glow.blink {
+    animation: ledBlink 0.6s ease-in-out infinite alternate;
+  }
+  @keyframes ledBlink {
+    0% { opacity: 1; }
+    100% { opacity: 0.15; }
   }
 
   /* ─── Diagramm ─── */
@@ -395,6 +430,16 @@
   .hw-key { color: var(--text-muted); }
   .hw-ok { color: var(--green); }
   .hw-err { color: var(--red); }
+
+  /* ─── Simulation ─── */
+  .sim-toggle {
+    display: flex; align-items: center; gap: 8px;
+    font: 500 var(--fs-sm) var(--font); color: var(--text-secondary);
+    cursor: pointer; margin-bottom: 10px;
+  }
+  .sim-slider { display: flex; align-items: center; gap: 10px; }
+  .sim-slider input { flex: 1; }
+  .sim-val { font: 700 var(--fs-base) var(--mono); min-width: 64px; text-align: right; }
 
   /* ─── Betriebsmodus ─── */
   .side-mode { margin-top: auto; }
