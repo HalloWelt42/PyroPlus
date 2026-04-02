@@ -139,8 +139,10 @@
                  getText: () => weatherCodeToText(weather?.weather_code) },
     w_press:   { cat:'wetter', label:'Luftdruck',      w:48, h:7, props:{ scale:1 },
                  getText: () => Math.round(weather?.surface_pressure ?? 1013)+'hPa' },
-    w_loc:     { cat:'wetter', label:'Ort',            w:48, h:7, props:{ scale:1, text:'Zeitz' },
-                 getText: (p) => p.text || 'Ort' },
+    w_icon:    { cat:'wetter', label:'Wetter-Symbol',   w:8, h:8, props:{}, isShape: true,
+                 draw: (px,x,y) => E.drawWeatherIcon(px, x, y, weather?.weather_code) },
+    w_loc:     { cat:'wetter', label:'Ort',            w:48, h:7, props:{ scale:1, text: 'Zeitz' },
+                 getText: (p) => p.text || weatherLocation?.name || 'Ort' },
     cpu_bar:   { cat:'sys',  label:'CPU Balken',      w:60, h:6, props:{ width:60, height:6 }, isShape: true,
                  draw: (px,x,y,p) => E.drawBar(px, x, y, p.width||60, p.height||6, s.stats?.cpu?.percent||0) },
     ram_bar:   { cat:'sys',  label:'RAM Balken',     w:60, h:6, props:{ width:60, height:6 }, isShape: true,
@@ -531,8 +533,9 @@
   .wc-cat { font: 600 var(--fs-xs) var(--font); text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); display: flex; align-items: center; gap: 4px; margin-top: 4px; }
   .wc-cat i { color: var(--accent); }
   .wc-grid { display: flex; flex-direction: column; gap: 2px; }
-  .wc-btn { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); font: 500 var(--fs-xs) var(--font); cursor: pointer; transition: all 120ms; text-align: left; width: 100%; }
-  .wc-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .wc-btn { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); font: 500 var(--fs-sm) var(--font); cursor: pointer; transition: all 120ms; text-align: left; width: 100%; }
+  .wc-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .wc-btn:active { background: var(--accent); color: #fff; }
   .wc-size { font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
 
   @media (max-width: 900px) { .side-panel { width: 200px; } }
