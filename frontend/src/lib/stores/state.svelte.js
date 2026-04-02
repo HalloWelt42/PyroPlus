@@ -21,7 +21,10 @@ function handleWs(msg) {
     connected = true;
     stats = msg.data.stats || stats;
     fan = { ...fan, ...msg.data.fan };
-    if (msg.data.leds) leds = { ...leds, ...msg.data.leds };
+    if (msg.data.leds) {
+      leds = { ...leds, ...msg.data.leds };
+      if (msg.data.leds.led_states) setLedDisplay(msg.data.leds.led_states);
+    }
     if (msg.data.oled) oled = { ...oled, ...msg.data.oled };
     if (msg.data.custom_data) customData = msg.data.custom_data;
   }
@@ -35,7 +38,10 @@ async function pollState() {
       connected = true;
       if (s.stats) stats = s.stats;
       if (s.fan) fan = { ...fan, ...s.fan };
-      if (s.leds) leds = { ...leds, ...s.leds };
+      if (s.leds) {
+        leds = { ...leds, ...s.leds };
+        if (s.leds.led_states) setLedDisplay(s.leds.led_states);
+      }
       if (s.oled) oled = { ...oled, ...s.oled };
       if (s.version) version = s.version;
       if (s.hw_proxy) hwProxy = s.hw_proxy;
@@ -64,13 +70,17 @@ function toast(msg, type = 'info') {
 
 function destroy() { ws?.close(); if (_pollTimer) clearInterval(_pollTimer); }
 
-/* Globale LED-Farben — direkt aus Hardware-States (bereits helligkeitskorrigiert) */
-function getLedColors() {
-  const states = leds?.led_states || [{r:0,g:0,b:0},{r:0,g:0,b:0},{r:0,g:0,b:0},{r:0,g:0,b:0}];
-  return states.map(led => {
-    const r = led.r || 0;
-    const g = led.g || 0;
-    const b = led.b || 0;
+/* Globaler LED-Zustand — wird von der lokalen Simulation ODER vom Backend gesetzt */
+let ledDisplay = $state([
+  {r:0,g:0,b:0,rgb:'rgb(0,0,0)',glow:'rgba(0,0,0,0.5)'},
+  {r:0,g:0,b:0,rgb:'rgb(0,0,0)',glow:'rgba(0,0,0,0.5)'},
+  {r:0,g:0,b:0,rgb:'rgb(0,0,0)',glow:'rgba(0,0,0,0.5)'},
+  {r:0,g:0,b:0,rgb:'rgb(0,0,0)',glow:'rgba(0,0,0,0.5)'},
+]);
+
+function setLedDisplay(leds4) {
+  ledDisplay = leds4.map(l => {
+    const r = l.r || 0, g = l.g || 0, b = l.b || 0;
     return { r, g, b, rgb: `rgb(${r},${g},${b})`, glow: `rgba(${r},${g},${b},0.5)` };
   });
 }
@@ -81,7 +91,8 @@ export function getState() {
     get stats() { return stats; },
     get fan() { return fan; },
     get leds() { return leds; },
-    get ledColors() { return getLedColors(); },
+    get ledColors() { return ledDisplay; },
+    setLedDisplay,
     get oled() { return oled; },
     get hwProxy() { return hwProxy; },
     get version() { return version; },

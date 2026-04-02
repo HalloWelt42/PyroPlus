@@ -65,6 +65,8 @@
   let _step = 0;
   let _frameCount = 0;
   let _fpsTime = 0;
+  let _lastFrame = 0;
+  const FRAME_MS = 1000 / 25; // 25 FPS wie Hardware-Proxy
 
 
   function hsv(h,sat,v) {
@@ -78,6 +80,8 @@
 
   function simTick(now) {
     _rafId = requestAnimationFrame(simTick);
+    if (now - _lastFrame < FRAME_MS) return;
+    _lastFrame = now;
 
     const fx = s.leds?.effect || 'off';
     const br = Math.pow((s.leds?.brightness || 500) / 1000, 0.6);
@@ -90,6 +94,7 @@
     const hw = s.leds?.led_states;
     if (tempEffects.includes(fx) && hw?.length === N) {
       simLeds = hw.map(l => ({r:l.r||0, g:l.g||0, b:l.b||0}));
+      s.setLedDisplay(simLeds);
       _step++; countFps(now); return;
     }
 
@@ -132,6 +137,7 @@
     else { L=L.map(()=>({...c})); }
 
     simLeds = L.map(l => ({r:Math.round(l.r*br),g:Math.round(l.g*br),b:Math.round(l.b*br)}));
+    s.setLedDisplay(simLeds);
     _step++;
     countFps(now);
   }
