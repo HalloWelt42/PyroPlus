@@ -231,9 +231,9 @@
   .ax-pt { font: 600 9px var(--mono); fill: var(--text-muted); }
 
   /* Duty-Bar */
-  .duty-bar { height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; position: relative; overflow: hidden; }
-  .duty-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
-  .duty-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 600 var(--fs-xs) var(--mono); color: var(--text-secondary); line-height: 8px; }
+  .duty-bar { height: 28px; background: rgba(255,255,255,0.06); border-radius: var(--radius-sm); position: relative; overflow: hidden; }
+  .duty-fill { height: 100%; border-radius: var(--radius-sm); transition: width 0.5s; }
+  .duty-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 600 var(--fs-xs) var(--mono); color: var(--text-primary); }
 
   /* Profile */
   .profiles { display: flex; gap: 4px; flex-wrap: wrap; }
