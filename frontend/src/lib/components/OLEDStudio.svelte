@@ -48,15 +48,48 @@
     {id:'move',icon:'fa-up-down-left-right',label:'Verschieben',key:'V'},
   ];
 
-  /* ═══ WETTER (Open-Meteo API) ═══ */
+  /* ═══ WETTER (Open-Meteo API + Ortssuche) ═══ */
   let weather = $state(null);
+  let weatherLocation = $state(JSON.parse(localStorage.getItem('pp-weather-loc') || 'null') || { name: 'Zeitz', lat: 51.05, lon: 12.13 });
+  let locationSearch = $state('');
+  let locationResults = $state([]);
+  let showLocationSearch = $state(!weatherLocation.name);
+
   async function fetchWeather() {
+    if (!weatherLocation) return;
     try {
-      const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=51.05&longitude=12.13&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,surface_pressure&timezone=Europe/Berlin');
+      const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${weatherLocation.lat}&longitude=${weatherLocation.lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,surface_pressure&timezone=auto`);
       const d = await r.json();
       weather = d.current;
     } catch {}
   }
+
+  async function searchLocation(q) {
+    if (q.length < 2) { locationResults = []; return; }
+    try {
+      const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=5&language=de`);
+      const d = await r.json();
+      locationResults = (d.results || []).map(r => ({ name: r.name, country: r.country, admin: r.admin1, lat: r.latitude, lon: r.longitude }));
+    } catch { locationResults = []; }
+  }
+
+  function selectLocation(loc) {
+    weatherLocation = { name: loc.name, lat: loc.lat, lon: loc.lon };
+    localStorage.setItem('pp-weather-loc', JSON.stringify(weatherLocation));
+    locationSearch = '';
+    locationResults = [];
+    showLocationSearch = false;
+    fetchWeather();
+    s.toast(`Wetter-Ort: ${loc.name}`, 'ok');
+  }
+
+  let _searchTimer = 0;
+  function onLocationInput(e) {
+    locationSearch = e.target.value;
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(() => searchLocation(locationSearch), 300);
+  }
+
   function weatherCodeToText(code) {
     if (code == null) return '—';
     if (code === 0) return 'Klar';
@@ -285,7 +318,7 @@
   async function sendToOled(){s.toast('An OLED gesendet','ok');}
 
   /* ═══ PANEL D&D ═══ */
-  let lpanels=$state(['preview','props','layers','widgets']), rpanels=$state(['tools','display','color']);
+  let lpanels=$state(['preview','props','layers','widgets','weather']), rpanels=$state(['tools','display','color']);
   let pdragId=$state(null), pdropSide=$state(null);
   function pDragStart(e,id){pdragId=id;e.dataTransfer.setData('application/x-oled-panel',id);e.dataTransfer.effectAllowed='move';}
   function pDragEnd(){pdragId=null;pdropSide=null;}
@@ -296,7 +329,7 @@
   function onKey(e){if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;if(e.ctrlKey&&e.key==='z'){undo();e.preventDefault();}if(e.ctrlKey&&e.key==='y'){redo();e.preventDefault();}if(e.key==='g'){showGrid=!showGrid;render();}if(e.key==='+')zoom=Math.min(16,zoom+1);if(e.key==='-')zoom=Math.max(2,zoom-1);const t=drawTools.find(t=>t.key===e.key.toUpperCase());if(t&&!e.ctrlKey)tool=t.id;}
 
   /* Panel-Metadaten */
-  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, color:{icon:'palette',label:'Farbe',c:false}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, widgets:{icon:'puzzle-piece',label:'Widgets',c:true} };
+  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, color:{icon:'palette',label:'Farbe',c:false}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, widgets:{icon:'puzzle-piece',label:'Widgets',c:true}, weather:{icon:'cloud-sun',label:'Wetter-Ort',c:true} };
   function panelIcon(id) { return _pd[id]?.icon || 'circle'; }
   function panelLabel(id) { return _pd[id]?.label || id; }
   function panelCollapsible(id) { return _pd[id]?.c ?? true; }
@@ -352,6 +385,26 @@
   {:else if id==='layers'}
     <div class="ll">{#each [...layers].reverse() as layer, ri}{@const idx=layers.length-1-ri}<div class="li" class:active={layer.id===activeLayer} class:drag-over={ldOver===idx} draggable="true" onclick={()=>activeLayer=layer.id} ondragstart={(e)=>ldStart(e,idx)} ondragover={(e)=>ldDragOver(e,idx)} ondrop={(e)=>ldDrop(e,idx)} ondragend={ldEnd}><span class="lh"><i class="fa-solid fa-grip-vertical"></i></span><button class="lv" onclick={(e)=>{e.stopPropagation();toggleVis(layer.id);render();}}><i class="fa-solid {layer.visible?'fa-eye':'fa-eye-slash'}"></i></button><span class="ln" contenteditable="false" ondblclick={(e)=>{e.target.contentEditable='true';e.target.focus();}} onblur={(e)=>{e.target.contentEditable='false';layers=layers.map(l=>l.id===layer.id?{...l,name:e.target.textContent}:l);}} onkeydown={(e)=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}}}>{layer.name}</span></div>{/each}</div>
     <div class="la"><button class="lab" onclick={()=>addLayer()}><i class="fa-solid fa-plus"></i></button><button class="lab" onclick={()=>dupLayer(activeLayer)}><i class="fa-solid fa-copy"></i></button><button class="lab" onclick={()=>rmLayer(activeLayer)}><i class="fa-solid fa-trash"></i></button></div>
+  {:else if id==='weather'}
+    <div class="rr"><span>Aktueller Ort</span><span class="mono">{weatherLocation?.name || '—'}</span></div>
+    {#if weather}
+      <div class="rr"><span>Temperatur</span><span class="mono">{weather.temperature_2m}°C</span></div>
+      <div class="rr"><span>Feuchtigkeit</span><span class="mono">{weather.relative_humidity_2m}%</span></div>
+      <div class="rr"><span>Wind</span><span class="mono">{weather.wind_speed_10m} km/h</span></div>
+    {/if}
+    <div class="loc-search">
+      <input type="text" class="ti" placeholder="Ort suchen..." value={locationSearch} oninput={onLocationInput}>
+      {#if locationResults.length > 0}
+        <div class="loc-results">
+          {#each locationResults as loc}
+            <button class="loc-item" onclick={() => selectLocation(loc)}>
+              <span class="loc-name">{loc.name}</span>
+              <span class="loc-detail">{loc.admin || ''}{loc.country ? ', '+loc.country : ''}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
   {:else if id==='widgets'}
     {#each ['zeit','sys','wetter','deko'] as cat}
       {@const items = widgetList.filter(w => w.cat === cat)}
@@ -455,6 +508,14 @@
   .la { display: flex; gap: 3px; margin-top: 6px; }
   .lab { flex: 1; padding: 5px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); cursor: pointer; font-size: var(--fs-sm); text-align: center; }
   .lab:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Ortssuche */
+  .loc-search { margin-top: 4px; }
+  .loc-results { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; max-height: 150px; overflow-y: auto; }
+  .loc-item { display: flex; flex-direction: column; padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); cursor: pointer; text-align: left; font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); transition: all 120ms; }
+  .loc-item:hover { border-color: var(--accent); color: var(--accent); }
+  .loc-name { font-weight: 600; }
+  .loc-detail { font: 500 var(--fs-xs) var(--font); color: var(--text-muted); }
 
   /* Widgets */
   .wc-cat { font: 600 var(--fs-xs) var(--font); text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); display: flex; align-items: center; gap: 4px; margin-top: 4px; }
