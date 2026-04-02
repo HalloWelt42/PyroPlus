@@ -372,6 +372,7 @@
 
 <div class="studio">
     <div class="side-panel" ondragover={(e)=>sDragOver(e,'left')} ondragleave={sDragLeave} ondrop={(e)=>sDrop(e,'left')} class:drop-target={pdropSide==='left'}>
+      <div class="studio-header"><i class="fa-solid fa-display"></i> OLED Studio</div>
       {#each lpanels as pid (pid)}
         <PanelWrapper id={pid} icon="fa-{_pd[pid]?.icon||'circle'}" label={panelLabel(pid)} collapsible={panelCollapsible(pid)} onDragStart={pDragStart}>
           {@render panelContent(pid)}
@@ -393,6 +394,8 @@
 
 <style>
   .studio { display: flex; height: 100%; overflow: hidden; }
+  .studio-header { font: 700 var(--fs-xl) var(--font); color: var(--text-primary); padding: 10px 10px 6px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .studio-header i { color: var(--accent); }
 
   .side-panel { width: 300px; flex-shrink: 0; background: var(--bg-base); padding: 4px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
   .side-panel:first-child { border-right: 1px solid var(--border); }
