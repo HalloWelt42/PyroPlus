@@ -170,7 +170,7 @@
     disk:         { cat:'sys',   label:'Disk Text',        w:72, h:10, font:'sm',  r:(c,x,y)=>{drawText(c,'DSK 1842/3726G',x,y+1)} },
     disk_bar:     { cat:'sys',   label:'Disk Balken',      w:60, h:6,  font:'',    r:(c,x,y,w,h)=>{drawBar(c,x,y,w||60,h||6,0.49)} },
     docker:       { cat:'sys',   label:'Docker',           w:60, h:10, font:'sm',  r:(c,x,y)=>{drawText(c,'Docker: 8 up',x,y+1)} },
-    ip:           { cat:'sys',   label:'IP-Adresse',       w:82, h:10, font:'sm',  r:(c,x,y)=>{drawText(c,'IP 192.168.178.49',x,y+1)} },
+    ip:           { cat:'sys',   label:'IP-Adresse',       w:82, h:10, font:'sm',  r:(c,x,y)=>{drawText(c,'IP 10.0.0.1',x,y+1)} },
     uptime:       { cat:'sys',   label:'Uptime',           w:60, h:10, font:'sm',  r:(c,x,y)=>{drawText(c,'Up 3d 14:32',x,y+1)} },
 
     network:      { cat:'net',   label:'Netz Rx/Tx',       w:82, h:10, font:'sm',  r:(c,x,y)=>{drawText(c,'Rx142 Tx38 KB/s',x,y+1)} },

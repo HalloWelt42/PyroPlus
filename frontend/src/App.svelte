@@ -15,171 +15,241 @@ const nav = [
 
 let now = $state(new Date());
 let clockTimer;
-let mobileMenuOpen = $state(false);
+let viewKey = $state(0);
+let sidebarOpen = $state(true);
 
 onMount(() => { s.init(); clockTimer = setInterval(() => now = new Date(), 1000); });
 onDestroy(() => { s.destroy(); clearInterval(clockTimer); });
 
 function selectView(id) {
+  if (s.currentView === id) return;
   s.currentView = id;
-  mobileMenuOpen = false;
+  viewKey++;
 }
 </script>
 
+<!-- Toasts -->
 <div class="toast-container">
   {#each s.toasts as t (t.id)}<div class="toast toast-{t.type}">{t.msg}</div>{/each}
 </div>
 
-<div class="shell" class:menu-open={mobileMenuOpen}>
-  <!-- Hamburger für Mobile -->
-  <button class="hamburger" onclick={() => mobileMenuOpen = !mobileMenuOpen} aria-label="Menü">
-    <i class="fa-solid" class:fa-bars={!mobileMenuOpen} class:fa-xmark={mobileMenuOpen}></i>
-  </button>
+<div class="app" class:sidebar-collapsed={!sidebarOpen}>
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <div class="sb-top">
+      <div class="sb-logo">
+        <div class="sb-logo-icon"><i class="fa-solid fa-fire"></i></div>
+        {#if sidebarOpen}<div class="sb-logo-text">Pyro<span>Plus</span></div>{/if}
+      </div>
 
-  <aside class="sidebar" class:open={mobileMenuOpen}>
-    <!-- Logo -->
-    <div class="sb-logo">
-      <div class="sb-logo-icon"><i class="fa-solid fa-fire"></i></div>
-      <div class="sb-logo-text">Pyro<span>Plus</span></div>
+      <button class="sb-collapse" onclick={() => sidebarOpen = !sidebarOpen} aria-label="Seitenleiste umschalten">
+        <i class="fa-solid" class:fa-angles-left={sidebarOpen} class:fa-angles-right={!sidebarOpen}></i>
+      </button>
     </div>
 
-    <!-- Navigation -->
-    <div class="sb-section">
-      <div class="sb-section-title">Navigation</div>
+    <nav class="sb-nav">
       {#each nav as item}
         <button class="nav-btn" class:active={s.currentView === item.id}
-          onclick={() => selectView(item.id)}>
-          <i class="{item.icon} nav-icon"></i>
-          <span>{item.label}</span>
+          onclick={() => selectView(item.id)} title={sidebarOpen ? '' : item.label}>
+          <i class="{item.icon}"></i>
+          {#if sidebarOpen}<span>{item.label}</span>{/if}
         </button>
       {/each}
-    </div>
+    </nav>
 
-    <!-- Schnellzugriff -->
-    <div class="sb-power">
-      <div class="sb-section-title">Schnellzugriff</div>
-      <div class="power-row">
-        <span class="power-dot" class:on={s.fanActive}></span>
-        <span class="power-label">Lüfter</span>
-        <button class="power-toggle" class:on={s.fanActive} onclick={() => s.toggleFan()} aria-label="Lüfter umschalten"></button>
+    {#if sidebarOpen}
+      <div class="sb-toggles">
+        <div class="sb-section-title">Schnellzugriff</div>
+        {#each [
+          { key: 'fan', label: 'Lüfter', active: s.fanActive, toggle: () => s.toggleFan() },
+          { key: 'leds', label: 'LEDs', active: s.ledsActive, toggle: () => s.toggleLeds() },
+          { key: 'oled', label: 'Display', active: s.oledActive, toggle: () => s.toggleOled() },
+        ] as item}
+          <div class="toggle-row">
+            <span class="toggle-dot" class:on={item.active}></span>
+            <span class="toggle-label">{item.label}</span>
+            <button class="toggle-switch" class:on={item.active} onclick={item.toggle} aria-label="{item.label} umschalten"></button>
+          </div>
+        {/each}
       </div>
-      <div class="power-row">
-        <span class="power-dot" class:on={s.ledsActive}></span>
-        <span class="power-label">LEDs</span>
-        <button class="power-toggle" class:on={s.ledsActive} onclick={() => s.toggleLeds()} aria-label="LEDs umschalten"></button>
-      </div>
-      <div class="power-row">
-        <span class="power-dot" class:on={s.oledActive}></span>
-        <span class="power-label">Display</span>
-        <button class="power-toggle" class:on={s.oledActive} onclick={() => s.toggleOled()} aria-label="Display umschalten"></button>
-      </div>
-    </div>
+    {/if}
 
-    <!-- Footer -->
     <div class="sb-footer">
-      <div class="sb-status">
-        <span class="dot" class:on={s.connected}></span>
-        {s.connected ? 'Verbunden' : 'Getrennt'}
-      </div>
-      <div class="sb-version">v{s.version || '?'} · HW {s.hwProxy?.version || '?'}</div>
-      <div class="sb-clock">{now.toLocaleTimeString('de-DE')}</div>
+      <div class="sb-status"><span class="status-dot" class:on={s.connected}></span>{#if sidebarOpen}{s.connected ? 'Verbunden' : 'Getrennt'}{/if}</div>
+      {#if sidebarOpen}
+        <div class="sb-meta">Version {s.version || '?'} · Hardware {s.hwProxy?.version || '?'}</div>
+        <div class="sb-clock">{now.toLocaleTimeString('de-DE')}</div>
+      {/if}
     </div>
   </aside>
 
-  <!-- Overlay für Mobile -->
-  {#if mobileMenuOpen}
-    <div class="overlay" onclick={() => mobileMenuOpen = false} role="presentation"></div>
-  {/if}
-
+  <!-- ═══ HAUPTBEREICH ═══ -->
   <main class="main">
-    {#if s.currentView === 'fan'}<FanControl state={s} />
-    {:else if s.currentView === 'leds'}<LEDLab state={s} />
-    {:else if s.currentView === 'oled'}<OLEDStudio state={s} />
-    {/if}
+    {#key viewKey}
+      <div class="view">
+        {#if s.currentView === 'fan'}<FanControl state={s} />
+        {:else if s.currentView === 'leds'}<LEDLab state={s} />
+        {:else if s.currentView === 'oled'}<OLEDStudio state={s} />
+        {/if}
+      </div>
+    {/key}
   </main>
+
+  <!-- ═══ BOTTOM TAB BAR (Mobil) ═══ -->
+  <nav class="bottom-bar">
+    {#each nav as item}
+      <button class="tab-btn" class:active={s.currentView === item.id}
+        onclick={() => selectView(item.id)}>
+        <i class="{item.icon}"></i>
+        <span>{item.label}</span>
+      </button>
+    {/each}
+  </nav>
 </div>
 
 <style>
-  .shell { display: grid; grid-template-columns: 240px 1fr; height: 100vh; }
-
-  .sidebar {
-    background: var(--bg-base); border-right: 1px solid var(--border);
-    display: flex; flex-direction: column; padding: 16px 10px; overflow: hidden;
-    z-index: 100;
+  /* ═══ APP SHELL ═══ */
+  .app {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    grid-template-rows: 1fr;
+    height: 100vh; width: 100vw;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: grid-template-columns 250ms ease;
   }
-  .sb-logo { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-bottom: 20px; }
+  .app.sidebar-collapsed {
+    grid-template-columns: 64px 1fr;
+  }
+
+  /* ═══ SIDEBAR ═══ */
+  .sidebar {
+    background: var(--bg-base);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 14px 10px;
+    overflow: hidden;
+    transition: all 250ms ease;
+  }
+
+  .sb-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .sb-logo { display: flex; align-items: center; gap: 10px; padding: 4px 6px; }
   .sb-logo-icon {
-    width: 36px; height: 36px; border-radius: 10px;
+    width: 40px; height: 40px; border-radius: var(--radius);
     background: linear-gradient(135deg, var(--accent), #0066ff);
     display: flex; align-items: center; justify-content: center;
-    font-size: 16px; color: #fff;
+    font-size: var(--fs-sm); color: #fff; flex-shrink: 0;
   }
-  .sb-logo-text { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+  .sb-logo-text { font-size: var(--fs-lg); font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
   .sb-logo-text span { color: var(--accent); }
 
-  .sb-section { margin-bottom: 16px; }
-  .sb-section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); padding: 0 12px; margin-bottom: 6px; font-weight: 600; }
+  .sb-collapse {
+    width: 32px; height: 32px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: none;
+    color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: var(--fs-xs); transition: all var(--tr); flex-shrink: 0;
+  }
+  .sb-collapse:hover { color: var(--text-primary); border-color: var(--border-accent); }
 
+  .sb-nav { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
   .nav-btn {
-    display: flex; align-items: center; gap: 10px; padding: 10px 12px; width: 100%;
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; width: 100%;
     border-radius: var(--radius-sm); border: none; background: none;
-    color: var(--text-secondary); font-size: 13px; font-family: inherit;
-    cursor: pointer; transition: all var(--tr); text-align: left;
+    color: var(--text-secondary); font: 500 var(--fs-sm) var(--font);
+    cursor: pointer; transition: all 150ms ease; text-align: left;
+    white-space: nowrap;
   }
+  .nav-btn i { width: 22px; text-align: center; font-size: var(--fs-base); flex-shrink: 0; }
   .nav-btn:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
-  .nav-btn.active { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--border-accent); }
-  .nav-icon { width: 20px; text-align: center; font-size: 14px; }
-
-  .sb-power { padding: 10px 4px; margin-top: 8px; }
-  .power-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--radius-sm); margin-bottom: 3px; }
-  .power-row:hover { background: rgba(255,255,255,0.02); }
-  .power-label { font-size: 12px; color: var(--text-secondary); flex: 1; }
-  .power-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); transition: all var(--tr); }
-  .power-dot.on { background: var(--green); box-shadow: 0 0 6px rgba(0,232,138,0.5); }
-  .power-toggle {
-    width: 36px; height: 20px; border-radius: 10px; border: none;
-    background: rgba(255,255,255,0.1); cursor: pointer; position: relative;
-    transition: background var(--tr);
+  .nav-btn.active {
+    background: var(--accent-dim); color: var(--accent);
+    border: 1px solid var(--border-accent);
   }
-  .power-toggle.on { background: var(--green); }
-  .power-toggle::after {
-    content: ''; position: absolute; top: 2px; left: 2px;
+  .sidebar-collapsed .nav-btn { justify-content: center; padding: 10px 0; }
+
+  .sb-toggles { padding: 10px 6px; }
+  .sb-section-title {
+    font: 600 var(--fs-xs) var(--font); text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--text-muted);
+    padding: 0 8px; margin-bottom: 8px;
+  }
+  .toggle-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--radius-sm); }
+  .toggle-label { font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); flex: 1; }
+  .toggle-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); transition: all var(--tr); flex-shrink: 0; }
+  .toggle-dot.on { background: var(--green); box-shadow: 0 0 8px rgba(0,232,138,0.5); }
+  .toggle-switch {
+    width: 40px; height: 22px; border-radius: 11px; border: none;
+    background: rgba(255,255,255,0.1); cursor: pointer; position: relative;
+    transition: background var(--tr); flex-shrink: 0;
+  }
+  .toggle-switch.on { background: var(--green); }
+  .toggle-switch::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
     width: 16px; height: 16px; border-radius: 50%; background: #fff;
     transition: transform var(--tr); box-shadow: 0 1px 3px rgba(0,0,0,0.3);
   }
-  .power-toggle.on::after { transform: translateX(16px); }
+  .toggle-switch.on::after { transform: translateX(18px); }
 
-  .sb-footer { margin-top: auto; padding: 12px 8px; border-top: 1px solid var(--border); }
-  .sb-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); }
-  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
-  .dot.on { background: var(--green); box-shadow: 0 0 6px rgba(0,232,138,0.4); }
-  .sb-version { font-family: var(--mono); font-size: 10px; color: var(--text-muted); margin-top: 4px; }
-  .sb-clock { font-family: var(--mono); font-size: 12px; color: var(--text-label); margin-top: 2px; }
+  .sb-footer { margin-top: auto; padding: 12px 10px; border-top: 1px solid var(--border); }
+  .sb-status { display: flex; align-items: center; gap: 8px; font: 500 var(--fs-xs) var(--font); color: var(--text-muted); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+  .status-dot.on { background: var(--green); box-shadow: 0 0 8px rgba(0,232,138,0.4); }
+  .sb-meta { font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); margin-top: 4px; }
+  .sb-clock { font: 600 var(--fs-sm) var(--mono); color: var(--text-label); margin-top: 3px; }
 
-  .main { overflow-y: auto; padding: 20px 24px; height: 100vh; }
-
-  .hamburger {
-    display: none; position: fixed; top: 12px; left: 12px; z-index: 200;
-    width: 40px; height: 40px; border-radius: 8px; border: 1px solid var(--border);
-    background: var(--bg-base); color: var(--text-primary); font-size: 18px;
-    cursor: pointer; align-items: center; justify-content: center;
+  /* ═══ HAUPTBEREICH ═══ */
+  .main {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .view {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px 20px;
+    animation: viewIn 200ms ease;
+  }
+  @keyframes viewIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
-  .overlay {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    z-index: 50;
-  }
+  /* ═══ BOTTOM BAR (nur Mobil) ═══ */
+  .bottom-bar { display: none; }
 
-  /* ─── Responsive: Mobile ──────────────────────────────── */
+  /* ═══ TOASTS ═══ */
+  .toast-container { position: fixed; top: 14px; right: 14px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+
+  /* ═══ MOBIL ═══ */
   @media (max-width: 768px) {
-    .shell { grid-template-columns: 1fr; }
-    .sidebar {
-      position: fixed; left: -260px; top: 0; bottom: 0; width: 250px;
-      transition: left 250ms ease;
+    .app, .app.sidebar-collapsed {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr 60px;
     }
-    .sidebar.open { left: 0; }
-    .hamburger { display: flex; }
-    .overlay { display: block; }
-    .main { padding: 60px 16px 16px; }
+    .sidebar { display: none; }
+
+    .bottom-bar {
+      display: flex;
+      background: var(--bg-base);
+      border-top: 1px solid var(--border);
+      padding: 0 8px;
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+    .tab-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 4px;
+      border: none; background: none;
+      color: var(--text-muted); font: 500 var(--fs-xs) var(--font);
+      cursor: pointer; transition: color 150ms;
+      padding: 8px 0;
+    }
+    .tab-btn i { font-size: var(--fs-lg); }
+    .tab-btn.active { color: var(--accent); }
+
+    .view { padding: 12px 12px; }
   }
 </style>

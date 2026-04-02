@@ -10,7 +10,7 @@
   const currentSpeed = $derived(s.fan?.current_speed || 0);
   const estimatedRpm = $derived(s.fan?.estimated_rpm || 0);
 
-  const W = 600, H = 250, PL = 50, PR = 20, PT = 30, PB = 35;
+  const W = 600, H = 220, PL = 50, PR = 20, PT = 25, PB = 30;
   const GW = W - PL - PR, GH = H - PT - PB;
   const TMIN = 25, TMAX = 80;
 
@@ -52,9 +52,11 @@
     const rect = svgEl.getBoundingClientRect();
     const cx = e.touches ? e.touches[0].clientX : e.clientX;
     const cy = e.touches ? e.touches[0].clientY : e.clientY;
-    const svgX = (cx - rect.left) * (W / rect.width);
-    const svgY = (cy - rect.top) * (H / rect.height);
-    const pts = [...curve]; pts[dragging] = { temp: xt(svgX), speed: ys(svgY) };
+    /* CTM (Current Transform Matrix) für präzise SVG-Koordinaten */
+    const pt = svgEl.createSVGPoint();
+    pt.x = cx; pt.y = cy;
+    const svgPt = pt.matrixTransform(svgEl.getScreenCTM().inverse());
+    const pts = [...curve]; pts[dragging] = { temp: xt(svgPt.x), speed: ys(svgPt.y) };
     s.updateFan({ curve: pts });
   }
   function stopDrag() {
@@ -71,8 +73,7 @@
   async function addPoint() {
     if (profile !== 'custom') { await selectProfile('custom'); }
     const pts = [...curve];
-    const newTemp = Math.round((TMIN + TMAX) / 2);
-    pts.push({ temp: newTemp, speed: 50 });
+    pts.push({ temp: Math.round((TMIN + TMAX) / 2), speed: 50 });
     s.updateFan({ curve: pts });
     s.setFanCurve(pts);
   }
@@ -84,215 +85,292 @@
   }
 
   const profIcons = { silent: 'fa-volume-xmark', balanced: 'fa-scale-balanced', performance: 'fa-rocket', night: 'fa-moon', custom: 'fa-sliders' };
-  const profLabels = { silent: 'Silent', balanced: 'Balanced', performance: 'Performance', night: 'Night', custom: 'Custom' };
+  const profLabels = { silent: 'Leise', balanced: 'Ausgewogen', performance: 'Leistung', night: 'Nacht', custom: 'Benutzerdefiniert' };
   const tempTicks = [30, 40, 50, 60, 70, 80];
   const spdTicks = [0, 25, 50, 75, 100];
 </script>
 
-<div class="page">
-  <div class="page-head">
-    <h1><i class="fa-solid fa-fan"></i> Lüftersteuerung</h1>
-    <p class="sub">Kurveneditor · PWM 4-Stufen</p>
-  </div>
+<div class="layout">
+  <!-- ═══ KOPFZEILE ═══ -->
+  <header class="topbar">
+    <i class="fa-solid fa-fan topbar-icon"></i>
+    <h1>Lüftersteuerung</h1>
+  </header>
 
-  <!-- Modus-Auswahl -->
-  <div class="mode-bar">
-    <button class="mode-btn" class:active={mode==='auto'} onclick={() => s.setFanMode('auto')}>
-      <i class="fa-solid fa-wand-magic-sparkles"></i> Automatik
-    </button>
-    <button class="mode-btn" class:active={mode==='manual'} onclick={() => s.setFanMode('manual')}>
-      <i class="fa-solid fa-hand"></i> Manuell
-    </button>
-    <button class="mode-btn" class:active={mode==='off'} onclick={() => s.setFanMode('off')}>
-      <i class="fa-solid fa-power-off"></i> Aus
-    </button>
-  </div>
-
-  <!-- Kurven-Editor -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title"><i class="fa-solid fa-chart-line"></i> Kurven-Editor</div>
-      <div class="card-info">
-        <span class="temp-val">{currentTemp.toFixed(1)}°C</span>
-        <i class="fa-solid fa-arrow-right" style="color:var(--text-muted);font-size:10px"></i>
-        <span class="speed-val">{Math.round(currentSpeed)}%</span>
-        {#if estimatedRpm > 0}<span class="rpm-val"> · {estimatedRpm} RPM</span>{/if}
-      </div>
-    </div>
-
-    <!-- Profil-Auswahl -->
-    <div class="profile-bar">
-      {#each profiles as p}
-        <button class="profile-pill" class:active={profile===p} onclick={() => selectProfile(p)}>
-          <i class="fa-solid {profIcons[p] || 'fa-circle'}"></i> {profLabels[p] || p}
-        </button>
-      {/each}
-    </div>
-
-    {#if profile === 'custom'}
-      <div class="hint"><i class="fa-solid fa-circle-info"></i> Punkte ziehen zum Bearbeiten</div>
-    {/if}
-
-    <!-- SVG Graph -->
-    <div class="graph-wrap">
-      <svg bind:this={svgEl} viewBox="0 0 {W} {H}" class="graph">
-        <defs>
-          <linearGradient id="curve-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.3"/>
-            <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
-          </linearGradient>
-        </defs>
-        <line x1={PL} y1={PT} x2={PL} y2={PT+GH} stroke="rgba(0,180,255,0.08)"/>
-        <line x1={PL} y1={PT+GH} x2={PL+GW} y2={PT+GH} stroke="rgba(0,180,255,0.08)"/>
-        {#each spdTicks as sp}
-          <line x1={PL} y1={sy(sp)} x2={PL+GW} y2={sy(sp)} stroke="rgba(0,180,255,0.05)" stroke-dasharray="4"/>
-          <text x={PL-10} y={sy(sp)+4} text-anchor="end" class="axis-label">{sp}%</text>
-        {/each}
-        {#each tempTicks as t}
-          <line x1={tx(t)} y1={PT} x2={tx(t)} y2={PT+GH} stroke="rgba(0,180,255,0.03)" stroke-dasharray="2"/>
-          <text x={tx(t)} y={PT+GH+18} text-anchor="middle" class="axis-label">{t}°C</text>
-        {/each}
-        {#if currentTemp > TMIN}
-          <line x1={tx(currentTemp)} y1={PT} x2={tx(currentTemp)} y2={PT+GH} stroke="var(--cyan)" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.7"/>
-          <text x={tx(currentTemp)} y={PT-8} text-anchor="middle" class="temp-label">{currentTemp.toFixed(1)}°C</text>
-        {/if}
-        <path d={fillPath(curve)} fill="url(#curve-grad)"/>
-        <path d={linePath(curve)} fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="curve-line"/>
-        {#each curve as pt, i}
-          <circle cx={tx(pt.temp)} cy={sy(pt.speed)} r={dragging===i?10:7} class="point" class:draggable={profile==='custom'} class:active={dragging===i}
-            role="slider" aria-label="Punkt {pt.temp}°C → {pt.speed}%" aria-valuenow={pt.speed} tabindex="0"
-            onmousedown={(e) => startDrag(i,e)} ontouchstart={(e) => startDrag(i,e)}/>
-          <text x={tx(pt.temp)} y={sy(pt.speed)-14} text-anchor="middle" class="point-label">{pt.temp}°/{pt.speed}%</text>
-        {/each}
-      </svg>
-    </div>
-
-    {#if profile === 'custom'}
-      <div class="point-actions">
-        <button class="btn btn-accent btn-sm" onclick={addPoint}><i class="fa-solid fa-plus"></i> Punkt</button>
-        <span class="point-count">{curve.length} Punkte</span>
-      </div>
-      <div class="point-list">
-        {#each [...curve].sort((a,b)=>a.temp-b.temp) as pt, i}
-          <div class="point-item">
-            <span class="pt-temp">{pt.temp}°C</span>
-            <i class="fa-solid fa-arrow-right" style="color:var(--text-muted);font-size:9px"></i>
-            <span class="pt-speed">{pt.speed}%</span>
-            {#if curve.length > 2}
-              <button class="pt-del" onclick={() => removePoint(curve.indexOf(pt))}><i class="fa-solid fa-xmark"></i></button>
-            {/if}
+  <!-- ═══ INHALT ═══ -->
+  <div class="content">
+    <!-- Kurven-Editor -->
+    <div class="panel panel-graph">
+      <!-- Live-Anzeige oben rechts im Graph -->
+      <div class="graph-live">
+        <div class="live-item">
+          <span class="live-label">Temperatur</span>
+          <span class="live-value temp">{currentTemp.toFixed(1)}°C</span>
+        </div>
+        <div class="live-divider"></div>
+        <div class="live-item">
+          <span class="live-label">Geschwindigkeit</span>
+          <span class="live-value speed">{Math.round(currentSpeed)}%</span>
+        </div>
+        {#if estimatedRpm > 0}
+          <div class="live-divider"></div>
+          <div class="live-item">
+            <span class="live-label">Drehzahl</span>
+            <span class="live-value rpm">{estimatedRpm} RPM</span>
           </div>
+        {/if}
+      </div>
+
+      <div class="profile-bar">
+        {#each profiles as p}
+          <button class="profile-pill" class:active={profile===p} onclick={() => selectProfile(p)}>
+            <i class="fa-solid {profIcons[p] || 'fa-circle'}"></i>
+            <span>{profLabels[p] || p}</span>
+          </button>
         {/each}
+        {#if profile === 'custom'}
+          <button class="profile-pill profile-add" onclick={addPoint} aria-label="Punkt hinzufügen">
+            <i class="fa-solid fa-plus"></i>
+            <span>Punkt</span>
+          </button>
+        {/if}
       </div>
-    {/if}
 
-    <!-- Feineinstellungen -->
-    <div class="settings-row">
-      <div class="setting">
-        <div class="setting-head"><span>Hysterese</span><span class="setting-val">{settings.hysteresis||3}°C</span></div>
-        <input type="range" min="1" max="10" step="0.5" value={settings.hysteresis||3} onchange={(e)=>updSetting('hysteresis',e)}/>
+      <div class="graph-wrap">
+        <svg bind:this={svgEl} viewBox="0 0 {W} {H}" class="graph">
+          <defs>
+            <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <line x1={PL} y1={PT} x2={PL} y2={PT+GH} stroke="rgba(0,180,255,0.08)"/>
+          <line x1={PL} y1={PT+GH} x2={PL+GW} y2={PT+GH} stroke="rgba(0,180,255,0.08)"/>
+          {#each spdTicks as sp}
+            <line x1={PL} y1={sy(sp)} x2={PL+GW} y2={sy(sp)} stroke="rgba(0,180,255,0.04)" stroke-dasharray="4"/>
+            <text x={PL-8} y={sy(sp)+4} text-anchor="end" class="ax">{sp}%</text>
+          {/each}
+          {#each tempTicks as t}
+            <line x1={tx(t)} y1={PT} x2={tx(t)} y2={PT+GH} stroke="rgba(0,180,255,0.03)" stroke-dasharray="2"/>
+            <text x={tx(t)} y={PT+GH+16} text-anchor="middle" class="ax">{t}°</text>
+          {/each}
+          {#if currentTemp > TMIN}
+            <line x1={tx(currentTemp)} y1={PT} x2={tx(currentTemp)} y2={PT+GH} stroke="var(--cyan)" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.6"/>
+            <text x={tx(currentTemp)} y={PT-6} text-anchor="middle" class="ax-now">{currentTemp.toFixed(1)}°</text>
+          {/if}
+          <path d={fillPath(curve)} fill="url(#cg)"/>
+          <path d={linePath(curve)} fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="drop-shadow(0 0 4px rgba(0,180,255,0.3))"/>
+          {#each curve as pt, i}
+            <circle cx={tx(pt.temp)} cy={sy(pt.speed)} r={dragging===i?10:7}
+              class="pt" class:draggable={profile==='custom'} class:active={dragging===i}
+              onmousedown={(e) => startDrag(i,e)} ontouchstart={(e) => startDrag(i,e)}/>
+            <text x={tx(pt.temp)} y={sy(pt.speed)-12} text-anchor="middle" class="pt-lbl">{pt.temp}° / {pt.speed}%</text>
+          {/each}
+        </svg>
       </div>
-      <div class="setting">
-        <div class="setting-head"><span>Rampe (Anstieg)</span><span class="setting-val">{settings.ramp_up||3}s</span></div>
-        <input type="range" min="0" max="15" step="0.5" value={settings.ramp_up||3} onchange={(e)=>updSetting('ramp_up',e)}/>
-      </div>
-      <div class="setting">
-        <div class="setting-head"><span>Min. Drehzahl</span><span class="setting-val">{settings.min_speed||0}%</span></div>
-        <input type="range" min="0" max="40" step="1" value={settings.min_speed||0} onchange={(e)=>updSetting('min_speed',e)}/>
-      </div>
-    </div>
-  </div>
 
-  <!-- Manuelle Geschwindigkeit -->
-  {#if mode === 'manual'}
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title"><i class="fa-solid fa-sliders"></i> Manuelle Geschwindigkeit</div>
-        <span class="speed-val" style="font-size:18px;font-weight:700">{Math.round(s.fan?.manual_speed||0)}%</span>
-      </div>
-      <input type="range" min="0" max="100" step="5" value={s.fan?.manual_speed||50} oninput={(e) => s.setFanManualSpeed(parseInt(e.target.value))}/>
+      {#if profile === 'custom' && curve.length > 0}
+        <div class="point-chips">
+          {#each [...curve].sort((a,b)=>a.temp-b.temp) as pt}
+            <div class="chip">
+              <span class="chip-temp">{pt.temp}°C</span>
+              <i class="fa-solid fa-arrow-right chip-arrow"></i>
+              <span class="chip-speed">{pt.speed}%</span>
+              {#if curve.length > 2}
+                <button class="chip-delete" onclick={() => removePoint(curve.indexOf(pt))} aria-label="Punkt entfernen"><i class="fa-solid fa-xmark"></i></button>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
     </div>
-  {/if}
 
-  <!-- Hardware-Info -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title"><i class="fa-solid fa-microchip"></i> Hardware</div>
-    </div>
-    <div class="hw-grid">
-      <div class="hw-item"><span class="hw-label">Typ</span>Kernel PWM</div>
-      <div class="hw-item"><span class="hw-label">GPIO</span>Pin 6</div>
-      <div class="hw-item"><span class="hw-label">Verfügbar</span><span class:text-green={s.fan?.available} class:text-red={!s.fan?.available}>{s.fan?.available ? 'Ja' : 'Nein'}</span></div>
-      <div class="hw-item"><span class="hw-label">Ist-Speed</span>{currentSpeed.toFixed(0)}% → {estimatedRpm} RPM</div>
+    <!-- Seitenleiste -->
+    <div class="panel panel-side">
+      <div class="side-section">
+        <div class="side-title"><i class="fa-solid fa-sliders"></i> Feineinstellung</div>
+        <div class="slider-group">
+          <div class="slider-head"><span>Hysterese</span><span class="slider-val">{settings.hysteresis || 3}°C</span></div>
+          <input type="range" min="1" max="10" step="0.5" value={settings.hysteresis || 3} onchange={(e) => updSetting('hysteresis', e)} />
+        </div>
+        <div class="slider-group">
+          <div class="slider-head"><span>Anstiegsrampe</span><span class="slider-val">{settings.ramp_up || 3} Sekunden</span></div>
+          <input type="range" min="0" max="15" step="0.5" value={settings.ramp_up || 3} onchange={(e) => updSetting('ramp_up', e)} />
+        </div>
+        <div class="slider-group">
+          <div class="slider-head"><span>Mindestdrehzahl</span><span class="slider-val">{settings.min_speed || 0}%</span></div>
+          <input type="range" min="0" max="40" step="1" value={settings.min_speed || 0} onchange={(e) => updSetting('min_speed', e)} />
+        </div>
+      </div>
+
+      {#if mode === 'manual'}
+        <div class="side-section">
+          <div class="side-title"><i class="fa-solid fa-gauge-high"></i> Manuelle Steuerung</div>
+          <div class="manual-row">
+            <input type="range" min="0" max="100" step="5" value={s.fan?.manual_speed || 50} oninput={(e) => s.setFanManualSpeed(parseInt(e.target.value))} />
+            <span class="manual-val">{Math.round(s.fan?.manual_speed || 0)}%</span>
+          </div>
+        </div>
+      {/if}
+
+      <div class="side-section">
+        <div class="side-title"><i class="fa-solid fa-microchip"></i> Hardware</div>
+        <div class="hw-rows">
+          <div class="hw-row"><span class="hw-key">Steuerung</span><span>Kernel PWM</span></div>
+          <div class="hw-row"><span class="hw-key">Anschluss</span><span>GPIO Pin 6</span></div>
+          <div class="hw-row">
+            <span class="hw-key">Status</span>
+            <span class:hw-ok={s.fan?.available} class:hw-err={!s.fan?.available}>
+              {s.fan?.available ? 'Verfügbar' : 'Nicht verfügbar'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modus-Auswahl -->
+      <div class="side-section side-mode">
+        <div class="side-title"><i class="fa-solid fa-power-off"></i> Betriebsmodus</div>
+        <div class="mode-buttons">
+          <button class="mode-btn" class:active={mode==='auto'} onclick={() => s.setFanMode('auto')}>
+            <i class="fa-solid fa-wand-magic-sparkles"></i><span>Automatik</span>
+          </button>
+          <button class="mode-btn" class:active={mode==='manual'} onclick={() => s.setFanMode('manual')}>
+            <i class="fa-solid fa-hand"></i><span>Manuell</span>
+          </button>
+          <button class="mode-btn" class:active={mode==='off'} onclick={() => s.setFanMode('off')}>
+            <i class="fa-solid fa-power-off"></i><span>Aus</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
 <style>
-  .page { display: flex; flex-direction: column; gap: 18px; }
-  .page-head h1 { display: flex; align-items: center; gap: 10px; font-size: 22px; }
-  .page-head h1 i { color: var(--accent); }
-  .sub { color: var(--text-muted); font-size: 13px; margin-top: 2px; }
+  .layout { display: flex; flex-direction: column; height: 100%; gap: 12px; }
 
-  .mode-bar { display: flex; gap: 8px; }
+  /* ─── Kopfzeile ─── */
+  .topbar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .topbar h1 { font-size: var(--fs-xl); }
+  .topbar-icon { color: var(--accent); font-size: var(--fs-lg); }
+
+  /* ─── Modus (im Seitenpanel) ─── */
+  .side-mode { margin-top: auto; }
+  .mode-buttons { display: flex; flex-direction: column; gap: 6px; }
   .mode-btn {
-    flex: 1; padding: 10px; border-radius: var(--radius);
-    border: 1px solid var(--border); background: var(--bg-surface);
-    color: var(--text-secondary); font: 500 13px/1 var(--font);
-    cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+    height: var(--h-btn); border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--bg-elevated);
+    color: var(--text-muted); font: 500 var(--fs-sm) var(--font);
+    cursor: pointer; transition: all 150ms;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%;
   }
-  .mode-btn:hover { border-color: var(--text-muted); }
+  .mode-btn:hover { border-color: var(--text-muted); color: var(--text-secondary); }
   .mode-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
-  .card-title { font: 600 12px/1 var(--font); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; }
-  .card-title i { color: var(--accent); font-size: 14px; }
-  .card-info { font: 12px var(--mono); color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
-  .temp-val { color: var(--cyan); font-weight: 600; }
-  .speed-val { color: var(--accent); font-weight: 600; }
-  .rpm-val { color: var(--text-muted); }
+  /* ─── Inhalt ─── */
+  .content { display: grid; grid-template-columns: 1fr 280px; gap: 12px; flex: 1; min-height: 0; }
+  .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .panel-graph { display: flex; flex-direction: column; padding: 14px; position: relative; }
 
-  .profile-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  /* ─── Live-Anzeige (Overlay oben rechts) ─── */
+  .graph-live {
+    position: absolute; top: 12px; right: 14px; z-index: 2;
+    display: flex; align-items: center; gap: 14px;
+    padding: 8px 16px; border-radius: var(--radius-sm);
+    background: rgba(10, 14, 24, 0.85); border: 1px solid var(--border);
+    backdrop-filter: blur(6px);
+  }
+  .live-item { display: flex; flex-direction: column; align-items: center; }
+  .live-label { font: 500 var(--fs-xs) var(--font); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .live-value { font: 700 var(--fs-base) var(--mono); }
+  .live-value.temp { color: var(--cyan); }
+  .live-value.speed { color: var(--accent); }
+  .live-value.rpm { color: var(--text-secondary); }
+  .live-divider { width: 1px; height: 30px; background: var(--border); }
+  .panel-side { display: flex; flex-direction: column; overflow-y: auto; }
+
+  /* ─── Profile ─── */
+  .profile-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; flex-shrink: 0; }
   .profile-pill {
-    padding: 7px 16px; background: var(--bg-deep); border: 1px solid var(--border);
-    border-radius: 20px; font: 500 12px/1 var(--font); cursor: pointer;
-    color: var(--text-secondary); transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+    height: var(--h-pill); padding: 0 16px;
+    background: var(--bg-deep); border: 1px solid var(--border);
+    border-radius: 99px; font: 500 var(--fs-xs) var(--font);
+    cursor: pointer; color: var(--text-muted); transition: all 150ms;
+    display: flex; align-items: center; gap: 6px;
   }
   .profile-pill:hover { border-color: var(--text-muted); }
   .profile-pill.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .profile-add { border-style: dashed; }
 
-  .hint { font: 11px var(--font); color: var(--accent); opacity: 0.7; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  /* ─── Graph ─── */
+  .graph-wrap { flex: 1; min-height: 0; }
+  .graph { width: 100%; height: 100%; display: block; }
+  .ax { font: 12px var(--mono); fill: var(--text-muted); }
+  .ax-now { font: 600 13px var(--mono); fill: var(--cyan); }
+  .pt-lbl { font: 600 10px var(--mono); fill: var(--text-muted); }
+  .pt { fill: var(--accent); stroke: var(--bg-card); stroke-width: 3; transition: r 150ms; }
+  .pt.draggable { cursor: grab; } .pt.draggable:hover { r: 10; } .pt.active { fill: var(--cyan); r: 10; }
 
-  .graph-wrap { background: var(--bg-deep); border-radius: 12px; padding: 12px; margin-bottom: 16px; }
-  .graph { width: 100%; display: block; }
-  .axis-label { font: 10px var(--mono); fill: var(--text-muted); }
-  .temp-label { font: 600 11px var(--mono); fill: var(--cyan); }
-  .point-label { font: 600 9px var(--mono); fill: var(--text-muted); }
-  .curve-line { filter: drop-shadow(0 0 6px rgba(0,180,255,0.35)); }
-  .point { fill: var(--accent); stroke: var(--bg-surface); stroke-width: 3; transition: r 0.15s; filter: drop-shadow(0 0 6px rgba(0,180,255,0.35)); }
-  .point.draggable { cursor: grab; } .point.draggable:hover { r: 10; } .point.active { fill: var(--cyan); r: 10; }
+  /* ─── Punkt-Chips ─── */
+  .point-chips { display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; margin-top: 8px; }
+  .chip {
+    display: flex; align-items: center; gap: 6px;
+    height: var(--h-pill); padding: 0 12px; border-radius: 99px;
+    background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+    font: 500 var(--fs-xs) var(--mono);
+  }
+  .chip-temp { color: var(--cyan); }
+  .chip-arrow { font-size: var(--fs-xs); color: var(--text-muted); }
+  .chip-speed { color: var(--accent); }
+  .chip-delete {
+    background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: var(--fs-xs); padding: 0 0 0 4px;
+    display: flex; align-items: center;
+  }
+  .chip-delete:hover { color: var(--red); }
 
-  .point-actions { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-  .point-count { font: 11px var(--mono); color: var(--text-muted); }
-  .point-list { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
-  .point-item { display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); font: 11px var(--mono); }
-  .pt-temp { color: var(--cyan); } .pt-speed { color: var(--accent); }
-  .pt-del { width: 18px; height: 18px; border-radius: 4px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center; margin-left: 4px; }
-  .pt-del:hover { background: rgba(255,64,96,0.1); color: var(--red); }
+  /* ─── Seitenleiste ─── */
+  .side-section { padding: 16px 18px; border-bottom: 1px solid var(--border); }
+  .side-section:last-child { border-bottom: none; }
+  .side-title {
+    font: 600 var(--fs-sm) var(--font); color: var(--text-secondary);
+    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .side-title i { color: var(--accent); font-size: var(--fs-sm); }
 
-  .settings-row { display: flex; gap: 20px; }
-  .setting { flex: 1; }
-  .setting-head { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12px; color: var(--text-secondary); }
-  .setting-val { font-family: var(--mono); color: var(--text-muted); background: var(--bg-deep); padding: 2px 8px; border-radius: 4px; }
+  .slider-group { margin-bottom: 14px; }
+  .slider-group:last-child { margin-bottom: 0; }
+  .slider-head {
+    display: flex; justify-content: space-between; align-items: center;
+    font: 500 var(--fs-sm) var(--font); color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+  .slider-val {
+    font: 500 var(--fs-xs) var(--mono); color: var(--text-muted);
+    background: var(--bg-deep); padding: 3px 10px; border-radius: var(--radius-sm);
+  }
 
-  .hw-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-  .hw-item { font: 12px var(--mono); }
-  .hw-label { display: block; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
-  .text-green { color: var(--green); }
-  .text-red { color: var(--red); }
+  .manual-row { display: flex; align-items: center; gap: 14px; }
+  .manual-row input { flex: 1; }
+  .manual-val { font: 700 var(--fs-lg) var(--mono); color: var(--accent); min-width: 56px; text-align: right; }
 
-  @media (max-width: 768px) {
-    .mode-bar { flex-direction: column; }
-    .settings-row { flex-direction: column; gap: 12px; }
-    .hw-grid { grid-template-columns: 1fr 1fr; }
+  .hw-rows { display: flex; flex-direction: column; gap: 8px; }
+  .hw-row {
+    display: flex; justify-content: space-between;
+    font: 500 var(--fs-sm) var(--font); color: var(--text-secondary);
+    padding: 3px 0;
+  }
+  .hw-key { color: var(--text-muted); }
+  .hw-ok { color: var(--green); }
+  .hw-err { color: var(--red); }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 900px) {
+    .content { grid-template-columns: 1fr; }
+    .graph-live { position: static; margin-bottom: 10px; justify-content: center; background: var(--bg-elevated); }
+  }
+  @media (max-width: 600px) {
+    .mode-btn span { display: none; }
   }
 </style>
