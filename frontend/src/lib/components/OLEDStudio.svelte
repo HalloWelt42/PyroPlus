@@ -179,6 +179,7 @@
       props: { ...wt.props },
     }];
     selectedWidget = placedWidgets.length - 1;
+    tool = 'move';
     renderWidgets();
     s.toast(`${wt.label} eingefügt`, 'ok');
   }
