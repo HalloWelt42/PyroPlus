@@ -210,8 +210,8 @@
   .fan-header { display: flex; align-items: center; gap: 10px; }
   .fan-icon { font-size: var(--fs-lg); color: var(--accent); }
   .fan-title { font: 600 var(--fs-sm) var(--font); }
-  .fan-sub { font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
-  .fan-badge { margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 99px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
+  .fan-sub { font: 500 var(--fs-sm) var(--mono); color: var(--text-muted); }
+  .fan-badge { margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 99px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); font: 500 var(--fs-sm) var(--mono); color: var(--text-muted); }
   .fan-badge.on { color: var(--green); border-color: rgba(0,232,138,0.2); background: rgba(0,232,138,0.06); }
   .fan-badge i { font-size: var(--fs-lg); }
   .spinning { animation: spin 1s linear infinite; }
@@ -241,11 +241,11 @@
   /* Duty-Bar */
   .duty-bar { height: 28px; background: rgba(255,255,255,0.06); border-radius: var(--radius-sm); position: relative; overflow: hidden; }
   .duty-fill { height: 100%; border-radius: var(--radius-sm); transition: width 0.5s; }
-  .duty-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 600 var(--fs-xs) var(--mono); color: var(--text-primary); }
+  .duty-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 600 var(--fs-sm) var(--mono); color: var(--text-primary); }
 
   /* Profile */
   .profiles { display: flex; gap: 4px; flex-wrap: wrap; }
-  .pill { padding: 4px 10px; background: var(--bg-deep); border: 1px solid var(--border); border-radius: 99px; font: 500 var(--fs-xs) var(--font); cursor: pointer; color: var(--text-muted); transition: all 150ms; display: flex; align-items: center; gap: 4px; }
+  .pill { padding: 6px 12px; background: var(--bg-deep); border: 1px solid var(--border); border-radius: 99px; font: 500 var(--fs-sm) var(--font); cursor: pointer; color: var(--text-muted); transition: all 150ms; display: flex; align-items: center; gap: 6px; }
   .pill:hover { border-color: var(--text-muted); }
   .pill.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
@@ -255,21 +255,21 @@
 
   /* Steuerung */
   .ctrl { display: flex; flex-direction: column; gap: 6px; }
-  .ctrl-row { display: flex; align-items: center; gap: 8px; font: 500 var(--fs-xs) var(--font); color: var(--text-secondary); }
-  .ctrl-row span:first-child { min-width: 100px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .ctrl-row { display: flex; align-items: center; gap: 10px; font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); }
+  .ctrl-row span:first-child { min-width: 110px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
   .ctrl-row input { flex: 1; }
-  .ctrl-val { font: 600 var(--fs-xs) var(--mono); color: var(--text-primary); background: var(--bg-deep); padding: 2px 8px; border-radius: var(--radius-sm); min-width: 40px; text-align: center; }
+  .ctrl-val { font: 600 var(--fs-sm) var(--mono); color: var(--text-primary); background: var(--bg-deep); padding: 3px 10px; border-radius: var(--radius-sm); min-width: 44px; text-align: center; }
 
   /* Modus */
   .modes { display: flex; gap: 6px; }
-  .mode { flex: 1; height: 34px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 var(--fs-xs) var(--font); cursor: pointer; transition: all 150ms; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .mode { flex: 1; height: 38px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 var(--fs-sm) var(--font); cursor: pointer; transition: all 150ms; display: flex; align-items: center; justify-content: center; gap: 6px; }
   .mode:hover { border-color: var(--text-muted); }
   .mode.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
   /* Simulation */
-  .sim { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--radius-sm); background: var(--bg-elevated); font: 500 var(--fs-xs) var(--font); color: var(--text-muted); }
+  .sim { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--bg-elevated); font: 500 var(--fs-sm) var(--font); color: var(--text-muted); }
   .sim input { flex: 1; }
-  .sim-v { font: 700 var(--fs-sm) var(--mono); min-width: 28px; text-align: right; }
+  .sim-v { font: 700 var(--fs-sm) var(--mono); min-width: 32px; text-align: right; }
   .tog { width: 34px; height: 18px; border-radius: 9px; border: none; background: rgba(255,255,255,0.1); cursor: pointer; position: relative; transition: background var(--tr); flex-shrink: 0; }
   .tog.on { background: var(--green); }
   .tog::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform var(--tr); box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
