@@ -141,6 +141,16 @@
                  getText: () => Math.round(weather?.surface_pressure ?? 1013)+'hPa' },
     w_loc:     { cat:'wetter', label:'Ort',            w:48, h:7, props:{ scale:1, text:'Zeitz' },
                  getText: (p) => p.text || 'Ort' },
+    cpu_bar:   { cat:'sys',  label:'CPU Balken',      w:60, h:6, props:{ width:60, height:6 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawBar(px, x, y, p.width||60, p.height||6, s.stats?.cpu?.percent||0) },
+    ram_bar:   { cat:'sys',  label:'RAM Balken',     w:60, h:6, props:{ width:60, height:6 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawBar(px, x, y, p.width||60, p.height||6, s.stats?.ram?.percent||0) },
+    disk:      { cat:'sys',  label:'Disk',           w:72, h:7, props:{ scale:1 },
+                 getText: () => { const d=s.stats?.disks?.[0]; return d ? 'DSK '+d.used_gb+'/'+d.total_gb+'G' : 'DSK --'; }},
+    net_rx:    { cat:'sys',  label:'Download',       w:52, h:7, props:{ scale:1 },
+                 getText: () => { const n=s.stats?.network; const b=n?.rx_bytes_sec||0; return b>1048576?(b/1048576).toFixed(1)+'MB/s':b>1024?(b/1024).toFixed(0)+'KB/s':b+'B/s'; }},
+    net_tx:    { cat:'sys',  label:'Upload',         w:52, h:7, props:{ scale:1 },
+                 getText: () => { const n=s.stats?.network; const b=n?.tx_bytes_sec||0; return b>1048576?(b/1048576).toFixed(1)+'MB/s':b>1024?(b/1024).toFixed(0)+'KB/s':b+'B/s'; }},
     label:     { cat:'deko', label:'Textfeld',       w:48, h:7, props:{ scale:1, text:'Text' },
                  getText: (p) => p.text || 'Text' },
     line_h:    { cat:'deko', label:'Linie ─',        w:60, h:1, props:{ width:60 }, isShape: true,
@@ -318,7 +328,7 @@
   async function sendToOled(){s.toast('An OLED gesendet','ok');}
 
   /* ═══ PANEL D&D ═══ */
-  let lpanels=$state(['preview','props','layers','widgets','weather']), rpanels=$state(['tools','display','color']);
+  let lpanels=$state(['preview','props','layers','widgets']), rpanels=$state(['tools','display','color','weather']);
   let pdragId=$state(null), pdropSide=$state(null);
   function pDragStart(e,id){pdragId=id;e.dataTransfer.setData('application/x-oled-panel',id);e.dataTransfer.effectAllowed='move';}
   function pDragEnd(){pdragId=null;pdropSide=null;}

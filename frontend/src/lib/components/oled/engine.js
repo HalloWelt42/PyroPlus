@@ -60,6 +60,15 @@ export function drawEllipse(cx, cy, x1, y1, plotFn, filled) {
   }
 }
 
+export function drawBar(pixels, x, y, w, h, pct) {
+  // Rahmen
+  for (let i = 0; i < w; i++) { if (y >= 0 && y < H && x+i >= 0 && x+i < W) pixels[y * W + x + i] = 1; if (y+h-1 >= 0 && y+h-1 < H && x+i >= 0 && x+i < W) pixels[(y+h-1) * W + x + i] = 1; }
+  for (let j = 0; j < h; j++) { if (x >= 0 && x < W && y+j >= 0 && y+j < H) pixels[(y+j) * W + x] = 1; if (x+w-1 >= 0 && x+w-1 < W && y+j >= 0 && y+j < H) pixels[(y+j) * W + x + w - 1] = 1; }
+  // Füllung
+  const fw = Math.round((w - 2) * Math.min(1, Math.max(0, pct / 100)));
+  for (let j = 1; j < h - 1; j++) for (let i = 0; i < fw; i++) { const px = x+1+i, py = y+j; if (px >= 0 && px < W && py >= 0 && py < H) pixels[py * W + px] = 1; }
+}
+
 export function floodFill(pixels, startX, startY, fillVal) {
   if (startX < 0 || startX >= W || startY < 0 || startY >= H) return;
   const target = pixels[startY * W + startX];
