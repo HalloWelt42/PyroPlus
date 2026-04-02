@@ -209,16 +209,18 @@
 
 <style>
   .layout { display: flex; flex-direction: column; height: 100%; }
-  .content { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-height: 0; align-items: start; }
+  .layout { display: flex; flex-direction: column; height: 100%; }
+  .content { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-height: 0; }
   .panel {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 14px; display: flex; flex-direction: column; gap: 10px;
+    padding: 14px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto;
+    height: 100%;
   }
 
   /* Lüfter-Header */
-  .fan-header { display: flex; align-items: center; gap: 10px; }
-  .fan-icon { font-size: var(--fs-lg); color: var(--accent); }
-  .fan-title { font: 700 var(--fs-xl) var(--font); }
+  .fan-header { display: flex; align-items: flex-start; gap: 10px; flex-shrink: 0; }
+  .fan-icon { font-size: var(--fs-xl); color: var(--accent); line-height: 1; margin-top: 2px; }
+  .fan-title { font: 700 var(--fs-xl) var(--font); line-height: 1; }
   .fan-sub { font: 500 var(--fs-sm) var(--mono); color: var(--text-muted); }
   .fan-badge { margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 99px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); font: 500 var(--fs-sm) var(--mono); color: var(--text-muted); }
   .fan-badge.on { color: var(--green); border-color: rgba(0,232,138,0.2); background: rgba(0,232,138,0.06); }
@@ -229,7 +231,7 @@
   @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } }
 
   /* Diagramm */
-  .chart { height: 40vh; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; }
+  .chart { flex: 1; min-height: 0; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; }
   .chart svg { width: 100%; height: 100%; display: block; }
   .ax { font: 10px var(--mono); fill: var(--text-muted); }
   .ax-on { font: 600 9px var(--mono); fill: var(--red); }
