@@ -202,7 +202,7 @@ const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
 
   /* LED-Status */
   .sb-leds { display: flex; justify-content: center; gap: 10px; margin-bottom: 16px; }
-  .sb-led { width: 18px; height: 18px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); transition: background 1s, box-shadow 1s; }
+  .sb-led { width: 20px; height: 20px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.1); transition: background 1s, box-shadow 1s; }
   .sidebar-collapsed .sb-leds { gap: 4px; }
   .sidebar-collapsed .sb-led { width: 10px; height: 10px; border-radius: 2px; }
 

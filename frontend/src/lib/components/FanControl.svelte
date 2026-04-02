@@ -337,6 +337,7 @@
     width: 26px; height: 26px; border-radius: 6px;
     border: 1px solid rgba(255,255,255,0.1);
     transition: background 1s, box-shadow 1s;
+    box-shadow: 0 0 8px var(--glow, transparent), 0 0 20px var(--glow, transparent);
   }
   .led-sm.blink { animation: blink 0.33s steps(1) infinite; }
   .pill { padding: 8px 16px; background: rgba(10,14,24,0.85); backdrop-filter: blur(4px); border: 1px solid var(--border); border-radius: 99px; font: 500 var(--fs-xs) var(--font); cursor: pointer; color: var(--text-muted); transition: all 150ms; display: flex; align-items: center; gap: 8px; }
