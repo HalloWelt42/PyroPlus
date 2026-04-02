@@ -406,8 +406,9 @@
     const base64 = c.toDataURL('image/png').split(',')[1];
 
     try {
-      // Direkt an HW-Proxy senden (über Backend-Proxy)
-      const { api } = await import('../api/client.js');
+      // Backend-Renderer stoppen damit er unser Bild nicht überschreibt
+      await s.setOledMode('manual');
+      // Bild direkt an HW-Proxy senden
       const r = await fetch('/api/oled/display-raw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Token': s.apiToken },
