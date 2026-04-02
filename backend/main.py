@@ -241,6 +241,10 @@ def simulate_temp(req: dict):
     if temp is None:
         _sim_temp = None
         if fan: fan.sim_temp = None
+        # Sofort echte Temperatur an HW-Proxy pushen
+        if leds:
+            real_temp = hw_client.get_temp() if hw_client else 40.0
+            leds.update_system_data(real_temp, leds.cpu_load)
         return {"ok": True, "simulation": False}
     _sim_temp = float(temp)
     if leds: leds.update_system_data(_sim_temp, leds.cpu_load)
