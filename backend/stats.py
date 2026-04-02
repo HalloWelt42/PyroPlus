@@ -518,10 +518,19 @@ def collect_stats():
     temp = get_cpu_temp()
     cpu_pct = get_cpu_percent()
     ram = get_ram()
-    disks = get_disks()
-    network = get_network()
-    docker = get_docker_containers()
-    fan = get_fan_state()
+    try:
+        disks = get_disks()
+    except Exception:
+        disks = []
+    try:
+        network = get_network()
+    except Exception:
+        network = {"interface": "?", "ip": "?", "rx_bytes_sec": 0, "tx_bytes_sec": 0}
+    docker = {"running": 0, "total": 0, "containers": []}
+    try:
+        fan = get_fan_state()
+    except Exception:
+        fan = {"pwm_level": 0}
     uptime = get_uptime()
 
     _history["cpu"].append(cpu_pct)

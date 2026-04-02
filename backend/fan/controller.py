@@ -23,7 +23,7 @@ from stats import fan_speed_history
 logger = logging.getLogger("fan")
 
 SAFETY_TEMP = 80.0  # Ab dieser Temperatur: Vollgas erzwungen
-POLL_INTERVAL = 0.5  # 500ms — schneller als der Kernel-Governor
+POLL_INTERVAL = 2.0  # 2s — Balance zwischen Reaktivität und Last
 
 
 class FanController:

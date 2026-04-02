@@ -65,7 +65,7 @@
   function areaPath(arr) { const l = smoothPath(arr); return l ? `${l}L${chx(arr.length-1,arr.length).toFixed(1)},${CHART.pt+CH}L${chx(0,arr.length).toFixed(1)},${CHART.pt+CH}Z` : ''; }
 
   /* ═══ KURVEN-EDITOR ═══ */
-  const CURVE = { w: 460, h: 200, pl: 36, pr: 12, pt: 14, pb: 24 };
+  const CURVE = { w: 460, h: 200, pl: 36, pr: 50, pt: 20, pb: 24 };
   const KW = CURVE.w - CURVE.pl - CURVE.pr, KH = CURVE.h - CURVE.pt - CURVE.pb;
   const TMIN = 25, TMAX = 80;
   function ktx(t) { return CURVE.pl + ((t - TMIN) / (TMAX - TMIN)) * KW; }
@@ -152,18 +152,10 @@
         {/each}
       </div>
 
-      <!-- Duty-Anzeige -->
-      <div class="duty-bar">
-        <div class="duty-fill" style="width:{currentDuty}%;background:var(--accent)"></div>
-        <span class="duty-text">{currentDuty.toFixed(0)}% PWM</span>
-      </div>
-
-      <!-- Profile -->
+      <!-- Profile + Kurveneditor -->
       <div class="profiles">
         {#each profiles as p}<button class="pill" class:active={profile===p} onclick={()=>s.setFanProfile(p)}><i class="fa-solid {profIcons[p]||'fa-circle'}"></i> {profLabels[p]||p}</button>{/each}
       </div>
-
-      <!-- Kurveneditor -->
       <div class="chart">
         <svg bind:this={curveEl} viewBox="0 0 {CURVE.w} {CURVE.h}">
           <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity="0.2"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
@@ -237,11 +229,6 @@
   .ax-off { font: 600 9px var(--mono); fill: var(--green); }
   .ax-now { font: 600 10px var(--mono); fill: var(--text-primary); }
   .ax-pt { font: 600 9px var(--mono); fill: var(--text-muted); }
-
-  /* Duty-Bar */
-  .duty-bar { height: 28px; background: rgba(255,255,255,0.06); border-radius: var(--radius-sm); position: relative; overflow: hidden; }
-  .duty-fill { height: 100%; border-radius: var(--radius-sm); transition: width 0.5s; }
-  .duty-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 600 var(--fs-sm) var(--mono); color: var(--text-primary); }
 
   /* Profile */
   .profiles { display: flex; gap: 4px; flex-wrap: wrap; }

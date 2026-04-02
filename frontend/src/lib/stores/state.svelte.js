@@ -14,6 +14,7 @@ let toasts = $state([]);
 let currentView = $state('fan');
 let apiToken = $state('');
 let ws = null;
+let _pollTimer = null;
 
 function handleWs(msg) {
   if (msg.type === 'stats') {
@@ -26,22 +27,32 @@ function handleWs(msg) {
   }
 }
 
+/* Polling als Fallback — zuverlässiger als WebSocket allein */
+async function pollState() {
+  try {
+    const s = await api.state();
+    if (!s.error) {
+      connected = true;
+      if (s.stats) stats = s.stats;
+      if (s.fan) fan = { ...fan, ...s.fan };
+      if (s.leds) leds = { ...leds, ...s.leds };
+      if (s.oled) oled = { ...oled, ...s.oled };
+      if (s.version) version = s.version;
+      if (s.hw_proxy) hwProxy = s.hw_proxy;
+    }
+  } catch {
+    connected = false;
+  }
+}
+
 async function init() {
   apiToken = await api.fetchToken();
-  const s = await api.state();
-  if (!s.error) {
-    version = s.version || '';
-    hwProxy = s.hw_proxy || {};
-    fan = s.fan || {};
-    oled = s.oled || {};
-    leds = s.leds || {};
-    stats = s.stats || {};
-    customData = s.custom_data || {};
-    connected = true;
-  }
+  await pollState();
   const fx = await api.leds.effects();
   if (!fx?.error) effectsCatalog = fx;
+  /* WebSocket für schnelle Updates + Polling als Fallback */
   ws = createWebSocket(handleWs);
+  _pollTimer = setInterval(pollState, 2000);
 }
 
 let _tid = 0;
@@ -51,7 +62,7 @@ function toast(msg, type = 'info') {
   setTimeout(() => { toasts = toasts.filter(t => t.id !== id); }, 3000);
 }
 
-function destroy() { ws?.close(); }
+function destroy() { ws?.close(); if (_pollTimer) clearInterval(_pollTimer); }
 
 export function getState() {
   return {

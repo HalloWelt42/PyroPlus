@@ -316,17 +316,9 @@ def _fan_write_pwm(value: int):
 
 @app.post("/fan/pwm")
 def fan_set_pwm(req: FanPWM):
-    """Lüfter-PWM setzen (duty 0-100% → PWM 0-255)."""
+    """CPU-Lüfter PWM setzen (duty 0-100% → PWM 0-255). Nur PWM, kein GPIO."""
     pwm_value = int(req.duty / 100.0 * 255)
     _fan_write_pwm(pwm_value)
-    # GPIO synchron schalten (An/Aus-Schalter)
-    if _fan_available and _fan_gpio:
-        try:
-            _fan_gpio.value = 1 if req.duty > 0 else 0
-            if _fan_led_gpio:
-                _fan_led_gpio.value = 1 if req.duty > 0 else 0
-        except Exception:
-            pass
     return {
         "ok": True,
         "duty": req.duty,
