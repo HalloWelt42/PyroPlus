@@ -299,24 +299,20 @@ class LEDEffectEngine:
             self._set_all(int(255 * br), int(200 * br), int(120 * br))
         elif self.effect == "temp_reactive":
             t = self.cpu_temp
-            # Farbskala: 25-30 Blau, 30-40 Gelb, 40-55 Orange, 55-60 Rot, 60+ Rot blinkend
-            r, g, b = self._temp_to_rgb(t)
-            # Ab 60°C: Blinken als Warnung
             if t >= 60.0:
-                blink = (math.sin(step * 0.5) + 1) / 2  # Pulsieren 0→1→0
-                r = int(r * (0.15 + 0.85 * blink))
-                g = int(g * (0.15 + 0.85 * blink))
-                b = int(b * (0.15 + 0.85 * blink))
-            # Leichter Versatz pro LED für natürlichen Farbverlauf
-            for i in range(LED_COUNT):
-                offset = (i - 1.5) * 2.0
-                ri, gi, bi = self._temp_to_rgb(t + offset)
-                if t >= 60.0:
-                    blink = (math.sin(step * 0.5 + i * 0.3) + 1) / 2
-                    ri = int(ri * (0.15 + 0.85 * blink))
-                    gi = int(gi * (0.15 + 0.85 * blink))
-                    bi = int(bi * (0.15 + 0.85 * blink))
-                self.led_states[i] = {"r": ri, "g": gi, "b": bi}
+                # Alarm: hartes Blinken — 3 Hz, abwechselnd Rot/Aus
+                on = (step % 8) < 4  # 25 FPS → ~3 Hz
+                for i in range(LED_COUNT):
+                    if on:
+                        self.led_states[i] = {"r": 255, "g": 0, "b": 0}
+                    else:
+                        self.led_states[i] = {"r": 0, "g": 0, "b": 0}
+            else:
+                # Normalbetrieb: Farbskala mit leichtem Versatz pro LED
+                for i in range(LED_COUNT):
+                    offset = (i - 1.5) * 2.0
+                    ri, gi, bi = self._temp_to_rgb(t + offset)
+                    self.led_states[i] = {"r": ri, "g": gi, "b": bi}
         elif self.effect == "load_reactive":
             intensity = min(100.0, self.cpu_load) / 100.0
             self._set_all(int(c["r"] * intensity), int(c["g"] * intensity), int(c["b"] * intensity))

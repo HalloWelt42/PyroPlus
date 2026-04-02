@@ -1,4 +1,5 @@
 <script>
+  import { api } from '../api/client.js';
   let { state: s } = $props();
 
   const mode = $derived(s.fan?.mode || 'auto');
@@ -279,14 +280,20 @@
       <div class="side-section">
         <div class="side-title"><i class="fa-solid fa-flask"></i> Simulation</div>
         <label class="sim-toggle">
-          <input type="checkbox" checked={simTemp !== null} onchange={(e) => { simTemp = e.target.checked ? 40 : null; }}>
+          <input type="checkbox" checked={simTemp !== null} onchange={(e) => {
+            if (e.target.checked) { simTemp = 40; api.simulate.temp(40); }
+            else { simTemp = null; api.simulate.stop(); }
+          }}>
           <span>Temperatur simulieren</span>
         </label>
         {#if simTemp !== null}
           <div class="sim-slider">
-            <input type="range" min="20" max="85" step="0.5" value={simTemp} oninput={(e) => simTemp = parseFloat(e.target.value)}>
+            <input type="range" min="20" max="85" step="0.5" value={simTemp}
+              oninput={(e) => { simTemp = parseFloat(e.target.value); }}
+              onchange={(e) => { api.simulate.temp(parseFloat(e.target.value)); }}>
             <span class="sim-val" style="color:{tempColorStr}">{simTemp.toFixed(1)}°C</span>
           </div>
+          <div class="sim-hint">Wirkt auf echte LEDs und Lüfter</div>
         {/if}
       </div>
 
@@ -371,11 +378,11 @@
     transition: color 1s;
   }
   .led-pixel.blink, .led-glow.blink {
-    animation: ledBlink 0.6s ease-in-out infinite alternate;
+    animation: ledAlarm 0.33s steps(1) infinite;
   }
-  @keyframes ledBlink {
+  @keyframes ledAlarm {
     0% { opacity: 1; }
-    100% { opacity: 0.15; }
+    50% { opacity: 0; }
   }
 
   /* ─── Diagramm ─── */
@@ -440,6 +447,7 @@
   .sim-slider { display: flex; align-items: center; gap: 10px; }
   .sim-slider input { flex: 1; }
   .sim-val { font: 700 var(--fs-base) var(--mono); min-width: 64px; text-align: right; }
+  .sim-hint { font: 500 var(--fs-xs) var(--font); color: var(--amber); margin-top: 6px; opacity: 0.7; }
 
   /* ─── Betriebsmodus ─── */
   .side-mode { margin-top: auto; }

@@ -91,6 +91,11 @@ export const api = {
     fanAuto: () => post('/quick/fan-auto'),
     fanOff: () => post('/quick/fan-off'),
   },
+
+  simulate: {
+    temp: (temp) => post('/simulate/temp', { temp }),
+    stop: () => post('/simulate/temp', { temp: null }),
+  },
 };
 
 export function createWebSocket(onMessage) {
