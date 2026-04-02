@@ -98,13 +98,6 @@
         <div class="fan-badge" class:on={caseFanOn}><i class="fa-solid fa-fan" class:spinning={caseFanOn}></i> {caseFanOn ? 'Läuft' : 'Aus'}</div>
       </div>
 
-      <!-- LED-Leiste -->
-      <div class="led-strip">
-        {#each [0,1,2,3] as i}
-          <div class="led-h"><div class="led-glow" class:blink={isBlinking} style="background:radial-gradient(circle, {ledGlows()[i]}, transparent 70%)"></div><div class="led-px" class:blink={isBlinking} style="background:{ledColors()[i]};box-shadow:0 0 10px {ledGlows()[i]}, 0 0 25px {ledGlows()[i]}"></div></div>
-        {/each}
-      </div>
-
       <!-- Temperatur -->
       <div class="temp-big" style="color:{tempColorStr}">{currentTemp.toFixed(1)}<span class="temp-u">°C</span></div>
 
@@ -143,13 +136,20 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════
-         RECHTS — PWM-Lüfter (Temperaturkurve)
+         RECHTS — CPU-Lüfter (Temperaturkurve)
          ═══════════════════════════════════════════════════ -->
     <div class="panel">
       <div class="fan-header">
         <i class="fa-solid fa-microchip fan-icon"></i>
-        <div><div class="fan-title">PWM-Lüfter</div><div class="fan-sub">Kernel PWM · 0-100% stufenlos</div></div>
+        <div><div class="fan-title">CPU-Lüfter</div><div class="fan-sub">Kernel PWM · 0-100% stufenlos</div></div>
         <div class="fan-badge" class:on={currentRpm > 0}><i class="fa-solid fa-fan" style="animation-duration:{fanSpinDuration}" class:spinning={currentRpm > 0}></i> {currentRpm > 0 ? `${currentRpm} RPM` : 'Aus'}</div>
+      </div>
+
+      <!-- LED-Leiste -->
+      <div class="led-strip">
+        {#each [0,1,2,3] as i}
+          <div class="led-h"><div class="led-glow" class:blink={isBlinking} style="background:radial-gradient(circle, {ledGlows()[i]}, transparent 70%)"></div><div class="led-px" class:blink={isBlinking} style="background:{ledColors()[i]};box-shadow:0 0 10px {ledGlows()[i]}, 0 0 25px {ledGlows()[i]}"></div></div>
+        {/each}
       </div>
 
       <!-- Duty-Anzeige -->
@@ -190,6 +190,13 @@
         <button class="mode" class:active={mode==='off'} onclick={()=>s.setFanMode('off')}><i class="fa-solid fa-power-off"></i> Aus</button>
       </div>
       {#if mode==='manual'}<div class="ctrl"><div class="ctrl-row"><span>Geschwindigkeit</span><input type="range" min="0" max="100" step="5" value={s.fan?.manual_speed||50} oninput={(e)=>s.setFanManualSpeed(parseInt(e.target.value))}><span class="ctrl-val">{s.fan?.manual_speed||50}%</span></div></div>{/if}
+
+      <!-- Simulation -->
+      <div class="sim">
+        <span>Simulation</span>
+        <button class="tog" class:on={simTemp!==null} onclick={()=>{if(simTemp!==null){simTemp=null;api.simulate.stop();}else{simTemp=40;api.simulate.temp(40);}}} aria-label="Simulation"></button>
+        {#if simTemp!==null}<input type="range" min="20" max="85" step="0.5" value={simTemp} oninput={(e)=>simTempLive(parseFloat(e.target.value))}><span class="sim-v" style="color:{tempColorStr}">{simTemp.toFixed(0)}°</span>{/if}
+      </div>
     </div>
   </div>
 </div>
@@ -204,8 +211,9 @@
   .fan-icon { font-size: var(--fs-lg); color: var(--accent); }
   .fan-title { font: 600 var(--fs-sm) var(--font); }
   .fan-sub { font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
-  .fan-badge { margin-left: auto; display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 99px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
+  .fan-badge { margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 99px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
   .fan-badge.on { color: var(--green); border-color: rgba(0,232,138,0.2); background: rgba(0,232,138,0.06); }
+  .fan-badge i { font-size: var(--fs-lg); }
   .spinning { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
