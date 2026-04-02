@@ -76,6 +76,10 @@ class FanController:
             return
         with self._lock:
             self.mode = mode
+            if mode == "off":
+                self.current_duty = 0.0
+                self.current_rpm = 0
+                hw_client.fan_set_pwm(0)
         self._save_settings()
 
     def set_profile(self, name: str) -> dict:
