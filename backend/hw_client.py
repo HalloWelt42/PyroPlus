@@ -100,6 +100,13 @@ def case_fan_get() -> dict:
         return {"available": False, "on": False}
 
 
+def get_host_ip() -> str:
+    try:
+        r = _get_client().get("/host-ip")
+        return r.json().get("ip", "N/A")
+    except:
+        return "N/A"
+
 def fan_available() -> bool:
     try:
         return fan_get_status().get("available", False)

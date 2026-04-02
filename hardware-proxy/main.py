@@ -256,6 +256,19 @@ def health():
 
 # ─── Temperature ────────────────────────────────────────────
 
+@app.get("/host-ip")
+def get_host_ip():
+    """Echte Host-IP (nicht Docker) — läuft nativ auf dem Pi."""
+    import subprocess
+    try:
+        result = subprocess.run(['ip', '-4', 'route', 'get', '1.1.1.1'], capture_output=True, text=True, timeout=2)
+        parts = result.stdout.split()
+        if 'src' in parts:
+            ip = parts[parts.index('src') + 1]
+            return {"ip": ip}
+    except: pass
+    return {"ip": "N/A"}
+
 @app.get("/temp")
 def get_temp():
     try:

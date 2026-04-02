@@ -264,10 +264,10 @@ def _detect_disks():
 
 
 def get_network():
-    """Host-Netzwerk-Stats — liest AUSSCHLIESSLICH aus /host Filesystem.
-    ip command im Container zeigt nur Container-Interfaces!"""
+    """Host-Netzwerk-Stats — IP kommt vom HW-Proxy (läuft nativ)."""
+    import hw_client
     result = {
-        "ip": "N/A",
+        "ip": hw_client.get_host_ip(),
         "interface": "",
         "rx_bytes_sec": 0,
         "tx_bytes_sec": 0,
