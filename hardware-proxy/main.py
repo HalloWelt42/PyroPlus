@@ -292,6 +292,7 @@ def _get_fan_rpm() -> int:
 
 @app.post("/fan/pwm")
 def fan_set_pwm(req: FanPWM):
+    """Legacy: Steuert beide Lüfter gleichzeitig."""
     results = {}
     if _fan_pwm_supported:
         level = _duty_to_level(req.duty)
@@ -314,6 +315,54 @@ def fan_set_pwm(req: FanPWM):
     if not _fan_available and not _fan_pwm_supported:
         return {"ok": False, "error": "Fan nicht verfügbar"}
     return {"ok": True, "duty": req.duty, **results}
+
+# ─── Getrennte Steuerung ─────────────────────────────────────
+
+@app.post("/fan/cpu")
+def fan_cpu_set(req: FanPWM):
+    """CPU-Lüfter: Kernel PWM, 4 Stufen (0=Aus, 1=Leise, 2=Mittel, 3=Voll)."""
+    if not _fan_pwm_supported:
+        return {"ok": False, "error": "Kernel PWM nicht verfügbar"}
+    level = _duty_to_level(req.duty)
+    try:
+        with open("/sys/class/thermal/cooling_device0/cur_state", "w") as f:
+            f.write(str(level))
+        return {"ok": True, "duty": req.duty, "level": level}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+@app.get("/fan/cpu")
+def fan_cpu_get():
+    """CPU-Lüfter Status."""
+    result = {"available": _fan_pwm_supported, "type": "pwm", "max_level": 4}
+    if _fan_pwm_supported:
+        try:
+            with open("/sys/class/thermal/cooling_device0/cur_state") as f:
+                result["level"] = int(f.read().strip())
+        except Exception:
+            result["level"] = 0
+    result["rpm"] = _get_fan_rpm()
+    return result
+
+@app.post("/fan/case")
+def fan_case_set(req: dict):
+    """Gehäuselüfter: GPIO Pin 6, nur An/Aus."""
+    if not _fan_available or not _fan_gpio:
+        return {"ok": False, "error": "Gehäuselüfter nicht verfügbar"}
+    on = bool(req.get("on", False))
+    try:
+        _fan_gpio.value = 1 if on else 0
+        if _fan_led_gpio:
+            _fan_led_gpio.value = 1 if on else 0
+        return {"ok": True, "on": on}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+@app.get("/fan/case")
+def fan_case_get():
+    """Gehäuselüfter Status."""
+    on = bool(_fan_gpio.value) if _fan_gpio else False
+    return {"available": _fan_available, "type": "gpio", "on": on}
 
 @app.get("/fan/pwm")
 def fan_get_pwm():
