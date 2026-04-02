@@ -361,7 +361,7 @@ def get_network():
 
         if host_iface:
             result["interface"] = host_iface
-            result["ip"] = host_ip or "Host"
+            # IP kommt vom HW-Proxy, nicht überschreiben
             if not _prev_net.get("logged"):
                 logger.info(f"Netzwerk erkannt: {host_iface} → {host_ip or 'IP unbekannt'}")
                 _prev_net["logged"] = True

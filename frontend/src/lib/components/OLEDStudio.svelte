@@ -397,25 +397,50 @@
   function invertLayer(){pushH();const px=ap();if(px)for(let i=0;i<px.length;i++)px[i]=px[i]?0:1;render();}
   async function sendToOled() {
     saveCurrentScreen();
-    // Aktuellen Screen rendern und direkt als Bild an HW-Proxy schicken
-    renderWidgets();
-    const comp = E.composite(layers);
-    const c = document.createElement('canvas'); c.width = W; c.height = H;
-    const ctx = c.getContext('2d'); ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#fff';
-    for (let y=0;y<H;y++) for(let x=0;x<W;x++) if(comp[y*W+x]) ctx.fillRect(x,y,1,1);
-    const base64 = c.toDataURL('image/png').split(',')[1];
-
     try {
-      // Backend-Renderer stoppen damit er unser Bild nicht überschreibt
-      await s.setOledMode('manual');
-      // Bild direkt an HW-Proxy senden
-      const r = await fetch('/api/oled/display-raw', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-API-Token': s.apiToken },
-        body: JSON.stringify({ image_base64: base64 }),
-      });
-      if (r.ok) s.toast(`An OLED gesendet`, 'ok');
-      else s.toast('Fehler beim Senden', 'err');
+      // Alle Screens als Widget-Konfiguration ans Backend schicken
+      // Backend rendert sie selbständig mit Live-Daten
+      const screenConfigs = screens.map(sc => ({
+        type: 'system',
+        name: sc.name,
+        widgets: (sc.widgets || []).map(w => ({
+          type: w.type,
+          x: w.x,
+          y: w.y,
+          font: (w.props?.scaleX || w.props?.scale || 1) >= 3 ? 'xl' : (w.props?.scaleX || w.props?.scale || 1) >= 2 ? 'lg' : 'sm',
+          prefix: w.props?.prefix,
+          text: w.props?.text,
+          w: w.props?.width,
+          h: w.props?.height,
+          diskIdx: w.props?.diskIdx,
+        })),
+      }));
+
+      // Bestehende Screens löschen und neue setzen
+      const oledScreens = s.oled?.screens || [];
+      // Ersten Screen updaten
+      if (screenConfigs.length > 0) {
+        await s.updateOledScreen(0, screenConfigs[0]);
+      }
+      // Weitere Screens hinzufügen
+      for (let i = 1; i < screenConfigs.length; i++) {
+        await s.addOledScreen(screenConfigs[i]);
+      }
+      // Überzählige Backend-Screens löschen
+      while (oledScreens.length > screenConfigs.length && oledScreens.length > 1) {
+        await s.removeOledScreen(oledScreens.length - 1);
+        oledScreens.pop();
+      }
+
+      // Rotation setzen
+      if (rotation) {
+        await s.setOledRotation(rotationInterval);
+        await s.setOledMode('auto');
+      } else {
+        await s.setOledMode('auto');
+      }
+
+      s.toast(`${screenConfigs.length} Screen(s) an Backend gesendet`, 'ok');
     } catch (e) {
       s.toast('Fehler: ' + (e.message||e), 'err');
     }

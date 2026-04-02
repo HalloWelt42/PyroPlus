@@ -79,6 +79,8 @@ class OLEDEngine:
         self._weather_alerts: list = []
         self._weather_aqi: Optional[dict] = None
         self._weather_location: str = ""
+        self._weather_lat: float = 51.05
+        self._weather_lon: float = 12.13
         self._weather_fetch_time: float = 0
         self._lock = threading.Lock()
         self._running = False
@@ -318,9 +320,11 @@ class OLEDEngine:
             draw_icon(draw, "thermo", x, y, 8)
             draw.text((x + 10, y), f"{t:.0f}C  CPU {p:.0f}%", fill=1, font=font)
         elif wt == "cpu_temp_only":
-            draw.text((x, y), f"{cpu.get('temp', 0):.0f}°C", fill=1, font=font)
+            prefix = widget.get("prefix", "")
+            draw.text((x, y), f"{prefix}{cpu.get('temp', 0):.0f}°", fill=1, font=font)
         elif wt == "cpu_pct":
-            draw.text((x, y), f"CPU {cpu.get('percent', 0):.0f}%", fill=1, font=font)
+            prefix = widget.get("prefix", "")
+            draw.text((x, y), f"{prefix}{cpu.get('percent', 0):.0f}%", fill=1, font=font)
         elif wt == "cpu_bar":
             bw = widget.get("w", 60)
             bh = widget.get("h", 6)
@@ -332,7 +336,8 @@ class OLEDEngine:
             u, t2, pct = ram.get("used_gb", 0), ram.get("total_gb", 1), ram.get("percent", 0)
             draw.text((x, y), f"RAM {u:.1f}/{t2:.1f}G {pct:.0f}%", fill=1, font=font)
         elif wt == "ram_pct":
-            draw.text((x, y), f"RAM {ram.get('percent', 0):.0f}%", fill=1, font=font)
+            prefix = widget.get("prefix", "")
+            draw.text((x, y), f"{prefix}{ram.get('percent', 0):.0f}%", fill=1, font=font)
         elif wt == "ram_bar_gfx":
             bw = widget.get("w", 60)
             bh = widget.get("h", 6)
@@ -354,9 +359,11 @@ class OLEDEngine:
         elif wt == "docker":
             draw.text((x, y), f"Docker: {docker.get('running', 0)} up", fill=1, font=font)
         elif wt == "ip":
-            draw.text((x, y), f"IP {net.get('ip', 'N/A')}", fill=1, font=font)
+            prefix = widget.get("prefix", "IP ")
+            draw.text((x, y), f"{prefix}{net.get('ip', 'N/A')}", fill=1, font=font)
         elif wt == "uptime":
-            draw.text((x, y), f"Up {uptime.get('formatted', '--')}", fill=1, font=font)
+            prefix = widget.get("prefix", "Up ")
+            draw.text((x, y), f"{prefix}{uptime.get('formatted', '--')}", fill=1, font=font)
 
         # ═══ NETZWERK ═══
         elif wt == "network" or wt == "network_io":
@@ -414,6 +421,38 @@ class OLEDEngine:
         elif wt == "w_location":
             loc = self._weather_location or "---"
             draw.text((x, y), loc[:12], fill=1, font=font)
+
+        # ═══ ATOMARE WIDGETS (vom Frontend-Editor) ═══
+        elif wt == "cpu_cores":
+            prefix = widget.get("prefix", "")
+            draw.text((x, y), f"{prefix}{cpu.get('cores', 4)}", fill=1, font=font)
+        elif wt == "ram_used":
+            prefix = widget.get("prefix", "")
+            draw.text((x, y), f"{prefix}{ram.get('used_gb', 0):.1f} G", fill=1, font=font)
+        elif wt == "ram_total":
+            prefix = widget.get("prefix", "")
+            draw.text((x, y), f"{prefix}{ram.get('total_gb', 0):.1f} G", fill=1, font=font)
+        elif wt == "disk_name":
+            di = widget.get("diskIdx", 0)
+            d = disks[di] if di < len(disks) else {}
+            prefix = widget.get("prefix", "")
+            draw.text((x, y), f"{prefix}{d.get('label', d.get('mount', '?'))}", fill=1, font=font)
+        elif wt == "disk_used":
+            di = widget.get("diskIdx", 0)
+            d = disks[di] if di < len(disks) else {}
+            prefix = widget.get("prefix", "")
+            draw.text((x, y), f"{prefix}{d.get('used_gb', 0):.0f} G", fill=1, font=font)
+        elif wt == "disk_total":
+            di = widget.get("diskIdx", 0)
+            d = disks[di] if di < len(disks) else {}
+            prefix = widget.get("prefix", "")
+            draw.text((x, y), f"{prefix}{d.get('total_gb', 0):.0f} G", fill=1, font=font)
+        elif wt == "net_ip":
+            prefix = widget.get("prefix", "")
+            draw.text((x, y), f"{prefix}{net.get('ip', 'N/A')}", fill=1, font=font)
+        elif wt == "net_if":
+            prefix = widget.get("prefix", "")
+            draw.text((x, y), f"{prefix}{net.get('interface', '?')}", fill=1, font=font)
 
         # ═══ DEKO ═══
         elif wt == "label":
@@ -1018,36 +1057,64 @@ class OLEDEngine:
                 logger.error(f"OLED Render-Loop: {e}")
             time.sleep(1)
 
+    @staticmethod
+    def _wmo_to_text(code):
+        if code is None: return "—"
+        if code == 0: return "Klar"
+        if code <= 3: return "Bewölkt"
+        if code <= 49: return "Nebel"
+        if code <= 59: return "Niesel"
+        if code <= 69: return "Regen"
+        if code <= 79: return "Schnee"
+        if code <= 84: return "Schauer"
+        return "Gewitter"
+
     def _fetch_weather(self):
         self._weather_fetch_time = time.time()
         try:
             import httpx
-            # WeatherCache läuft auf dem Host, nicht im Container!
-            from config import HW_PROXY_URL
-            weather_base = HW_PROXY_URL.rsplit(":", 1)[0] + ":8060"  # host.docker.internal:8060
-            r = httpx.get(f"{weather_base}/api/v1/locations", timeout=5)
+            # Open-Meteo API (kostenlos, kein API-Key)
+            lat = self._weather_lat or 51.05
+            lon = self._weather_lon or 12.13
+            r = httpx.get(
+                f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+                f"&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,surface_pressure"
+                f"&hourly=temperature_2m,weather_code"
+                f"&daily=temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset"
+                f"&timezone=auto",
+                timeout=10
+            )
             if r.status_code != 200:
                 return
-            locs = r.json().get("locations", [])
-            if not locs:
-                return
-            loc = locs[0]
-            loc_id = loc.get("id", "")
-            self._weather_location = loc.get("name", loc.get("city", ""))
-            if not loc_id:
-                return
-            r2 = httpx.get(f"{weather_base}/api/v1/weather/complete/{loc_id}", timeout=5)
-            if r2.status_code != 200:
-                return
-            data = r2.json()
+            data = r.json()
             current = data.get("current", {})
-            self._weather_data = current.get("data", current)
+            self._weather_data = {
+                "temperature": current.get("temperature_2m"),
+                "temp": current.get("temperature_2m"),
+                "humidity": current.get("relative_humidity_2m"),
+                "wind_speed": current.get("wind_speed_10m"),
+                "windspeed": current.get("wind_speed_10m"),
+                "weather_code": current.get("weather_code"),
+                "pressure": current.get("surface_pressure"),
+                "condition_text": self._wmo_to_text(current.get("weather_code")),
+                "condition": self._wmo_to_text(current.get("weather_code")),
+            }
+            # Stündlich
             hourly = data.get("hourly", {})
-            self._weather_hourly = hourly.get("hours", hourly.get("data", []))
+            temps = hourly.get("temperature_2m", [])
+            codes = hourly.get("weather_code", [])
+            self._weather_hourly = [{"temp": t, "weather_code": c} for t, c in zip(temps[:24], codes[:24])]
+            # Täglich
             daily = data.get("daily", {})
-            self._weather_daily = daily.get("days", daily.get("data", []))
-            alerts = data.get("alerts", {})
-            self._weather_alerts = alerts.get("alerts", alerts.get("data", []))
+            self._weather_daily = []
+            for i in range(min(7, len(daily.get("temperature_2m_max", [])))):
+                self._weather_daily.append({
+                    "temp_max": daily["temperature_2m_max"][i],
+                    "temp_min": daily["temperature_2m_min"][i],
+                    "weather_code": daily.get("weather_code", [0]*7)[i],
+                    "sunrise": daily.get("sunrise", [""])[i] if i < len(daily.get("sunrise", [])) else "",
+                    "sunset": daily.get("sunset", [""])[i] if i < len(daily.get("sunset", [])) else "",
+                })
             aqi = data.get("air_quality", {})
             self._weather_aqi = aqi.get("data", aqi)
             logger.info(f"Wetter geladen: {self._weather_location} {self._weather_data.get('temperature', '?')}°C")
