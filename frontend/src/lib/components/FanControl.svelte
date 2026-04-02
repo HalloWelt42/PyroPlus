@@ -135,17 +135,16 @@
         </svg>
       </div>
 
-      <!-- Schwellwert-Regler -->
-      <div class="ctrl">
-        <div class="ctrl-row"><span><i class="fa-solid fa-arrow-up" style="color:var(--red)"></i> Einschalten</span><input type="range" min="35" max="75" step="1" value={thresholdOn} oninput={onThresholdOnInput} onchange={commitCaseFan}><span class="ctrl-val">{thresholdOn}°C</span></div>
-        <div class="ctrl-row"><span><i class="fa-solid fa-arrow-down" style="color:var(--green)"></i> Ausschalten</span><input type="range" min="30" max="70" step="1" value={thresholdOff} oninput={onThresholdOffInput} onchange={commitCaseFan}><span class="ctrl-val">{thresholdOff}°C</span></div>
-      </div>
-
-      <!-- Gehäuse-Simulation (nur lokal, zeigt Schwellwert-Reaktion) -->
-      <div class="sim">
-        <span>Simulation</span>
-        <button class="tog" class:on={simCaseTemp!==null} onclick={()=>{ simCaseTemp = simCaseTemp !== null ? null : 40; }} aria-label="Simulation"></button>
-        {#if simCaseTemp!==null}<input type="range" min="20" max="85" step="0.5" value={simCaseTemp} oninput={(e)=>simCaseLive(parseFloat(e.target.value))}><span class="sim-v" style="color:{tempColorStr}">{simCaseTemp.toFixed(0)}°</span>{/if}
+      <div class="panel-footer">
+        <div class="ctrl">
+          <div class="ctrl-row"><span><i class="fa-solid fa-arrow-up" style="color:var(--red)"></i> Einschalten</span><input type="range" min="35" max="75" step="1" value={thresholdOn} oninput={onThresholdOnInput} onchange={commitCaseFan}><span class="ctrl-val">{thresholdOn}°C</span></div>
+          <div class="ctrl-row"><span><i class="fa-solid fa-arrow-down" style="color:var(--green)"></i> Ausschalten</span><input type="range" min="30" max="70" step="1" value={thresholdOff} oninput={onThresholdOffInput} onchange={commitCaseFan}><span class="ctrl-val">{thresholdOff}°C</span></div>
+        </div>
+        <div class="sim">
+          <span>Simulation</span>
+          <button class="tog" class:on={simCaseTemp!==null} onclick={()=>{ simCaseTemp = simCaseTemp !== null ? null : 40; }} aria-label="Simulation"></button>
+          {#if simCaseTemp!==null}<input type="range" min="20" max="85" step="0.5" value={simCaseTemp} oninput={(e)=>simCaseLive(parseFloat(e.target.value))}><span class="sim-v" style="color:{tempColorStr}">{simCaseTemp.toFixed(0)}°</span>{/if}
+        </div>
       </div>
     </div>
 
@@ -186,22 +185,21 @@
         </svg>
       </div>
 
-      <!-- Steuerung -->
-      <div class="ctrl">
-        <div class="ctrl-row"><span>Hysterese</span><input type="range" min="1" max="10" step="0.5" value={hysteresis} onchange={(e)=>s.setFanSettings({hysteresis:parseFloat(e.target.value)})}><span class="ctrl-val">{hysteresis}°C</span></div>
-      </div>
-      <div class="modes">
-        <button class="mode" class:active={mode==='auto'} onclick={()=>s.setFanMode('auto')}><i class="fa-solid fa-wand-magic-sparkles"></i> Automatik</button>
-        <button class="mode" class:active={mode==='manual'} onclick={()=>s.setFanMode('manual')}><i class="fa-solid fa-hand"></i> Manuell</button>
-        <button class="mode" class:active={mode==='off'} onclick={()=>s.setFanMode('off')}><i class="fa-solid fa-power-off"></i> Aus</button>
-      </div>
-      {#if mode==='manual'}<div class="ctrl"><div class="ctrl-row"><span>Geschwindigkeit</span><input type="range" min="0" max="100" step="5" value={s.fan?.manual_speed||50} oninput={(e)=>s.setFanManualSpeed(parseInt(e.target.value))}><span class="ctrl-val">{s.fan?.manual_speed||50}%</span></div></div>{/if}
-
-      <!-- CPU-Simulation (wirkt auf echte Hardware: PWM + LEDs) -->
-      <div class="sim">
-        <span>Simulation</span>
-        <button class="tog" class:on={simCpuTemp!==null} onclick={()=>{if(simCpuTemp!==null){simCpuTemp=null;api.simulate.stop();}else{simCpuTemp=40;api.simulate.temp(40);}}} aria-label="Simulation"></button>
-        {#if simCpuTemp!==null}<input type="range" min="20" max="85" step="0.5" value={simCpuTemp} oninput={(e)=>simCpuLive(parseFloat(e.target.value))}><span class="sim-v" style="color:{tempColorStr}">{simCpuTemp.toFixed(0)}°</span>{/if}
+      <div class="panel-footer">
+        <div class="ctrl">
+          <div class="ctrl-row"><span>Hysterese</span><input type="range" min="1" max="10" step="0.5" value={hysteresis} onchange={(e)=>s.setFanSettings({hysteresis:parseFloat(e.target.value)})}><span class="ctrl-val">{hysteresis}°C</span></div>
+        </div>
+        <div class="modes">
+          <button class="mode" class:active={mode==='auto'} onclick={()=>s.setFanMode('auto')}><i class="fa-solid fa-wand-magic-sparkles"></i> Automatik</button>
+          <button class="mode" class:active={mode==='manual'} onclick={()=>s.setFanMode('manual')}><i class="fa-solid fa-hand"></i> Manuell</button>
+          <button class="mode" class:active={mode==='off'} onclick={()=>s.setFanMode('off')}><i class="fa-solid fa-power-off"></i> Aus</button>
+        </div>
+        {#if mode==='manual'}<div class="ctrl"><div class="ctrl-row"><span>Geschwindigkeit</span><input type="range" min="0" max="100" step="5" value={s.fan?.manual_speed||50} oninput={(e)=>s.setFanManualSpeed(parseInt(e.target.value))}><span class="ctrl-val">{s.fan?.manual_speed||50}%</span></div></div>{/if}
+        <div class="sim">
+          <span>Simulation</span>
+          <button class="tog" class:on={simCpuTemp!==null} onclick={()=>{if(simCpuTemp!==null){simCpuTemp=null;api.simulate.stop();}else{simCpuTemp=40;api.simulate.temp(40);}}} aria-label="Simulation"></button>
+          {#if simCpuTemp!==null}<input type="range" min="20" max="85" step="0.5" value={simCpuTemp} oninput={(e)=>simCpuLive(parseFloat(e.target.value))}><span class="sim-v" style="color:{tempColorStr}">{simCpuTemp.toFixed(0)}°</span>{/if}
+        </div>
       </div>
     </div>
   </div>
@@ -231,7 +229,8 @@
   @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } }
 
   /* Diagramm */
-  .chart { flex: 1; min-height: 100px; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; margin-bottom: 4px; }
+  .chart { flex: 1; min-height: 80px; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; }
+  .panel-footer { flex-shrink: 0; min-height: 160px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; }
   .chart svg { width: 100%; height: 100%; display: block; }
   .ax { font: 10px var(--mono); fill: var(--text-muted); }
   .ax-on { font: 600 9px var(--mono); fill: var(--red); }
