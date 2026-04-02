@@ -60,10 +60,9 @@
 
   /* Profile: "Leise" = spät ein (Lüfter ist laut), "Leistung" = früh ein */
   const caseProfiles = {
-    silent:      { on: 52, off: 46 },
+    silent:      { on: 55, off: 48 },
     balanced:    { on: 48, off: 42 },
     performance: { on: 42, off: 36 },
-    night:       { on: 55, off: 48 },
     custom:      { on: 48, off: 42 },
   };
 
@@ -144,8 +143,8 @@
   function onDrag(e) { if (dragging < 0 || !curveEl) return; e.preventDefault(); const pt = curveEl.createSVGPoint(); pt.x = e.touches ? e.touches[0].clientX : e.clientX; pt.y = e.touches ? e.touches[0].clientY : e.clientY; const svgPt = pt.matrixTransform(curveEl.getScreenCTM().inverse()); const pts = [...curve]; pts[dragging] = { temp: kxt(svgPt.x), speed: kys(svgPt.y) }; s.updateFan({ curve: pts }); }
   function stopDrag() { if (dragging >= 0) { s.setFanCurve(curve); dragging = -1; } window.removeEventListener('mousemove', onDrag); window.removeEventListener('mouseup', stopDrag); window.removeEventListener('touchmove', onDrag); window.removeEventListener('touchend', stopDrag); }
 
-  const profIcons = { silent: 'fa-volume-xmark', balanced: 'fa-scale-balanced', performance: 'fa-rocket', night: 'fa-moon', custom: 'fa-sliders' };
-  const profLabels = { silent: 'Leise', balanced: 'Ausgewogen', performance: 'Leistung', night: 'Nacht', custom: 'Eigene' };
+  const profIcons = { silent: 'fa-volume-xmark', balanced: 'fa-scale-balanced', performance: 'fa-rocket', custom: 'fa-sliders' };
+  const profLabels = { silent: 'Leise', balanced: 'Ausgewogen', performance: 'Leistung', custom: 'Eigene' };
   /* Fan-Animation: proportional zu RPM aber immer wahrnehmbar.
      0 RPM = steht, 500 RPM = 3s/Umdrehung, 3500 RPM = 0.4s/Umdrehung */
   const fanSpinDuration = $derived(currentRpm > 0
