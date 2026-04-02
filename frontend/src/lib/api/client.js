@@ -99,18 +99,32 @@ export const api = {
 };
 
 export function createWebSocket(onMessage) {
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const url = `${proto}//${location.host}/ws`;
-  let ws = null, alive = true, timer = null;
+  /* WebSocket direkt zum Backend — kein Proxy, kein Ausfall bei Rebuilds.
+     Im Dev-Modus (Port 5173) verbindet auf Port 8071.
+     In Produktion (Nginx) verbindet über /ws (Nginx proxied). */
+  const isDev = location.port === '5173';
+  const wsUrl = isDev
+    ? `ws://${location.hostname}:8071/ws`
+    : `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`;
+
+  let ws = null, alive = true, timer = null, retries = 0;
 
   function connect() {
     if (!alive) return;
     try {
-      ws = new WebSocket(url);
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => { retries = 0; };
       ws.onmessage = (e) => { try { onMessage(JSON.parse(e.data)); } catch {} };
-      ws.onclose = () => { if (alive) timer = setTimeout(connect, 3000); };
+      ws.onclose = () => {
+        if (!alive) return;
+        retries++;
+        const delay = Math.min(1000 * retries, 5000);
+        timer = setTimeout(connect, delay);
+      };
       ws.onerror = () => ws?.close();
-    } catch { if (alive) timer = setTimeout(connect, 3000); }
+    } catch {
+      if (alive) timer = setTimeout(connect, 2000);
+    }
   }
   connect();
   return { close() { alive = false; clearTimeout(timer); ws?.close(); } };
