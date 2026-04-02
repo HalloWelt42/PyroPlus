@@ -377,7 +377,7 @@
       <div class="pr"><span>X</span><input type="range" min="0" max={W-1} value={sw.x} oninput={(e)=>{sw.x=+e.target.value;placedWidgets=[...placedWidgets];renderWidgets();}}><span class="pv">{sw.x}</span></div>
       <div class="pr"><span>Y</span><input type="range" min="0" max={H-1} value={sw.y} oninput={(e)=>{sw.y=+e.target.value;placedWidgets=[...placedWidgets];renderWidgets();}}><span class="pv">{sw.y}</span></div>
       {#if sw.props.scale !== undefined}
-        <div class="pr"><span>Größe</span><input type="range" min="1" max="3" value={sw.props.scale} oninput={(e)=>updateWidgetProp(selectedWidget,'scale',+e.target.value)}><span class="pv">{sw.props.scale}×</span></div>
+        <div class="pr"><span>Größe</span><input type="range" min="1" max="5" value={sw.props.scale} oninput={(e)=>updateWidgetProp(selectedWidget,'scale',+e.target.value)}><span class="pv">{sw.props.scale}×</span></div>
       {/if}
       {#if sw.props.text !== undefined}
         <div class="pr"><span>Text</span><input type="text" class="ti" value={sw.props.text} oninput={(e)=>updateWidgetProp(selectedWidget,'text',e.target.value)}></div>
