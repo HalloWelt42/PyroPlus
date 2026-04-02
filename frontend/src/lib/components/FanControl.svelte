@@ -132,6 +132,30 @@
   const profIcons = { silent: 'fa-volume-xmark', balanced: 'fa-scale-balanced', performance: 'fa-rocket', night: 'fa-moon', custom: 'fa-sliders' };
   const profLabels = { silent: 'Leise', balanced: 'Ausgewogen', performance: 'Leistung', night: 'Nacht', custom: 'Benutzerdefiniert' };
 
+  /* Gehäuselüfter (GPIO An/Aus) — Schwellwerte lokal getrackt */
+  let caseFanOn = $derived(s.fan?.gpio_on || false);
+  let thresholdOn = $state(50);
+  let thresholdOff = $state(45);
+  let caseFanMode = $state('auto'); // auto | on | off
+
+  $effect(() => {
+    if (s.fan?.threshold_on) thresholdOn = s.fan.threshold_on;
+    if (s.fan?.threshold_off) thresholdOff = s.fan.threshold_off;
+    if (s.fan?.case_mode) caseFanMode = s.fan.case_mode;
+  });
+
+  function onThresholdOnInput(e) {
+    thresholdOn = parseInt(e.target.value);
+    if (thresholdOff >= thresholdOn - 2) thresholdOff = thresholdOn - 3;
+  }
+  function onThresholdOffInput(e) {
+    thresholdOff = parseInt(e.target.value);
+    if (thresholdOn <= thresholdOff + 2) thresholdOn = thresholdOff + 3;
+  }
+  function commitCaseFan() {
+    s.setFanSettings({ threshold_on: thresholdOn, threshold_off: thresholdOff, case_mode: caseFanMode });
+  }
+
   /* Fan-Animation: Drehgeschwindigkeit proportional zu RPM */
   const fanSpinDuration = $derived(currentRpm > 0 ? Math.max(0.1, 60 / currentRpm) + 's' : '0s');
 </script>
