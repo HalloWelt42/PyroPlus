@@ -65,7 +65,7 @@
   function areaPath(arr) { const l = smoothPath(arr); return l ? `${l}L${chx(arr.length-1,arr.length).toFixed(1)},${CHART.pt+CH}L${chx(0,arr.length).toFixed(1)},${CHART.pt+CH}Z` : ''; }
 
   /* ═══ KURVEN-EDITOR ═══ */
-  const CURVE = { w: 460, h: 200, pl: 36, pr: 50, pt: 20, pb: 24 };
+  const CURVE = { w: 460, h: 220, pl: 36, pr: 50, pt: 40, pb: 24 };
   const KW = CURVE.w - CURVE.pl - CURVE.pr, KH = CURVE.h - CURVE.pt - CURVE.pb;
   const TMIN = 25, TMAX = 80;
   function ktx(t) { return CURVE.pl + ((t - TMIN) / (TMAX - TMIN)) * KW; }
@@ -156,11 +156,11 @@
         {/each}
       </div>
 
-      <!-- Profile + Kurveneditor -->
-      <div class="profiles">
-        {#each profiles as p}<button class="pill" class:active={profile===p} onclick={()=>s.setFanProfile(p)}><i class="fa-solid {profIcons[p]||'fa-circle'}"></i> {profLabels[p]||p}</button>{/each}
-      </div>
-      <div class="chart">
+      <!-- Kurveneditor mit Profilen oben -->
+      <div class="chart chart-with-profiles">
+        <div class="chart-profiles">
+          {#each profiles as p}<button class="pill" class:active={profile===p} onclick={()=>s.setFanProfile(p)}><i class="fa-solid {profIcons[p]||'fa-circle'}"></i> {profLabels[p]||p}</button>{/each}
+        </div>
         <svg bind:this={curveEl} viewBox="0 0 {CURVE.w} {CURVE.h}">
           <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity="0.2"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
           {#each [0,25,50,75,100] as sp}<line x1={CURVE.pl} y1={ksy(sp)} x2={CURVE.pl+KW} y2={ksy(sp)} stroke="rgba(255,255,255,0.04)" stroke-dasharray="4"/><text x={CURVE.pl-5} y={ksy(sp)+4} text-anchor="end" class="ax">{sp}%</text>{/each}
@@ -205,7 +205,7 @@
   /* Lüfter-Header */
   .fan-header { display: flex; align-items: center; gap: 10px; }
   .fan-icon { font-size: var(--fs-lg); color: var(--accent); }
-  .fan-title { font: 600 var(--fs-sm) var(--font); }
+  .fan-title { font: 700 var(--fs-xl) var(--font); }
   .fan-sub { font: 500 var(--fs-sm) var(--mono); color: var(--text-muted); }
   .fan-badge { margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 99px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); font: 500 var(--fs-sm) var(--mono); color: var(--text-muted); }
   .fan-badge.on { color: var(--green); border-color: rgba(0,232,138,0.2); background: rgba(0,232,138,0.06); }
@@ -226,7 +226,7 @@
   .temp-u { font-size: 20px; font-weight: 400; color: var(--text-muted); }
 
   /* Diagramm */
-  .chart { flex: 1; min-height: 120px; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; }
+  .chart { flex: 1; min-height: 150px; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; }
   .chart svg { width: 100%; height: 100%; display: block; }
   .ax { font: 10px var(--mono); fill: var(--text-muted); }
   .ax-on { font: 600 9px var(--mono); fill: var(--red); }
@@ -234,9 +234,13 @@
   .ax-now { font: 600 10px var(--mono); fill: var(--text-primary); }
   .ax-pt { font: 600 9px var(--mono); fill: var(--text-muted); }
 
-  /* Profile */
-  .profiles { display: flex; gap: 4px; flex-wrap: wrap; }
-  .pill { padding: 6px 12px; background: var(--bg-deep); border: 1px solid var(--border); border-radius: 99px; font: 500 var(--fs-sm) var(--font); cursor: pointer; color: var(--text-muted); transition: all 150ms; display: flex; align-items: center; gap: 6px; }
+  /* Profile (im Chart-Bereich) */
+  .chart-with-profiles { position: relative; }
+  .chart-profiles {
+    position: absolute; top: 6px; left: 6px; right: 6px; z-index: 2;
+    display: flex; gap: 4px; flex-wrap: wrap;
+  }
+  .pill { padding: 4px 10px; background: rgba(10,14,24,0.85); backdrop-filter: blur(4px); border: 1px solid var(--border); border-radius: 99px; font: 500 var(--fs-xs) var(--font); cursor: pointer; color: var(--text-muted); transition: all 150ms; display: flex; align-items: center; gap: 4px; }
   .pill:hover { border-color: var(--text-muted); }
   .pill.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
