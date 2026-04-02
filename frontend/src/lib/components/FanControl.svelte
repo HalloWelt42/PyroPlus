@@ -219,19 +219,6 @@
         <div class="fan-badge" class:on={currentRpm > 0}><i class="fa-solid fa-fan" style="animation-duration:{fanSpinDuration}" class:spinning={currentRpm > 0}></i> {currentRpm > 0 ? `${currentRpm} RPM` : 'Aus'}</div>
       </div>
 
-      <!-- LED-Zuordnung -->
-      <div class="led-mode-switch">
-        <span class="led-mode-label">LED-Farbe bestimmt durch</span>
-        <div class="led-mode-btns">
-          <button class="led-mode-btn" class:active={['temp_reactive','load_reactive'].includes(s.leds?.effect)} onclick={() => s.setLedEffect('temp_reactive')}>
-            <i class="fa-solid fa-temperature-half"></i> Temperatur
-          </button>
-          <button class="led-mode-btn" class:active={!['temp_reactive','load_reactive'].includes(s.leds?.effect)} onclick={() => { if (['temp_reactive','load_reactive'].includes(s.leds?.effect)) s.setLedEffect('static'); }}>
-            <i class="fa-solid fa-palette"></i> LED-Steuerung
-          </button>
-        </div>
-      </div>
-
       <!-- Kurveneditor mit Profilen und LEDs oben -->
       <div class="chart chart-with-profiles">
         <div class="chart-topbar">
@@ -260,17 +247,6 @@
       </div>
 
       <div class="panel-footer">
-        {#if profile === 'custom'}
-          <div class="point-actions">
-            <button class="btn-point" onclick={addCurvePoint}><i class="fa-solid fa-plus"></i> Punkt</button>
-            <span class="point-count">{curve.length} Punkte</span>
-            <div class="point-chips">
-              {#each [...curve].sort((a,b)=>a.temp-b.temp) as pt, i}
-                <span class="chip">{pt.temp}°→{pt.speed}%{#if curve.length > 2}<button class="chip-x" onclick={()=>removeCurvePoint(curve.indexOf(pt))} aria-label="Entfernen"><i class="fa-solid fa-xmark"></i></button>{/if}</span>
-              {/each}
-            </div>
-          </div>
-        {/if}
         <div class="ctrl">
           <div class="ctrl-row"><span>Hysterese</span><input type="range" min="1" max="10" step="0.5" value={hysteresis} onchange={(e)=>s.setFanSettings({hysteresis:parseFloat(e.target.value)})}><span class="ctrl-val">{hysteresis}°C</span></div>
         </div>
@@ -315,27 +291,7 @@
 
   @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } }
 
-  /* LED-Zuordnung */
-  .led-mode-switch { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-  .led-mode-label { font: 500 var(--fs-sm) var(--font); color: var(--text-muted); white-space: nowrap; }
-  .led-mode-btns { display: flex; gap: 4px; flex: 1; }
-  .led-mode-btn {
-    flex: 1; height: 34px; border-radius: var(--radius-sm);
-    border: 1px solid var(--border); background: var(--bg-elevated);
-    color: var(--text-muted); font: 500 var(--fs-xs) var(--font);
-    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
-    transition: all 150ms;
-  }
-  .led-mode-btn:hover { border-color: var(--text-muted); }
-  .led-mode-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
-  /* Punkt-Aktionen */
-  .point-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .btn-point { padding: 4px 12px; border-radius: 99px; border: 1px dashed var(--accent); background: var(--accent-dim); color: var(--accent); font: 500 var(--fs-xs) var(--font); cursor: pointer; display: flex; align-items: center; gap: 4px; }
-  .point-count { font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
-  .point-chips { display: flex; gap: 4px; flex-wrap: wrap; }
-  .chip { display: flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 99px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); font: 500 var(--fs-xs) var(--mono); color: var(--text-secondary); }
-  .chip-x { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-xs); padding: 0 2px; display: flex; } .chip-x:hover { color: var(--red); }
 
   /* Diagramm */
   .chart { flex: 1; min-height: 120px; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; touch-action: none; }
