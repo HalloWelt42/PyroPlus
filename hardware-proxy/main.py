@@ -97,9 +97,9 @@ def _init_hardware():
 
     try:
         import gpiozero
-        _fan_gpio = gpiozero.DigitalOutputDevice(6)
+        _fan_gpio = gpiozero.DigitalOutputDevice(6, initial_value=False)
         _fan_available = True
-        logger.info("Fan GPIO: Pin 6 (gpiozero)")
+        logger.info("Fan GPIO: Pin 6 (gpiozero, initial=aus)")
     except Exception as e:
         logger.error(f"Fan GPIO Init: {e}")
 
