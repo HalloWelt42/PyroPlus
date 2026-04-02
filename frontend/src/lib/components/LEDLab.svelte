@@ -110,11 +110,13 @@
           <div class="color-row">
             <span class="color-label">Primärfarbe</span>
             <input type="color" value={toHex(s.leds?.color)} oninput={(e) => { const c = fromHex(e.target.value); s.setLedColor(c.r, c.g, c.b); }}>
+            <div class="color-swatch" style="background:{toHex(s.leds?.color)}"></div>
             <span class="color-hex">{toHex(s.leds?.color)}</span>
           </div>
           <div class="color-row">
             <span class="color-label">Sekundärfarbe</span>
             <input type="color" value={toHex(s.leds?.color2)} oninput={(e) => { const c = fromHex(e.target.value); s.setLedColor2(c.r, c.g, c.b); }}>
+            <div class="color-swatch" style="background:{toHex(s.leds?.color2)}"></div>
             <span class="color-hex">{toHex(s.leds?.color2)}</span>
           </div>
         </div>
@@ -274,9 +276,11 @@
   .ctrl-val { font: 600 var(--fs-sm) var(--mono); color: var(--text-primary); background: var(--bg-deep); padding: 3px 10px; border-radius: var(--radius-sm); min-width: 60px; text-align: center; }
 
   /* Farben */
-  .color-section { display: flex; gap: 16px; }
-  .color-row { display: flex; align-items: center; gap: 8px; flex: 1; }
-  .color-label { font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); min-width: 110px; }
+  .color-section { display: flex; flex-direction: column; gap: 10px; }
+  .color-row { display: flex; align-items: center; gap: 12px; }
+  .color-label { font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); min-width: 120px; }
+  .color-row input[type=color] { width: 48px; height: 36px; }
+  .color-swatch { width: 36px; height: 36px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
   .color-hex { font: 500 var(--fs-sm) var(--mono); color: var(--text-muted); }
 
   /* Reaktive Info */
