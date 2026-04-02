@@ -243,6 +243,8 @@ class FanController:
                 "ramp_down": self.ramp_down,
                 "min_speed": self.min_speed,
                 "poll_interval": self.poll_interval,
+                "threshold_on": self.threshold_on,
+                "threshold_off": self.threshold_off,
             },
             "profiles": list(FAN_PROFILES.keys()) + ["custom"],
         }

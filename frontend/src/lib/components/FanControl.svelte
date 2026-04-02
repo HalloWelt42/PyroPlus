@@ -144,6 +144,14 @@
   function commitThresholds() {
     s.setFanSettings({ threshold_on: thresholdOn, threshold_off: thresholdOff });
   }
+
+  /* Gedrosselter API-Call für Simulation (max alle 200ms) */
+  let _simTimer = 0;
+  function simTempLive(val) {
+    simTemp = val;
+    clearTimeout(_simTimer);
+    _simTimer = setTimeout(() => api.simulate.temp(val), 200);
+  }
 </script>
 
 <div class="layout">
@@ -275,8 +283,7 @@
         {#if simTemp !== null}
           <div class="sim-slider">
             <input type="range" min="20" max="85" step="0.5" value={simTemp}
-              oninput={(e) => { simTemp = parseFloat(e.target.value); }}
-              onchange={(e) => { api.simulate.temp(parseFloat(e.target.value)); }}>
+              oninput={(e) => simTempLive(parseFloat(e.target.value))}>
             <span class="sim-val" style="color:{tempColorStr}">{simTemp.toFixed(1)}°C</span>
           </div>
           <div class="sim-hint">Wirkt auf echte LEDs und Lüfter</div>

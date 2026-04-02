@@ -143,13 +143,13 @@ class LEDEngine:
         hw_client.leds_config(effect="off")
 
     def _system_data_loop(self):
-        """Pusht CPU-Temp/Load alle 3s für reaktive Effekte."""
+        """Pusht CPU-Temp/Load alle 1s für reaktive Effekte (synchron mit WebSocket)."""
         while self._running:
             try:
                 hw_client.leds_push_system_data(self.cpu_temp, self.cpu_load)
             except Exception:
                 pass
-            time.sleep(3)
+            time.sleep(1)
 
     def update_system_data(self, cpu_temp: float, cpu_load: float):
         """Wird vom Stats-Collector aufgerufen."""
