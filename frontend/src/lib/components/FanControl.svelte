@@ -230,7 +230,7 @@
 
   /* Diagramm */
   .chart { flex: 1; min-height: 80px; background: var(--bg-deep); border-radius: var(--radius-sm); padding: 4px; overflow: hidden; }
-  .panel-footer { flex-shrink: 0; min-height: 160px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; }
+  .panel-footer { flex-shrink: 0; min-height: 160px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; }
   .chart svg { width: 100%; height: 100%; display: block; }
   .ax { font: 10px var(--mono); fill: var(--text-muted); }
   .ax-on { font: 600 9px var(--mono); fill: var(--red); }
