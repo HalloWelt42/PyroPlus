@@ -2,8 +2,8 @@
   import { onMount, onDestroy } from 'svelte';
   import PanelWrapper from './oled/PanelWrapper.svelte';
   import * as E from './oled/engine.js';
-  import { TABS, ALL_SOURCES, DATA_SOURCES, DISPLAY_MODES, getSource, getModesForType, getSourcesForTab, HISTORY_KEYS, defaultOpts, createWidget } from './oled/catalog.js';
-  import { renderWidget, getWidgetSize } from './oled/widgetRenderer.js';
+  import { TABS, getSource, getModesForType, getSourcesForTab, defaultOpts, createWidget, HISTORY_KEYS } from './oled/catalog.js';
+  import { renderWidget as renderWidgetNew, getWidgetSize } from './oled/widgetRenderer.js';
   let { state: s } = $props();
   const W = E.W, H = E.H;
 
@@ -21,7 +21,7 @@
   function dupLayer(id) { const src = gl(id); if (!src) return; const nid = _nid++; layers = [...layers, { id: nid, name: src.name+' Kopie', pixels: new Uint8Array(src.pixels), visible: true }]; activeLayer = nid; }
   function toggleVis(id) { layers = layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l); }
 
-  /* ═══ SCREEN-VERWALTUNG ═══ */
+  /* ═══ SCREEN-VERWALTUNG (mehrere Bilder/Displays) ═══ */
   let screens = $state([{ id: 0, name: 'Screen 1', widgets: [], layers: [{ id: 0, name: 'Hintergrund', pixels: Array.from(new Uint8Array(W*H)), visible: true }], thumbnail: '' }]);
   let activeScreen = $state(0);
   let rotation = $state(false);
@@ -36,17 +36,41 @@
     screens[idx].thumbnail = E.compositeToDataUrl(layers);
     screens = [...screens];
   }
-  function addScreen() { saveCurrentScreen(); const id = _screenId++; screens = [...screens, { id, name: `Screen ${id+1}`, widgets: [], layers: [{ id: 0, name: 'Hintergrund', pixels: Array.from(new Uint8Array(W*H)), visible: true }], thumbnail: '' }]; switchScreen(id); }
-  function removeScreen(id) { if (screens.length <= 1) return; screens = screens.filter(sc => sc.id !== id); if (activeScreen === id) switchScreen(screens[0].id); }
+
+  function addScreen() {
+    saveCurrentScreen();
+    const id = _screenId++;
+    screens = [...screens, { id, name: `Screen ${id + 1}`, widgets: [], layers: [{ id: 0, name: 'Hintergrund', pixels: Array.from(new Uint8Array(W*H)), visible: true }], thumbnail: '' }];
+    switchScreen(id);
+  }
+
+  function removeScreen(id) {
+    if (screens.length <= 1) return;
+    screens = screens.filter(sc => sc.id !== id);
+    if (activeScreen === id) switchScreen(screens[0].id);
+  }
+
   function switchScreen(id) {
-    saveCurrentScreen(); activeScreen = id;
-    const sc = screens.find(sc => sc.id === id); if (!sc) return;
+    saveCurrentScreen();
+    activeScreen = id;
+    const sc = screens.find(sc => sc.id === id);
+    if (!sc) return;
     placedWidgets = sc.widgets ? JSON.parse(JSON.stringify(sc.widgets)) : [];
     layers = sc.layers ? sc.layers.map(l => ({ ...l, pixels: new Uint8Array(l.pixels) })) : [{ id: 0, name: 'Hintergrund', pixels: new Uint8Array(W*H), visible: true }];
-    activeLayer = layers[0]?.id || 0; _nid = Math.max(0, ...layers.map(l => l.id)) + 1;
-    selectedWidget = -1; selectedWidgets = new Set(); renderAll();
+    activeLayer = layers[0]?.id || 0;
+    _nid = Math.max(0, ...layers.map(l => l.id)) + 1;
+    selectedWidget = -1;
+    renderWidgets();
   }
-  function duplicateScreen() { saveCurrentScreen(); const src = screens.find(sc => sc.id === activeScreen); if (!src) return; const id = _screenId++; screens = [...screens, { id, name: src.name+' Kopie', widgets: JSON.parse(JSON.stringify(src.widgets)), layers: JSON.parse(JSON.stringify(src.layers)), thumbnail: src.thumbnail }]; switchScreen(id); }
+
+  function duplicateScreen() {
+    saveCurrentScreen();
+    const src = screens.find(sc => sc.id === activeScreen);
+    if (!src) return;
+    const id = _screenId++;
+    screens = [...screens, { id, name: src.name + ' Kopie', widgets: JSON.parse(JSON.stringify(src.widgets)), layers: JSON.parse(JSON.stringify(src.layers)), thumbnail: src.thumbnail }];
+    switchScreen(id);
+  }
 
   /* Screen D&D Reorder */
   let scDragFrom = $state(-1), scDragOver = $state(-1);
@@ -54,6 +78,13 @@
   function scDragOverFn(e, idx) { e.preventDefault(); scDragOver = idx; }
   function scDrop(e, idx) { e.preventDefault(); scDragOver = -1; if (scDragFrom === idx) return; const arr = [...screens]; const [m] = arr.splice(scDragFrom, 1); arr.splice(idx, 0, m); screens = arr; scDragFrom = -1; }
   function scDragEnd() { scDragFrom = -1; scDragOver = -1; }
+
+  /* Layer D&D */
+  let ldFrom = $state(-1), ldOver = $state(-1);
+  function ldStart(e, i) { ldFrom = i; e.dataTransfer.effectAllowed = 'move'; }
+  function ldDragOver(e, i) { e.preventDefault(); ldOver = i; }
+  function ldDrop(e, i) { e.preventDefault(); ldOver = -1; if (ldFrom === i) return; const a = [...layers]; const [m] = a.splice(ldFrom, 1); a.splice(i, 0, m); layers = a; ldFrom = -1; }
+  function ldEnd() { ldFrom = -1; ldOver = -1; }
 
   /* ═══ HISTORY ═══ */
   let hist = [], hidx = -1;
@@ -71,78 +102,31 @@
   let textInput = $state('HELLO'), textScale = $state(1);
   let showGrid = $state(true), zoom = $state(6);
   let cursorX = $state(-1), cursorY = $state(-1);
-  let snapGrid = $state(0);
-  function snapPos(v) { return snapGrid > 0 ? Math.round(v / snapGrid) * snapGrid : v; }
 
   const drawTools = [
     {id:'pencil',icon:'fa-pen',label:'Stift',key:'P'},{id:'eraser',icon:'fa-eraser',label:'Radierer',key:'E'},
     {id:'line',icon:'fa-minus',label:'Linie',key:'L'},{id:'rect',icon:'fa-square',label:'Rechteck',key:'R'},
     {id:'circle',icon:'fa-circle',label:'Kreis',key:'C'},{id:'ellipse',icon:'fa-egg',label:'Ellipse',key:'O'},
-    {id:'fill',icon:'fa-fill-drip',label:'Fuellen',key:'F'},{id:'text',icon:'fa-font',label:'Text',key:'T'},
+    {id:'fill',icon:'fa-fill-drip',label:'Füllen',key:'F'},{id:'text',icon:'fa-font',label:'Text',key:'T'},
     {id:'move',icon:'fa-up-down-left-right',label:'Verschieben',key:'V'},
   ];
-
-  /* ═══ WIDGETS (neues dynamisches System) ═══ */
-  let placedWidgets = $state([]);
-  let selectedWidget = $state(-1);
-  let selectedWidgets = $state(new Set());
-  let ctxMenu = $state(null);
-
-  /* Sparkline History */
-  const _hist = { cpu: [], temp: [], ram: [], fan_speed: [], net_rx: [], net_tx: [] };
-  const HIST_LEN = 30;
-
-  function placeNewWidget(sourceId, display, x = 4, y = 4) {
-    const w = createWidget(sourceId, display, x, y);
-    placedWidgets = [...placedWidgets, w];
-    selectedWidget = placedWidgets.length - 1;
-    selectedWidgets = new Set([selectedWidget]);
-    tool = 'move';
-    renderAll();
-  }
-
-  function removeWidget(idx) {
-    placedWidgets = placedWidgets.filter((_, i) => i !== idx);
-    if (selectedWidget >= placedWidgets.length) selectedWidget = placedWidgets.length - 1;
-    selectedWidgets = new Set(); renderAll();
-  }
-
-  function updateWidgetOpt(idx, key, val) {
-    placedWidgets[idx].opts[key] = val;
-    placedWidgets = [...placedWidgets]; renderAll();
-  }
-
-  /* ═══ WIDGET-EDITOR STATE ═══ */
-  let activeTab = $state('cpu');
-  let configSource = $state(null);   // Datenquelle die gerade konfiguriert wird
-  let configDisplay = $state(null);  // Gewaehlter Display-Modus
-
-  function selectSource(src) {
-    configSource = src;
-    const modes = getModesForType(src.type);
-    configDisplay = modes[0]?.id || 'zahl';
-  }
-
-  function addConfiguredWidget() {
-    if (!configSource) return;
-    placeNewWidget(configSource.id, configDisplay);
-    s.toast(`${configSource.label} hinzugefuegt`, 'ok');
-  }
 
   /* ═══ WETTER (Open-Meteo API + Ortssuche) ═══ */
   let weather = $state(null);
   let weatherLocation = $state(JSON.parse(localStorage.getItem('pp-weather-loc') || 'null') || { name: 'Zeitz', lat: 51.05, lon: 12.13 });
   let locationSearch = $state('');
   let locationResults = $state([]);
+  let showLocationSearch = $state(!weatherLocation.name);
 
   async function fetchWeather() {
     if (!weatherLocation) return;
     try {
       const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${weatherLocation.lat}&longitude=${weatherLocation.lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,surface_pressure&timezone=auto`);
       const d = await r.json();
-      weather = { ...d.current, location: weatherLocation.name };
+      weather = d.current;
     } catch {}
   }
+
   async function searchLocation(q) {
     if (q.length < 2) { locationResults = []; return; }
     try {
@@ -151,58 +135,273 @@
       locationResults = (d.results || []).map(r => ({ name: r.name, country: r.country, admin: r.admin1, lat: r.latitude, lon: r.longitude }));
     } catch { locationResults = []; }
   }
+
   function selectLocation(loc) {
     weatherLocation = { name: loc.name, lat: loc.lat, lon: loc.lon };
     localStorage.setItem('pp-weather-loc', JSON.stringify(weatherLocation));
-    locationSearch = ''; locationResults = [];
-    fetchWeather(); s.toast(`Wetter-Ort: ${loc.name}`, 'ok');
+    locationSearch = '';
+    locationResults = [];
+    showLocationSearch = false;
+    fetchWeather();
+    s.toast(`Wetter-Ort: ${loc.name}`, 'ok');
   }
+
   let _searchTimer = 0;
-  function onLocationInput(e) { locationSearch = e.target.value; clearTimeout(_searchTimer); _searchTimer = setTimeout(() => searchLocation(locationSearch), 300); }
-
-  /* ═══ RENDERING ═══ */
-  let canvasEl = $state(null), previewEl = $state(null);
-
-  function renderAll() {
-    // Widgets in Layer 0 rendern
-    const px = layers[0].pixels; px.fill(0);
-    for (const w of placedWidgets) {
-      renderWidget(px, w, s.stats, weather, s.stats?.history || _hist);
-    }
-    layers = [...layers]; render(); autoSave();
+  function onLocationInput(e) {
+    locationSearch = e.target.value;
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(() => searchLocation(locationSearch), 300);
   }
 
+  function weatherCodeToText(code) {
+    if (code == null) return '—';
+    if (code === 0) return 'Klar';
+    if (code <= 3) return 'Bewölkt';
+    if (code <= 49) return 'Nebel';
+    if (code <= 59) return 'Nieselregen';
+    if (code <= 69) return 'Regen';
+    if (code <= 79) return 'Schnee';
+    if (code <= 84) return 'Schauer';
+    if (code <= 94) return 'Schneesch.';
+    return 'Gewitter';
+  }
+
+  /* Zahl rechtsbündig mit führenden Leerzeichen */
+  function pad(n, len=3) { const s = String(n); return s.length >= len ? s : ' '.repeat(len - s.length) + s; }
+  /* Tausenderpunkt: 24214 → 24.214 */
+  function tsd(n) { return Math.round(n).toLocaleString('de-DE'); }
+
+  /* ═══ WIDGETS MIT LIVE-DATEN ═══ */
+  const widgetTypes = {
+    clock:     { cat:'zeit', label:'Uhr HH:MM',    w:58, h:14, props:{ scale:2, format:'HH:MM' },
+                 getText: (p) => { const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }},
+    clock_s:   { cat:'zeit', label:'Uhr HH:MM:SS', w:48, h:7, props:{ scale:1 },
+                 getText: () => { const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0'); }},
+    clock_l:   { cat:'zeit', label:'Uhr Groß',     w:90, h:21, props:{ scale:3 },
+                 getText: () => { const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }},
+    date:      { cat:'zeit', label:'Datum',         w:60, h:7, props:{ scale:1 },
+                 getText: () => new Date().toLocaleDateString('de-DE') },
+    weekday:   { cat:'zeit', label:'Wochentag',     w:14, h:7, props:{ scale:1 },
+                 getText: () => ['So','Mo','Di','Mi','Do','Fr','Sa'][new Date().getDay()] },
+    /* ─── CPU ─── */
+    cpu_temp:  { cat:'cpu',  label:'Temperatur °C',  w:24, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+pad(Math.round(s.stats?.cpu?.temp||0))+'°' },
+    cpu_pct:   { cat:'cpu',  label:'Auslastung %',   w:24, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+pad(Math.round(s.stats?.cpu?.percent||0))+'%' },
+    cpu_cores: { cat:'cpu',  label:'Kerne',          w:12, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+(s.stats?.cpu?.cores||4) },
+    cpu_bar:   { cat:'cpu',  label:'Balken',         w:60, h:6, props:{ width:60, height:6 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawBar(px, x, y, p.width||60, p.height||6, s.stats?.cpu?.percent||0) },
+    /* ─── RAM ─── */
+    ram_used:  { cat:'ram',  label:'Benutzt',        w:30, h:7, props:{ scale:1, prefix:'', tsep:true },
+                 getText: (p) => (p.prefix||'')+(p.tsep?tsd(s.stats?.ram?.used_gb||0):Math.round(s.stats?.ram?.used_gb||0))+' G' },
+    ram_total: { cat:'ram',  label:'Gesamt',         w:30, h:7, props:{ scale:1, prefix:'', tsep:true },
+                 getText: (p) => (p.prefix||'')+(p.tsep?tsd(s.stats?.ram?.total_gb||0):Math.round(s.stats?.ram?.total_gb||0))+' G' },
+    ram_pct:   { cat:'ram',  label:'Prozent',        w:24, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+pad(Math.round(s.stats?.ram?.percent||0))+'%' },
+    ram_bar:   { cat:'ram',  label:'Balken',         w:60, h:6, props:{ width:60, height:6 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawBar(px, x, y, p.width||60, p.height||6, s.stats?.ram?.percent||0) },
+    /* ─── Disk ─── */
+    disk_name: { cat:'disk', label:'Name',           w:48, h:7, props:{ scale:1, prefix:'', diskIdx:0 },
+                 getText: (p) => (p.prefix||'')+(s.stats?.disks?.[p.diskIdx||0]?.label||s.stats?.disks?.[p.diskIdx||0]?.mount||'?') },
+    disk_used: { cat:'disk', label:'Benutzt',        w:48, h:7, props:{ scale:1, prefix:'', diskIdx:0, tsep:true },
+                 getText: (p) => { const d=s.stats?.disks?.[p.diskIdx||0]; return (p.prefix||'')+(d?(p.tsep?tsd(d.used_gb):Math.round(d.used_gb))+' G':'?'); }},
+    disk_total:{ cat:'disk', label:'Gesamt',         w:48, h:7, props:{ scale:1, prefix:'', diskIdx:0, tsep:true },
+                 getText: (p) => { const d=s.stats?.disks?.[p.diskIdx||0]; return (p.prefix||'')+(d?(p.tsep?tsd(d.total_gb):Math.round(d.total_gb))+' G':'?'); }},
+    disk_pct:  { cat:'disk', label:'Prozent',        w:30, h:7, props:{ scale:1, prefix:'', diskIdx:0 },
+                 getText: (p) => (p.prefix||'')+pad(Math.round(s.stats?.disks?.[p.diskIdx||0]?.percent||0))+'%' },
+    disk_bar:  { cat:'disk', label:'Balken',         w:60, h:6, props:{ width:60, height:6, diskIdx:0 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawBar(px, x, y, p.width||60, p.height||6, s.stats?.disks?.[p.diskIdx||0]?.percent||0) },
+    /* ─── Netzwerk ─── */
+    net_ip:    { cat:'net',  label:'IP-Adresse',     w:60, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+(s.stats?.network?.ip||'0.0.0.0') },
+    net_if:    { cat:'net',  label:'Interface',      w:36, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+(s.stats?.network?.interface||'?') },
+    net_rx:    { cat:'net',  label:'Download',       w:60, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => { const b=s.stats?.network?.rx_bytes_sec||0; return (p.prefix||'')+(b>1048576?(b/1048576).toFixed(1)+' MB/s':b>1024?Math.round(b/1024)+' KB/s':b+' B/s'); }},
+    net_tx:    { cat:'net',  label:'Upload',         w:60, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => { const b=s.stats?.network?.tx_bytes_sec||0; return (p.prefix||'')+(b>1048576?(b/1048576).toFixed(1)+' MB/s':b>1024?Math.round(b/1024)+' KB/s':b+' B/s'); }},
+    /* ─── System ─── */
+    uptime:    { cat:'sys',  label:'Uptime',         w:48, h:7, props:{ scale:1, prefix:'' },
+                 getText: (p) => (p.prefix||'')+(s.stats?.uptime?.formatted||'0:00') },
+    /* ─── Layout ─── */
+    label:     { cat:'layout', label:'Textfeld',       w:48, h:7, props:{ scale:1, text:'Text' },
+                 getText: (p) => p.text || 'Text' },
+    marquee:   { cat:'layout', label:'Laufschrift',    w:128, h:7, props:{ scale:1, text:'Hallo Welt!' },
+                 getText: (p) => p.text || 'Laufschrift' },
+    line_h:    { cat:'layout', label:'Linie ─',        w:60, h:1, props:{ width:60 }, isShape: true,
+                 draw: (px,x,y,p) => { for(let i=0;i<(p.width||60);i++) if(x+i>=0&&x+i<W) px[y*W+x+i]=1; }},
+    line_v:    { cat:'layout', label:'Linie │',        w:1, h:20, props:{ height:20 }, isShape: true,
+                 draw: (px,x,y,p) => { for(let i=0;i<(p.height||20);i++) if(y+i>=0&&y+i<H) px[(y+i)*W+x]=1; }},
+    rect_o:    { cat:'layout', label:'Rahmen □',       w:40, h:20, props:{ width:40, height:20 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawRect(x,y,x+(p.width||40)-1,y+(p.height||20)-1,(px2,py)=>{if(px2>=0&&px2<W&&py>=0&&py<H)px[py*W+px2]=1;},false) },
+    rect_f:    { cat:'layout', label:'Block ■',        w:40, h:20, props:{ width:40, height:20 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawRect(x,y,x+(p.width||40)-1,y+(p.height||20)-1,(px2,py)=>{if(px2>=0&&px2<W&&py>=0&&py<H)px[py*W+px2]=1;},true) },
+    /* ─── Sparklines (Verlaufsgraph) ─── */
+    spark_cpu: { cat:'cpu',  label:'CPU Verlauf',    w:60, h:20, props:{ width:60, height:20 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawSparkline(px, _hist.cpu, x, y, p.width||60, p.height||20) },
+    spark_temp:{ cat:'cpu',  label:'Temp Verlauf',   w:60, h:20, props:{ width:60, height:20 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawSparkline(px, _hist.temp, x, y, p.width||60, p.height||20) },
+    spark_ram: { cat:'ram',  label:'RAM Verlauf',    w:60, h:20, props:{ width:60, height:20 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawSparkline(px, _hist.ram, x, y, p.width||60, p.height||20) },
+    /* ─── Gauges (Halbkreis) ─── */
+    gauge_cpu: { cat:'cpu',  label:'CPU Gauge',      w:32, h:18, props:{ radius:12 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawGauge(px, s.stats?.cpu?.percent||0, x, y, p.radius||12) },
+    gauge_ram: { cat:'ram',  label:'RAM Gauge',      w:32, h:18, props:{ radius:12 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawGauge(px, s.stats?.ram?.percent||0, x, y, p.radius||12) },
+    gauge_disk:{ cat:'disk', label:'Disk Gauge',     w:32, h:18, props:{ radius:12, diskIdx:0 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawGauge(px, s.stats?.disks?.[p.diskIdx||0]?.percent||0, x, y, p.radius||12) },
+    gauge_temp:{ cat:'cpu',  label:'Temp Gauge',     w:32, h:18, props:{ radius:12 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawGauge(px, Math.min(100,(s.stats?.cpu?.temp||0)/80*100), x, y, p.radius||12) },
+    /* ─── Section Header ─── */
+    section:   { cat:'layout', label:'── Header ──',   w:60, h:7, props:{ width:60, text:'CPU' }, isShape: true,
+                 draw: (px,x,y,p) => E.drawSectionHeader(px, p.text||'Label', x, y, p.width||60) },
+  };
+  const widgetList = Object.entries(widgetTypes).map(([id,v])=>({id,...v}));
+
+  /* ═══ HISTORY für Sparklines ═══ */
+  const _hist = { cpu: [], temp: [], ram: [], fan_speed: [], net_rx: [], net_tx: [] };
+  const HIST_LEN = 30;
+
+  /* Platzierte Widgets — jedes hat Position, Typ, eigene Eigenschaften */
+  let placedWidgets = $state([]);
+  let selectedWidget = $state(-1);
+  let selectedWidgets = $state(new Set()); // Multi-Select
+
+  /* Kontextmenü */
+  let ctxMenu = $state(null); // { x, y, widgetIdx }
+
+  let snapGrid = $state(0); // 0=aus, 4/8/16=Rasterweite
+
+  function snapPos(v) { return snapGrid > 0 ? Math.round(v / snapGrid) * snapGrid : v; }
+
+  function placeWidget(w) {
+    const wt = widgetTypes[w.id];
+    placedWidgets = [...placedWidgets, {
+      id: Date.now(),
+      type: w.id,
+      x: 4, y: 4,
+      props: { ...wt.props, invert: false, border: false, align: 'left' },
+    }];
+    selectedWidget = placedWidgets.length - 1;
+    tool = 'move';
+    renderWidgets();
+    s.toast(`${wt.label} eingefügt`, 'ok');
+  }
+
+  function removeWidget(idx) {
+    placedWidgets = placedWidgets.filter((_, i) => i !== idx);
+    if (selectedWidget >= placedWidgets.length) selectedWidget = placedWidgets.length - 1;
+    renderWidgets();
+  }
+
+  function moveWidget(idx, dx, dy) {
+    const w = placedWidgets[idx];
+    w.x = Math.max(0, Math.min(W - 1, w.x + dx));
+    w.y = Math.max(0, Math.min(H - 1, w.y + dy));
+    placedWidgets = [...placedWidgets];
+    renderWidgets();
+  }
+
+  function updateWidgetProp(idx, key, val) {
+    placedWidgets[idx].props[key] = val;
+    placedWidgets = [...placedWidgets];
+    renderWidgets();
+  }
+
+  /* ═══ WIDGET-EDITOR STATE (neues System) ═══ */
+  let activeTab = $state('cpu');
+  let configSource = $state(null);
+  let configDisplay = $state(null);
+
+  function selectSource(src) {
+    configSource = src;
+    configDisplay = getModesForType(src.type)[0]?.id || 'zahl';
+  }
+  function placeNewWidget(sourceId, displayMode, x = 4, y = 4) {
+    const w = createWidget(sourceId, displayMode, x, y);
+    placedWidgets = [...placedWidgets, w];
+    selectedWidget = placedWidgets.length - 1;
+    tool = 'move';
+    renderWidgets();
+    s.toast(`${w.name} eingefuegt`, 'ok');
+  }
+  function addConfiguredWidget() {
+    if (!configSource) return;
+    placeNewWidget(configSource.id, configDisplay);
+  }
+
+  /* Alle Widgets in Layer 0 rendern — neues Format (source+display+opts) */
+  function renderWidgets() {
+    const px = layers[0].pixels;
+    px.fill(0);
+    for (const w of placedWidgets) {
+      if (w.source) {
+        // Neues Format
+        renderWidgetNew(px, w, s.stats, weather, s.stats?.history || _hist);
+      } else if (w.type) {
+        // Altes Format (Abwaertskompatibilitaet)
+        const wt = widgetTypes[w.type];
+        if (!wt) continue;
+        if (wt.isShape) {
+          wt.draw(px, w.x, w.y, w.props);
+        } else {
+          const text = wt.getText(w.props);
+          const sx = w.props.scaleX ?? w.props.scale ?? 1;
+          const sy = w.props.scaleY ?? w.props.scale ?? 1;
+          E.drawText(px, text, w.x, w.y, sx, sy);
+        }
+      }
+    }
+    layers = [...layers];
+    render();
+    autoSave();
+  }
+
+  /* Widget-Rendering 5fps, History + Previews 1x/s */
+  let _renderTimer, _statsTimer;
+  function startWidgetTimer() {
+    // Rendering 5fps (200ms)
+    _renderTimer = setInterval(() => {
+      if (placedWidgets.length > 0) renderWidgets();
+    }, 200);
+    // History + Vorschau-Leiste nur 1x/s
+    _statsTimer = setInterval(() => {
+      _hist.cpu.push(s.stats?.cpu?.percent || 0);
+      _hist.temp.push(s.stats?.cpu?.temp || 0);
+      _hist.ram.push(s.stats?.ram?.percent || 0);
+      if (_hist.cpu.length > HIST_LEN) _hist.cpu.shift();
+      if (_hist.temp.length > HIST_LEN) _hist.temp.shift();
+      if (_hist.ram.length > HIST_LEN) _hist.ram.shift();
+    }, 1000);
+  }
+  function stopWidgetTimer() { clearInterval(_renderTimer); clearInterval(_statsTimer); }
+
+  /* ═══ CANVAS ═══ */
+  let canvasEl = $state(null), previewEl = $state(null);
   function render() {
     const comp = E.composite(layers);
     if (canvasEl) {
       E.renderCanvas(canvasEl.getContext('2d'), comp, zoom, showGrid);
       const ctx = canvasEl.getContext('2d');
+      // Multi-Select Rahmen
       const selSet = selectedWidgets.size > 0 ? selectedWidgets : (selectedWidget >= 0 ? new Set([selectedWidget]) : new Set());
       for (const idx of selSet) {
-        const w = placedWidgets[idx]; if (!w) continue;
-        const sz = getWidgetSize(w);
+        const w = placedWidgets[idx];
+        if (!w) continue;
+        const wt = widgetTypes[w.type];
+        if (!wt) continue;
+        const ww = wt.isShape ? (w.props.width || w.props.radius*2 || wt.w) : wt.w * (w.props.scaleX ?? w.props.scale ?? 1);
+        const wh = wt.isShape ? (w.props.height || w.props.radius*2 || wt.h) : wt.h * (w.props.scaleY ?? w.props.scale ?? 1);
         ctx.strokeStyle = idx === selectedWidget ? 'rgba(0,180,255,0.7)' : 'rgba(0,232,138,0.5)';
-        ctx.lineWidth = 1; ctx.setLineDash([4, 2]);
-        ctx.strokeRect(w.x * zoom - 1, w.y * zoom - 1, sz.w * zoom + 2, sz.h * zoom + 2);
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 2]);
+        ctx.strokeRect(w.x * zoom - 1, w.y * zoom - 1, ww * zoom + 2, wh * zoom + 2);
         ctx.setLineDash([]);
       }
     }
     if (previewEl) E.renderPreview(previewEl.getContext('2d'), comp);
   }
-
-  /* Timer: Rendering 5fps, Stats 1x/s */
-  let _renderTimer, _statsTimer;
-  function startTimers() {
-    _renderTimer = setInterval(() => { if (placedWidgets.length > 0) renderAll(); }, 200);
-    _statsTimer = setInterval(() => {
-      const st = s.stats;
-      _hist.cpu.push(st?.cpu?.percent || 0); _hist.temp.push(st?.cpu?.temp || 0);
-      _hist.ram.push(st?.ram?.percent || 0); _hist.fan_speed.push(st?.fan?.rpm || 0);
-      _hist.net_rx.push(st?.network?.rx_bytes_sec || 0); _hist.net_tx.push(st?.network?.tx_bytes_sec || 0);
-      for (const k of Object.keys(_hist)) if (_hist[k].length > HIST_LEN) _hist[k].shift();
-    }, 1000);
-  }
-  function stopTimers() { clearInterval(_renderTimer); clearInterval(_statsTimer); }
 
   /* ═══ MAUS ═══ */
   let drawing=$state(false), sx=0, sy=0, lx=-1, ly=-1, snap=null, mvStart=null;
@@ -210,28 +409,53 @@
 
   function hitTestWidget(x, y) {
     for (let i = placedWidgets.length - 1; i >= 0; i--) {
-      const w = placedWidgets[i]; const sz = getWidgetSize(w);
-      if (x >= w.x && x < w.x + sz.w && y >= w.y && y < w.y + sz.h) return i;
+      const w = placedWidgets[i];
+      const wt = widgetTypes[w.type];
+      if (!wt) continue;
+      const ww = wt.isShape ? (w.props.width || wt.w) : wt.w * (w.props.scaleX ?? w.props.scale ?? 1);
+      const wh = wt.isShape ? (w.props.height || wt.h) : wt.h * (w.props.scaleY ?? w.props.scale ?? 1);
+      if (x >= w.x && x < w.x + ww && y >= w.y && y < w.y + wh) return i;
     }
     return -1;
   }
 
   let widgetDrag = null;
   function onDown(e) {
-    if (!canvasEl) return; ctxMenu = null;
+    if (!canvasEl) return;
+    ctxMenu = null; // Kontextmenü schließen
     const [x,y]=m2p(e);
+
+    // Widget-Klick prüfen (im Move-Modus)
     if (tool === 'move') {
       const hit = hitTestWidget(x, y);
       if (hit >= 0) {
-        if (e.shiftKey) { const ns = new Set(selectedWidgets); if (ns.has(hit)) ns.delete(hit); else ns.add(hit); selectedWidgets = ns; selectedWidget = hit; render(); return; }
+        // Shift+Klick = Multi-Select toggle
+        if (e.shiftKey) {
+          const ns = new Set(selectedWidgets);
+          if (ns.has(hit)) ns.delete(hit); else ns.add(hit);
+          selectedWidgets = ns;
+          selectedWidget = hit;
+          render();
+          return;
+        }
         selectedWidget = hit;
         if (!selectedWidgets.has(hit)) selectedWidgets = new Set([hit]);
-        const origins = new Map(); for (const idx of selectedWidgets) origins.set(idx, { x: placedWidgets[idx].x, y: placedWidgets[idx].y });
+        // Multi-Drag: Startpositionen aller selektierten Widgets merken
+        const origins = new Map();
+        for (const idx of selectedWidgets) origins.set(idx, { x: placedWidgets[idx].x, y: placedWidgets[idx].y });
         widgetDrag = { idx: hit, startX: x, startY: y, origX: placedWidgets[hit].x, origY: placedWidgets[hit].y, origins };
-        drawing = true; render(); return;
+        drawing = true;
+        render();
+        return;
       }
     }
-    const hit2 = hitTestWidget(x, y); selectedWidget = hit2; selectedWidgets = hit2 >= 0 ? new Set([hit2]) : new Set(); render();
+
+    // Klick ohne Shift = Einzel-Select oder abwählen
+    const hit2 = hitTestWidget(x, y);
+    selectedWidget = hit2;
+    selectedWidgets = hit2 >= 0 ? new Set([hit2]) : new Set();
+    render();
+
     drawing=true; sx=x; sy=y; lx=x; ly=y;
     if (tool==='pencil'||tool==='eraser') { pushH(); plot(x,y); render(); }
     else if (tool==='fill') { pushH(); E.floodFill(ap(),x,y,gp(x,y)===1?0:1); render(); drawing=false; }
@@ -240,136 +464,585 @@
     else { snap = new Uint8Array(ap()); }
   }
   function onMove(e) {
-    if (!canvasEl) return; const [x,y]=m2p(e); cursorX=x; cursorY=y;
+    if (!canvasEl) return;
+    const [x,y]=m2p(e); cursorX=x; cursorY=y;
     if (!drawing) return;
+    // Widget-Drag (Multi oder Einzel)
     if (widgetDrag) {
       const dx = x - widgetDrag.startX, dy = y - widgetDrag.startY;
       if (widgetDrag.origins && widgetDrag.origins.size > 1) {
-        for (const [idx, orig] of widgetDrag.origins) { placedWidgets[idx].x = Math.max(0, Math.min(W-1, orig.x + dx)); placedWidgets[idx].y = Math.max(0, Math.min(H-1, orig.y + dy)); }
-      } else { placedWidgets[widgetDrag.idx].x = Math.max(0, Math.min(W-1, widgetDrag.origX + dx)); placedWidgets[widgetDrag.idx].y = Math.max(0, Math.min(H-1, widgetDrag.origY + dy)); }
-      placedWidgets = [...placedWidgets]; renderAll(); return;
+        // Multi-Drag
+        for (const [idx, orig] of widgetDrag.origins) {
+          placedWidgets[idx].x = Math.max(0, Math.min(W-1, orig.x + dx));
+          placedWidgets[idx].y = Math.max(0, Math.min(H-1, orig.y + dy));
+        }
+      } else {
+        placedWidgets[widgetDrag.idx].x = Math.max(0, Math.min(W-1, widgetDrag.origX + dx));
+        placedWidgets[widgetDrag.idx].y = Math.max(0, Math.min(H-1, widgetDrag.origY + dy));
+      }
+      placedWidgets = [...placedWidgets];
+      renderWidgets();
+      return;
     }
     if (tool==='pencil'||tool==='eraser') { E.bresenhamLine(lx,ly,x,y,plot); lx=x; ly=y; render(); }
-    else if (tool==='move'&&mvStart) { const layer=gl(activeLayer); if(!layer)return; const dx=x-mvStart.x,dy=y-mvStart.y; layer.pixels.fill(0); for(let py=0;py<H;py++)for(let px=0;px<W;px++)if(mvStart.snap[py*W+px]){const nx=px+dx,ny=py+dy;if(nx>=0&&nx<W&&ny>=0&&ny<H)layer.pixels[ny*W+nx]=1;} layers=[...layers]; render(); }
-    else if (snap) { gl(activeLayer).pixels=new Uint8Array(snap); const p=(px,py)=>sp(px,py,1); if(tool==='line')E.bresenhamLine(sx,sy,x,y,p); else if(tool==='rect')E.drawRect(sx,sy,x,y,p,filled); else if(tool==='circle')E.drawCircle(sx,sy,x,y,p,filled); else if(tool==='ellipse')E.drawEllipse(sx,sy,x,y,p,filled); render(); }
+    else if (tool==='move'&&mvStart) {
+      const layer=gl(activeLayer); if(!layer)return;
+      const dx=x-mvStart.x,dy=y-mvStart.y; layer.pixels.fill(0);
+      for(let py=0;py<H;py++)for(let px=0;px<W;px++)if(mvStart.snap[py*W+px]){const nx=px+dx,ny=py+dy;if(nx>=0&&nx<W&&ny>=0&&ny<H)layer.pixels[ny*W+nx]=1;}
+      layers=[...layers]; render();
+    } else if (snap) {
+      gl(activeLayer).pixels=new Uint8Array(snap);
+      const p=(px,py)=>sp(px,py,1);
+      if(tool==='line')E.bresenhamLine(sx,sy,x,y,p);
+      else if(tool==='rect')E.drawRect(sx,sy,x,y,p,filled);
+      else if(tool==='circle')E.drawCircle(sx,sy,x,y,p,filled);
+      else if(tool==='ellipse')E.drawEllipse(sx,sy,x,y,p,filled);
+      render();
+    }
   }
   function onUp(){if(!drawing)return;if(widgetDrag){widgetDrag=null;drawing=false;return;}if(snap)pushH();if(tool==='move'&&mvStart){pushH();mvStart=null;}drawing=false;snap=null;}
 
-  function onContext(e) { e.preventDefault(); if (!canvasEl) return; const [x,y]=m2p(e); const hit = hitTestWidget(x,y); if (hit>=0) { selectedWidget=hit; if(!selectedWidgets.has(hit))selectedWidgets=new Set([hit]); ctxMenu={x:e.clientX,y:e.clientY,widgetIdx:hit}; render(); } else ctxMenu=null; }
-  function ctxAction(action) {
-    const idx=ctxMenu?.widgetIdx; if(idx==null||idx<0){ctxMenu=null;return;}
-    if(action==='dup'){const src=placedWidgets[idx];placedWidgets=[...placedWidgets,{...JSON.parse(JSON.stringify(src)),id:Date.now(),x:src.x+4,y:src.y+4}];selectedWidget=placedWidgets.length-1;selectedWidgets=new Set([selectedWidget]);renderAll();}
-    else if(action==='del'){placedWidgets=placedWidgets.filter((_,i)=>i!==idx);selectedWidget=-1;selectedWidgets=new Set();renderAll();}
-    else if(action==='front'){const[w]=placedWidgets.splice(idx,1);placedWidgets=[...placedWidgets,w];selectedWidget=placedWidgets.length-1;selectedWidgets=new Set([selectedWidget]);renderAll();}
-    else if(action==='back'){const[w]=placedWidgets.splice(idx,1);placedWidgets=[w,...placedWidgets];selectedWidget=0;selectedWidgets=new Set([0]);renderAll();}
-    ctxMenu=null;
+  function onContext(e) {
+    e.preventDefault();
+    if (!canvasEl) return;
+    const [x,y]=m2p(e);
+    const hit = hitTestWidget(x, y);
+    if (hit >= 0) {
+      selectedWidget = hit;
+      if (!selectedWidgets.has(hit)) selectedWidgets = new Set([hit]);
+      ctxMenu = { x: e.clientX, y: e.clientY, widgetIdx: hit };
+      render();
+    } else {
+      ctxMenu = null;
+    }
   }
 
+  function ctxAction(action) {
+    const idx = ctxMenu?.widgetIdx;
+    if (idx == null || idx < 0) { ctxMenu = null; return; }
+    if (action === 'dup') {
+      const src = placedWidgets[idx];
+      placedWidgets = [...placedWidgets, { ...JSON.parse(JSON.stringify(src)), id: Date.now(), x: src.x+4, y: src.y+4 }];
+      selectedWidget = placedWidgets.length - 1;
+      selectedWidgets = new Set([selectedWidget]);
+      renderWidgets();
+    } else if (action === 'del') {
+      placedWidgets = placedWidgets.filter((_, i) => i !== idx);
+      selectedWidget = -1; selectedWidgets = new Set();
+      renderWidgets();
+    } else if (action === 'front') {
+      const [w] = placedWidgets.splice(idx, 1);
+      placedWidgets = [...placedWidgets, w];
+      selectedWidget = placedWidgets.length - 1;
+      selectedWidgets = new Set([selectedWidget]);
+      renderWidgets();
+    } else if (action === 'back') {
+      const [w] = placedWidgets.splice(idx, 1);
+      placedWidgets = [w, ...placedWidgets];
+      selectedWidget = 0;
+      selectedWidgets = new Set([0]);
+      renderWidgets();
+    }
+    ctxMenu = null;
+  }
   function clearLayer(){pushH();ap()?.fill(0);render();}
   function invertLayer(){pushH();const px=ap();if(px)for(let i=0;i<px.length;i++)px[i]=px[i]?0:1;render();}
-
-  /* ═══ KEYBOARD ═══ */
-  function onKey(e) {
-    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
-    if(e.ctrlKey&&e.key==='z'){undo();e.preventDefault();}
-    if(e.ctrlKey&&e.key==='y'){redo();e.preventDefault();}
-    if(e.ctrlKey&&e.key==='d'){ const indices=selectedWidgets.size>0?[...selectedWidgets]:(selectedWidget>=0?[selectedWidget]:[]); if(indices.length>0){const ns=new Set();for(const idx of indices){const src=placedWidgets[idx];placedWidgets=[...placedWidgets,{...JSON.parse(JSON.stringify(src)),id:Date.now()+Math.random(),x:src.x+4,y:src.y+4}];ns.add(placedWidgets.length-1);}selectedWidgets=ns;selectedWidget=[...ns][0];renderAll();e.preventDefault();return;} }
-    if(e.ctrlKey&&e.key==='a'){selectedWidgets=new Set(placedWidgets.map((_,i)=>i));if(placedWidgets.length>0)selectedWidget=0;render();e.preventDefault();return;}
-    if((e.key==='Delete'||e.key==='Backspace')){const indices=selectedWidgets.size>0?[...selectedWidgets].sort((a,b)=>b-a):(selectedWidget>=0?[selectedWidget]:[]);if(indices.length>0){for(const idx of indices)placedWidgets.splice(idx,1);placedWidgets=[...placedWidgets];selectedWidget=-1;selectedWidgets=new Set();renderAll();e.preventDefault();return;}}
-    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){const indices=selectedWidgets.size>0?[...selectedWidgets]:(selectedWidget>=0?[selectedWidget]:[]);if(indices.length>0){const step=e.shiftKey?(snapGrid||8):1;for(const idx of indices){const w=placedWidgets[idx];if(e.key==='ArrowLeft')w.x=Math.max(0,w.x-step);if(e.key==='ArrowRight')w.x=Math.min(W-1,w.x+step);if(e.key==='ArrowUp')w.y=Math.max(0,w.y-step);if(e.key==='ArrowDown')w.y=Math.min(H-1,w.y+step);if(snapGrid>0){w.x=snapPos(w.x);w.y=snapPos(w.y);}}placedWidgets=[...placedWidgets];renderAll();e.preventDefault();return;}}
-    if(e.key==='g'){showGrid=!showGrid;render();}
-    if(e.key==='+')zoom=Math.min(16,zoom+1);if(e.key==='-')zoom=Math.max(2,zoom-1);
-    const t=drawTools.find(t=>t.key===e.key.toUpperCase());if(t&&!e.ctrlKey)tool=t.id;
-  }
-
-  /* ═══ SEND / LOAD ═══ */
   async function sendToOled() {
     saveCurrentScreen();
     try {
+      // Alle Screens als Widget-Konfiguration ans Backend schicken
+      // Backend rendert sie selbständig mit Live-Daten
       const screenConfigs = screens.map(sc => ({
-        type: 'system', name: sc.name,
-        widgets: (sc.widgets || []).map(w => ({ source: w.source, display: w.display, x: w.x, y: w.y, name: w.name, opts: w.opts })),
+        type: 'system',
+        name: sc.name,
+        widgets: (sc.widgets || []).map(w => ({
+          type: w.type,
+          x: w.x,
+          y: w.y,
+          scaleX: w.props?.scaleX ?? w.props?.scale ?? 1,
+          scaleY: w.props?.scaleY ?? w.props?.scale ?? 1,
+          prefix: w.props?.prefix,
+          text: w.props?.text,
+          w: w.props?.width,
+          h: w.props?.height,
+          scale: w.props?.scale,
+          radius: w.props?.radius,
+          diskIdx: w.props?.diskIdx,
+          invert: w.props?.invert || false,
+          border: w.props?.border || false,
+          align: w.props?.align || 'left',
+          boxW: w.props?.boxW || 0,
+          tsep: w.props?.tsep || false,
+        })),
       }));
-      if (screenConfigs.length > 0) await s.updateOledScreen(0, screenConfigs[0]);
-      for (let i = 1; i < screenConfigs.length; i++) await s.addOledScreen(screenConfigs[i]);
+
+      // Bestehende Screens löschen und neue setzen
       const oledScreens = s.oled?.screens || [];
-      while (oledScreens.length > screenConfigs.length && oledScreens.length > 1) { await s.removeOledScreen(oledScreens.length - 1); oledScreens.pop(); }
-      if (rotation) { await s.setOledRotation(rotationInterval); await s.setOledMode('auto'); } else { await s.setOledMode('auto'); }
-      s.toast(`${screenConfigs.length} Screen(s) gesendet`, 'ok');
-    } catch (e) { s.toast('Fehler: ' + (e.message||e), 'err'); }
+      // Ersten Screen updaten
+      if (screenConfigs.length > 0) {
+        await s.updateOledScreen(0, screenConfigs[0]);
+      }
+      // Weitere Screens hinzufügen
+      for (let i = 1; i < screenConfigs.length; i++) {
+        await s.addOledScreen(screenConfigs[i]);
+      }
+      // Überzählige Backend-Screens löschen
+      while (oledScreens.length > screenConfigs.length && oledScreens.length > 1) {
+        await s.removeOledScreen(oledScreens.length - 1);
+        oledScreens.pop();
+      }
+
+      // Rotation setzen
+      if (rotation) {
+        await s.setOledRotation(rotationInterval);
+        await s.setOledMode('auto');
+      } else {
+        await s.setOledMode('auto');
+      }
+
+      s.toast(`${screenConfigs.length} Screen(s) an Backend gesendet`, 'ok');
+    } catch (e) {
+      s.toast('Fehler: ' + (e.message||e), 'err');
+    }
   }
 
   async function loadFromOled() {
     try {
+      // Widget-Konfigurationen vom Backend holen (nicht nur PNG!)
       const backendScreens = s.oled?.screens;
-      if (!backendScreens || backendScreens.length === 0) { s.toast('Keine Screens im Backend', 'info'); return; }
-      const newScreens = backendScreens.map((bs, i) => ({
-        id: i, name: bs.name || `Screen ${i+1}`,
-        widgets: (bs.widgets || []).map(bw => ({ id: Date.now()+Math.random(), source: bw.source, display: bw.display, x: bw.x||0, y: bw.y||0, name: bw.name||'', opts: bw.opts||{} })),
-        layers: [{ id: 0, name: 'Hintergrund', pixels: Array.from(new Uint8Array(W*H)), visible: true }], thumbnail: '',
-      }));
-      screens = newScreens; _screenId = screens.length; activeScreen = screens[0]?.id ?? 0;
-      const sc = screens[0]; placedWidgets = sc.widgets ? JSON.parse(JSON.stringify(sc.widgets)) : [];
-      layers = sc.layers.map(l => ({ ...l, pixels: new Uint8Array(l.pixels) })); activeLayer = 0; _nid = 1; selectedWidget = -1;
-      renderAll(); s.toast(`${newScreens.length} Screen(s) geladen`, 'ok');
-    } catch (e) { s.toast('Fehler: ' + (e.message||e), 'err'); }
+      if (!backendScreens || backendScreens.length === 0) {
+        s.toast('Keine Screens im Backend', 'info');
+        return;
+      }
+
+      // Backend-Screens in Editor-Format konvertieren
+      const newScreens = backendScreens.map((bs, i) => {
+        const widgets = (bs.widgets || []).map(bw => ({
+          id: Date.now() + Math.random(),
+          type: bw.type,
+          x: bw.x || 0,
+          y: bw.y || 0,
+          props: {
+            ...(widgetTypes[bw.type]?.props || {}),
+            scaleX: bw.scaleX ?? bw.scale ?? (widgetTypes[bw.type]?.props?.scale ?? 1),
+            scaleY: bw.scaleY ?? bw.scale ?? (widgetTypes[bw.type]?.props?.scale ?? 1),
+            prefix: bw.prefix ?? widgetTypes[bw.type]?.props?.prefix,
+            text: bw.text ?? widgetTypes[bw.type]?.props?.text,
+            width: bw.w ?? widgetTypes[bw.type]?.props?.width,
+            height: bw.h ?? widgetTypes[bw.type]?.props?.height,
+            diskIdx: bw.diskIdx ?? widgetTypes[bw.type]?.props?.diskIdx,
+            invert: bw.invert || false,
+            border: bw.border || false,
+            align: bw.align || 'left',
+            boxW: bw.boxW || 0,
+            tsep: bw.tsep || false,
+          },
+        }));
+        return {
+          id: i,
+          name: bs.name || `Screen ${i + 1}`,
+          widgets,
+          layers: [{ id: 0, name: 'Hintergrund', pixels: Array.from(new Uint8Array(W*H)), visible: true }],
+          thumbnail: '',
+        };
+      });
+
+      screens = newScreens;
+      _screenId = screens.length;
+      activeScreen = screens[0]?.id ?? 0;
+      const sc = screens[0];
+      placedWidgets = sc.widgets ? JSON.parse(JSON.stringify(sc.widgets)) : [];
+      layers = sc.layers.map(l => ({ ...l, pixels: new Uint8Array(l.pixels) }));
+      activeLayer = 0;
+      _nid = 1;
+      selectedWidget = -1;
+      renderWidgets();
+      s.toast(`${newScreens.length} Screen(s) vom Backend geladen`, 'ok');
+    } catch (e) {
+      s.toast('Fehler: ' + (e.message||e), 'err');
+    }
   }
 
-  async function exportScreens() { saveCurrentScreen(); const data = JSON.stringify({ screens, version: '2.0' }, null, 2); const blob = new Blob([data], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `pyroplus-oled-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url); s.toast('Exportiert', 'ok'); }
-  async function importScreens() { const input = document.createElement('input'); input.type = 'file'; input.accept = '.json'; input.onchange = async (e) => { try { const text = await e.target.files[0].text(); const data = JSON.parse(text); if (data.screens?.length > 0) { screens = data.screens.map((sc, i) => ({ ...sc, id: i, layers: sc.layers || [{ id: 0, name: 'Hintergrund', pixels: Array.from(new Uint8Array(W*H)), visible: true }] })); _screenId = screens.length; switchScreen(screens[0].id); s.toast(`${screens.length} Screen(s) importiert`, 'ok'); } } catch (err) { s.toast('Import-Fehler: ' + err.message, 'err'); } }; input.click(); }
+  async function exportScreens() {
+    saveCurrentScreen();
+    const data = JSON.stringify({ screens, version: '1.0' }, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `pyroplus-oled-${new Date().toISOString().slice(0,10)}.json`;
+    a.click(); URL.revokeObjectURL(url);
+    s.toast('Screens exportiert', 'ok');
+  }
 
-  /* ═══ PROFILE ═══ */
-  let profiles = $state(JSON.parse(localStorage.getItem('pp-oled-profiles') || '[]'));
-  let activeProfile = $state('');
-  let showProfileSave = $state(false), profileSaveName = $state('');
-  function saveProfile(name) { if (!name) return; saveCurrentScreen(); const p = { name, created: new Date().toISOString(), screens: JSON.parse(JSON.stringify(screens)), rotation, rotationInterval }; profiles = [...profiles.filter(p => p.name !== name), p]; localStorage.setItem('pp-oled-profiles', JSON.stringify(profiles)); activeProfile = name; s.toast(`Profil "${name}" gespeichert`, 'ok'); }
-  function loadProfile(p) { screens = p.screens.map((sc, i) => ({ ...sc, id: i })); _screenId = screens.length; rotation = p.rotation || false; rotationInterval = p.rotationInterval || 10; activeProfile = p.name; switchScreen(screens[0]?.id ?? 0); s.toast(`Profil "${p.name}" geladen`, 'ok'); }
-  function deleteProfile(name) { profiles = profiles.filter(p => p.name !== name); localStorage.setItem('pp-oled-profiles', JSON.stringify(profiles)); if (activeProfile === name) activeProfile = ''; }
+  async function importScreens() {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.json';
+    input.onchange = async (e) => {
+      try {
+        const text = await e.target.files[0].text();
+        const data = JSON.parse(text);
+        if (data.screens?.length > 0) {
+          screens = data.screens.map((sc, i) => ({
+            ...sc, id: i,
+            layers: sc.layers || [{ id: 0, name: 'Hintergrund', pixels: Array.from(new Uint8Array(W*H)), visible: true }],
+          }));
+          _screenId = screens.length;
+          switchScreen(screens[0].id);
+          s.toast(`${screens.length} Screen(s) importiert`, 'ok');
+        }
+      } catch (err) { s.toast('Import-Fehler: ' + err.message, 'err'); }
+    };
+    input.click();
+  }
 
-  /* ═══ PERSISTENZ ═══ */
-  function saveState() { try { saveCurrentScreen(); localStorage.setItem('pp-oled-state', JSON.stringify({ screens: screens.map(sc => ({ ...sc, thumbnail: sc.thumbnail || '' })), activeScreen, rotation, rotationInterval, zoom, showGrid })); } catch {} }
-  function loadState() { try { const raw = localStorage.getItem('pp-oled-state'); if (!raw) return; const data = JSON.parse(raw); if (data.screens?.length > 0) { screens = data.screens; _screenId = Math.max(0, ...screens.map(sc => sc.id)) + 1; } if (data.activeScreen !== undefined) activeScreen = data.activeScreen; if (data.rotation !== undefined) rotation = data.rotation; if (data.rotationInterval) rotationInterval = data.rotationInterval; if (data.zoom) zoom = data.zoom; if (data.showGrid !== undefined) showGrid = data.showGrid; const sc = screens.find(sc => sc.id === activeScreen) || screens[0]; if (sc) { placedWidgets = sc.widgets ? JSON.parse(JSON.stringify(sc.widgets)) : []; layers = sc.layers ? sc.layers.map(l => ({ ...l, pixels: new Uint8Array(l.pixels) })) : [{ id: 0, name: 'Hintergrund', pixels: new Uint8Array(W*H), visible: true }]; activeLayer = layers[0]?.id || 0; _nid = Math.max(0, ...layers.map(l => l.id)) + 1; } } catch {} }
+  /* ═══ PANEL D&D ═══ */
+  let lpanels=$state(['preview','props','layers','widgets']), rpanels=$state(['tools','display','weather']);
+  let pdragId=$state(null), pdropSide=$state(null);
+  function pDragStart(e,id){pdragId=id;e.dataTransfer.setData('application/x-oled-panel',id);e.dataTransfer.effectAllowed='move';}
+  function pDragEnd(){pdragId=null;pdropSide=null;}
+  function sDragOver(e,side){if(!e.dataTransfer.types.includes('application/x-oled-panel'))return;e.preventDefault();pdropSide=side;}
+  function sDragLeave(e){if(!e.currentTarget.contains(e.relatedTarget))pdropSide=null;}
+  function sDrop(e,side){e.preventDefault();const id=e.dataTransfer.getData('application/x-oled-panel');if(!id)return;lpanels=lpanels.filter(p=>p!==id);rpanels=rpanels.filter(p=>p!==id);if(side==='left')lpanels=[...lpanels,id];else rpanels=[...rpanels,id];pdragId=null;pdropSide=null;}
+
+  function onKey(e){
+    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+    if(e.ctrlKey&&e.key==='z'){undo();e.preventDefault();}
+    if(e.ctrlKey&&e.key==='y'){redo();e.preventDefault();}
+    if(e.ctrlKey&&e.key==='d'){
+      // Duplizieren (Multi oder Einzel)
+      const indices = selectedWidgets.size > 0 ? [...selectedWidgets] : (selectedWidget >= 0 ? [selectedWidget] : []);
+      if(indices.length > 0){
+        const newSel = new Set();
+        for(const idx of indices){
+          const src=placedWidgets[idx];
+          placedWidgets=[...placedWidgets,{...JSON.parse(JSON.stringify(src)),id:Date.now()+Math.random(),x:src.x+4,y:src.y+4}];
+          newSel.add(placedWidgets.length-1);
+        }
+        selectedWidgets=newSel;selectedWidget=[...newSel][0];renderWidgets();e.preventDefault();return;
+      }
+    }
+    if(e.ctrlKey&&e.key==='a'){
+      // Alle selektieren
+      selectedWidgets=new Set(placedWidgets.map((_,i)=>i));
+      if(placedWidgets.length>0)selectedWidget=0;
+      render();e.preventDefault();return;
+    }
+    if((e.key==='Delete'||e.key==='Backspace')){
+      const indices = selectedWidgets.size > 0 ? [...selectedWidgets].sort((a,b)=>b-a) : (selectedWidget >= 0 ? [selectedWidget] : []);
+      if(indices.length > 0){ for(const idx of indices) placedWidgets.splice(idx,1); placedWidgets=[...placedWidgets]; selectedWidget=-1; selectedWidgets=new Set(); renderWidgets(); e.preventDefault(); return; }
+    }
+    // Arrow-Key Nudge (Multi oder Einzel)
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
+      const indices = selectedWidgets.size > 0 ? [...selectedWidgets] : (selectedWidget >= 0 ? [selectedWidget] : []);
+      if(indices.length > 0){
+        const step=e.shiftKey?(snapGrid||8):1;
+        for(const idx of indices){
+          const w=placedWidgets[idx];
+          if(e.key==='ArrowLeft')w.x=Math.max(0,w.x-step);
+          if(e.key==='ArrowRight')w.x=Math.min(W-1,w.x+step);
+          if(e.key==='ArrowUp')w.y=Math.max(0,w.y-step);
+          if(e.key==='ArrowDown')w.y=Math.min(H-1,w.y+step);
+          if(snapGrid>0){w.x=snapPos(w.x);w.y=snapPos(w.y);}
+        }
+        placedWidgets=[...placedWidgets];renderWidgets();e.preventDefault();return;
+      }
+    }
+    if(e.key==='g'){showGrid=!showGrid;render();}
+    if(e.key==='+')zoom=Math.min(16,zoom+1);
+    if(e.key==='-')zoom=Math.max(2,zoom-1);
+    const t=drawTools.find(t=>t.key===e.key.toUpperCase());if(t&&!e.ctrlKey)tool=t.id;
+  }
+
+  /* Panel-Metadaten */
+  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, widgets:{icon:'puzzle-piece',label:'Widgets',c:true}, weather:{icon:'cloud-sun',label:'Wetter-Ort',c:true} };
+
+  /* Vorlagen entfernt — Profile ersetzen Vorlagen */
+  function panelIcon(id) { return _pd[id]?.icon || 'circle'; }
+  function panelLabel(id) { return _pd[id]?.label || id; }
+  function panelCollapsible(id) { return _pd[id]?.c ?? true; }
+
+  /* ═══ PERSISTENZ (localStorage Auto-Save) ═══ */
+  function saveState() {
+    try {
+      saveCurrentScreen();
+      const data = {
+        screens: screens.map(sc => ({ ...sc, thumbnail: sc.thumbnail || '' })),
+        activeScreen, rotation, rotationInterval, zoom, showGrid,
+      };
+      localStorage.setItem('pp-oled-state', JSON.stringify(data));
+    } catch {}
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem('pp-oled-state');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data.screens?.length > 0) {
+        screens = data.screens;
+        _screenId = Math.max(0, ...screens.map(sc => sc.id)) + 1;
+      }
+      if (data.activeScreen !== undefined) activeScreen = data.activeScreen;
+      if (data.rotation !== undefined) rotation = data.rotation;
+      if (data.rotationInterval) rotationInterval = data.rotationInterval;
+      if (data.zoom) zoom = data.zoom;
+      if (data.showGrid !== undefined) showGrid = data.showGrid;
+      // Aktiven Screen laden
+      const sc = screens.find(sc => sc.id === activeScreen) || screens[0];
+      if (sc) {
+        placedWidgets = sc.widgets ? JSON.parse(JSON.stringify(sc.widgets)) : [];
+        layers = sc.layers ? sc.layers.map(l => ({ ...l, pixels: new Uint8Array(l.pixels) })) : [{ id: 0, name: 'Hintergrund', pixels: new Uint8Array(W*H), visible: true }];
+        activeLayer = layers[0]?.id || 0;
+        _nid = Math.max(0, ...layers.map(l => l.id)) + 1;
+      }
+    } catch {}
+  }
+
   let _saveTimer = 0;
   function autoSave() { clearTimeout(_saveTimer); _saveTimer = setTimeout(saveState, 1000); }
 
-  /* Canvas Drop */
-  function onCanvasDrop(e) { const sid = e.dataTransfer.getData('application/x-widget-source'); const disp = e.dataTransfer.getData('application/x-widget-display'); if (!sid) return; e.preventDefault(); const rect = canvasEl.getBoundingClientRect(); const x = Math.max(0, Math.min(W-1, Math.floor((e.clientX - rect.left) / zoom))); const y = Math.max(0, Math.min(H-1, Math.floor((e.clientY - rect.top) / zoom))); placeNewWidget(sid, disp || 'zahl', snapGrid > 0 ? snapPos(x) : x, snapGrid > 0 ? snapPos(y) : y); }
-  function onCanvasDragOver(e) { if (e.dataTransfer.types.includes('application/x-widget-source')) e.preventDefault(); }
+  /* ═══ PROFIL-SYSTEM ═══ */
+  let profiles = $state(JSON.parse(localStorage.getItem('pp-oled-profiles') || '[]'));
+  let activeProfile = $state('');
 
-  onMount(()=>{loadState();pushH();renderAll();startTimers();fetchWeather();setInterval(fetchWeather,300000);});
-  onDestroy(()=>{stopTimers();saveState();});
+  function saveProfile(name) {
+    if (!name) return;
+    saveCurrentScreen();
+    const profile = {
+      name, created: new Date().toISOString(),
+      screens: JSON.parse(JSON.stringify(screens)),
+      rotation, rotationInterval,
+    };
+    profiles = [...profiles.filter(p => p.name !== name), profile];
+    localStorage.setItem('pp-oled-profiles', JSON.stringify(profiles));
+    activeProfile = name;
+    s.toast(`Profil "${name}" gespeichert`, 'ok');
+  }
+
+  function loadProfile(p) {
+    screens = p.screens.map((sc, i) => ({ ...sc, id: i }));
+    _screenId = screens.length;
+    rotation = p.rotation || false;
+    rotationInterval = p.rotationInterval || 10;
+    activeProfile = p.name;
+    switchScreen(screens[0]?.id ?? 0);
+    s.toast(`Profil "${p.name}" geladen`, 'ok');
+  }
+
+  function deleteProfile(name) {
+    profiles = profiles.filter(p => p.name !== name);
+    localStorage.setItem('pp-oled-profiles', JSON.stringify(profiles));
+    if (activeProfile === name) activeProfile = '';
+    s.toast(`Profil "${name}" gelöscht`, 'ok');
+  }
+
+  let showProfileSave = $state(false);
+  let profileSaveName = $state('');
+
+  onMount(()=>{loadState();pushH();renderWidgets();startWidgetTimer();fetchWeather();setInterval(fetchWeather,300000);});
+  onDestroy(()=>{stopWidgetTimer();saveState();});
   $effect(()=>{zoom;showGrid;render();autoSave();});
 </script>
 
 <svelte:window onkeydown={onKey} />
 
+{#snippet panelContent(id)}
+  {#if id==='tools'}
+    <div class="tool-grid">{#each drawTools as t}<button class="tool-btn" class:active={tool===t.id} onclick={()=>tool=t.id} title="{t.label} ({t.key})"><i class="fa-solid {t.icon}"></i></button>{/each}</div>
+    {#if tool==='pencil'||tool==='eraser'}<div class="pr"><span>Größe</span><input type="range" min="1" max="8" value={penSize} oninput={(e)=>penSize=+e.target.value}><span class="pv">{penSize}</span></div>{/if}
+    {#if tool==='rect'||tool==='circle'||tool==='ellipse'}<div class="pr"><span>Gefüllt</span><button class="tog" class:on={filled} onclick={()=>filled=!filled}></button></div>{/if}
+    {#if tool==='text'}<div class="pr"><span>Text</span><input type="text" class="ti" bind:value={textInput} maxlength="20"></div><div class="pr"><span>Größe</span><input type="range" min="1" max="3" value={textScale} oninput={(e)=>textScale=+e.target.value}><span class="pv">{textScale}×</span></div>{/if}
+    <div class="ag"><button class="ab" onclick={undo}><i class="fa-solid fa-rotate-left"></i></button><button class="ab" onclick={redo}><i class="fa-solid fa-rotate-right"></i></button><button class="ab" onclick={clearLayer}><i class="fa-solid fa-trash-can"></i></button><button class="ab" onclick={invertLayer}><i class="fa-solid fa-circle-half-stroke"></i></button></div>
+  {:else if id==='display'}
+    <div class="pr"><span>Zoom</span><input type="range" min="2" max="16" value={zoom} oninput={(e)=>zoom=+e.target.value}><span class="pv">{zoom}×</span></div>
+    <div class="pr"><span>Raster</span><button class="tog" class:on={showGrid} onclick={()=>{showGrid=!showGrid;}}></button></div>
+    <div class="pr"><span>Snap</span>
+      <select class="ti" style="flex:1;padding:3px 6px" onchange={(e)=>snapGrid=+e.target.value}>
+        <option value="0" selected={snapGrid===0}>Aus</option>
+        <option value="4" selected={snapGrid===4}>4px</option>
+        <option value="8" selected={snapGrid===8}>8px</option>
+        <option value="16" selected={snapGrid===16}>16px</option>
+      </select>
+    </div>
+  {:else if id==='preview'}
+    <div class="pv-box"><div class="pv-bezel"><canvas bind:this={previewEl} width={W} height={H} class="pv-canvas"></canvas></div></div>
+    <button class="send-btn" onclick={sendToOled}><i class="fa-solid fa-paper-plane"></i> An OLED senden ({screens.length})</button>
+    <button class="send-btn sec" onclick={loadFromOled}><i class="fa-solid fa-download"></i> Vom Backend laden</button>
+    <div class="btn-row">
+      <button class="send-btn half" onclick={exportScreens}><i class="fa-solid fa-file-export"></i> Export</button>
+      <button class="send-btn half" onclick={importScreens}><i class="fa-solid fa-file-import"></i> Import</button>
+    </div>
+  {:else if id==='props'}
+    {#if selectedWidget >= 0 && placedWidgets[selectedWidget]}
+      {@const sw = placedWidgets[selectedWidget]}
+      {@const wt = widgetTypes[sw.type]}
+      <div class="rr"><span>Widget</span><span class="mono">{wt?.label}</span></div>
+      <div class="rr"><span>Position</span><span class="mono">{sw.x}, {sw.y}</span></div>
+      <div class="pr"><span>X</span><input type="range" min="0" max={W-1} value={sw.x} oninput={(e)=>{sw.x=+e.target.value;placedWidgets=[...placedWidgets];renderWidgets();}}><span class="pv">{sw.x}</span></div>
+      <div class="pr"><span>Y</span><input type="range" min="0" max={H-1} value={sw.y} oninput={(e)=>{sw.y=+e.target.value;placedWidgets=[...placedWidgets];renderWidgets();}}><span class="pv">{sw.y}</span></div>
+      {#if sw.props.scale !== undefined}
+        <div class="pr"><span>Breite</span><input type="range" min="1" max="8" value={sw.props.scaleX||sw.props.scale} oninput={(e)=>updateWidgetProp(selectedWidget,'scaleX',+e.target.value)}><span class="pv">{sw.props.scaleX||sw.props.scale}×</span></div>
+        <div class="pr"><span>Höhe</span><input type="range" min="1" max="8" value={sw.props.scaleY||sw.props.scale} oninput={(e)=>updateWidgetProp(selectedWidget,'scaleY',+e.target.value)}><span class="pv">{sw.props.scaleY||sw.props.scale}×</span></div>
+      {/if}
+      {#if sw.props.text !== undefined}
+        <div class="pr"><span>Text</span><input type="text" class="ti" value={sw.props.text} oninput={(e)=>updateWidgetProp(selectedWidget,'text',e.target.value)}></div>
+      {/if}
+      {#if sw.props.prefix !== undefined}
+        <div class="pr"><span>Präfix</span><input type="text" class="ti" value={sw.props.prefix} oninput={(e)=>updateWidgetProp(selectedWidget,'prefix',e.target.value)}></div>
+      {/if}
+      {#if sw.props.tsep !== undefined}
+        <div class="pr"><span>1.000er</span><button class="tog" class:on={sw.props.tsep} onclick={()=>updateWidgetProp(selectedWidget,'tsep',!sw.props.tsep)}></button></div>
+      {/if}
+      {#if sw.props.diskIdx !== undefined}
+        <div class="pr"><span>Disk</span><input type="range" min="0" max={Math.max(0,(s.stats?.disks?.length||1)-1)} value={sw.props.diskIdx} oninput={(e)=>updateWidgetProp(selectedWidget,'diskIdx',+e.target.value)}><span class="pv">{s.stats?.disks?.[sw.props.diskIdx]?.mount||'?'}</span></div>
+      {/if}
+      {#if sw.props.width !== undefined}
+        <div class="pr"><span>Breite</span><input type="range" min="4" max="128" value={sw.props.width} oninput={(e)=>updateWidgetProp(selectedWidget,'width',+e.target.value)}><span class="pv">{sw.props.width}</span></div>
+      {/if}
+      {#if sw.props.height !== undefined}
+        <div class="pr"><span>Höhe</span><input type="range" min="2" max="64" value={sw.props.height} oninput={(e)=>updateWidgetProp(selectedWidget,'height',+e.target.value)}><span class="pv">{sw.props.height}</span></div>
+      {/if}
+      {#if sw.props.radius !== undefined}
+        <div class="pr"><span>Radius</span><input type="range" min="6" max="30" value={sw.props.radius} oninput={(e)=>updateWidgetProp(selectedWidget,'radius',+e.target.value)}><span class="pv">{sw.props.radius}px</span></div>
+      {/if}
+      <!-- Erweiterte Darstellung -->
+      <div class="rr" style="margin-top:6px;color:var(--text-muted);font-size:var(--fs-xs)"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent)"></i> Darstellung</div>
+      <div class="pr"><span>Invertiert</span><button class="tog" class:on={sw.props.invert} onclick={()=>updateWidgetProp(selectedWidget,'invert',!sw.props.invert)}></button></div>
+      <div class="pr"><span>Rahmen</span><button class="tog" class:on={sw.props.border} onclick={()=>updateWidgetProp(selectedWidget,'border',!sw.props.border)}></button></div>
+      {#if !wt?.isShape}
+        <div class="pr"><span>Ausr.</span>
+          <div class="align-btns">
+            <button class="align-btn" class:active={!sw.props.align||sw.props.align==='left'} onclick={()=>updateWidgetProp(selectedWidget,'align','left')} title="Links"><i class="fa-solid fa-align-left"></i></button>
+            <button class="align-btn" class:active={sw.props.align==='center'} onclick={()=>updateWidgetProp(selectedWidget,'align','center')} title="Mitte"><i class="fa-solid fa-align-center"></i></button>
+            <button class="align-btn" class:active={sw.props.align==='right'} onclick={()=>updateWidgetProp(selectedWidget,'align','right')} title="Rechts"><i class="fa-solid fa-align-right"></i></button>
+          </div>
+        </div>
+        {#if sw.props.align && sw.props.align !== 'left'}
+          <div class="pr"><span>Box-B.</span><input type="range" min="0" max="128" value={sw.props.boxW||0} oninput={(e)=>updateWidgetProp(selectedWidget,'boxW',+e.target.value)}><span class="pv">{sw.props.boxW||0}</span></div>
+        {/if}
+      {/if}
+      <div class="prop-actions">
+        <button class="ab" style="flex:1;height:28px" onclick={()=>{const src=placedWidgets[selectedWidget];placedWidgets=[...placedWidgets,{...JSON.parse(JSON.stringify(src)),id:Date.now(),x:src.x+4,y:src.y+4}];selectedWidget=placedWidgets.length-1;renderWidgets();}} title="Duplizieren"><i class="fa-solid fa-copy"></i></button>
+        <button class="ab del" style="flex:1;height:28px" onclick={()=>removeWidget(selectedWidget)} title="Entfernen"><i class="fa-solid fa-trash-can"></i></button>
+      </div>
+    {:else}
+      <div class="rr"><span>Cursor</span><span class="mono">{cursorX>=0?`${cursorX}, ${cursorY}`:'—'}</span></div>
+      <div class="rr"><span>Widgets</span><span class="mono">{placedWidgets.length}</span></div>
+      <div class="rr" style="color:var(--text-muted);font-size:var(--fs-xs)">Klicke ein Widget auf dem Canvas zum Bearbeiten</div>
+    {/if}
+  {:else if id==='layers'}
+    <div class="ll">{#each [...layers].reverse() as layer, ri}{@const idx=layers.length-1-ri}<div class="li" class:active={layer.id===activeLayer} class:drag-over={ldOver===idx} draggable="true" onclick={()=>activeLayer=layer.id} ondragstart={(e)=>ldStart(e,idx)} ondragover={(e)=>ldDragOver(e,idx)} ondrop={(e)=>ldDrop(e,idx)} ondragend={ldEnd}><span class="lh"><i class="fa-solid fa-grip-vertical"></i></span><button class="lv" onclick={(e)=>{e.stopPropagation();toggleVis(layer.id);render();}}><i class="fa-solid {layer.visible?'fa-eye':'fa-eye-slash'}"></i></button><span class="ln" contenteditable="false" ondblclick={(e)=>{e.target.contentEditable='true';e.target.focus();}} onblur={(e)=>{e.target.contentEditable='false';layers=layers.map(l=>l.id===layer.id?{...l,name:e.target.textContent}:l);}} onkeydown={(e)=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}}}>{layer.name}</span></div>{/each}</div>
+    <div class="la"><button class="lab" onclick={()=>addLayer()}><i class="fa-solid fa-plus"></i></button><button class="lab" onclick={()=>dupLayer(activeLayer)}><i class="fa-solid fa-copy"></i></button><button class="lab" onclick={()=>rmLayer(activeLayer)}><i class="fa-solid fa-trash"></i></button></div>
+  {:else if id==='weather'}
+    <div class="rr"><span>Aktueller Ort</span><span class="mono">{weatherLocation?.name || '—'}</span></div>
+    {#if weather}
+      <div class="rr"><span>Temperatur</span><span class="mono">{weather.temperature_2m}°C</span></div>
+      <div class="rr"><span>Feuchtigkeit</span><span class="mono">{weather.relative_humidity_2m}%</span></div>
+      <div class="rr"><span>Wind</span><span class="mono">{weather.wind_speed_10m} km/h</span></div>
+    {/if}
+    <div class="loc-search">
+      <input type="text" class="ti" placeholder="Ort suchen..." value={locationSearch} oninput={onLocationInput}>
+      {#if locationResults.length > 0}
+        <div class="loc-results">
+          {#each locationResults as loc}
+            <button class="loc-item" onclick={() => selectLocation(loc)}>
+              <span class="loc-name">{loc.name}</span>
+              <span class="loc-detail">{loc.admin || ''}{loc.country ? ', '+loc.country : ''}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {:else if id==='widgets'}
+    {#each ['zeit','cpu','ram','disk','net','sys','wetter','layout'] as cat}
+      {@const items = widgetList.filter(w => w.cat === cat)}
+      {#if items.length > 0}
+        {@const catName = {zeit:'Zeit',cpu:'CPU',ram:'RAM',disk:'Festplatten',net:'Netzwerk',sys:'System',wetter:'Wetter',layout:'Layout'}[cat] || cat}
+        <div class="wc-cat">{catName}</div>
+        <div class="wc-grid">
+          {#each items as w}
+            <button class="wc-btn" onclick={() => placeWidget(w)} title="{w.label} ({w.w}×{w.h})">
+              <span class="wc-name">{w.label}</span>
+              <span class="wc-size">{w.w}×{w.h}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    {/each}
+  {/if}
+{/snippet}
+
 <div class="studio">
-  <!-- ═══ LINKE SEITE: Canvas + Vorschau ═══ -->
-  <div class="left-col">
-    <div class="left-header">
-      <span class="studio-title">OLED Studio</span>
-      <div class="mode-switch">
-        <button class:active={editorMode==='widget'} onclick={()=>editorMode='widget'}>Widget</button>
-        <button class:active={editorMode==='raster'} onclick={()=>editorMode='raster'}>Raster</button>
-      </div>
+    <div class="side-panel" ondragover={(e)=>sDragOver(e,'left')} ondragleave={sDragLeave} ondrop={(e)=>sDrop(e,'left')} class:drop-target={pdropSide==='left'}>
+      <div class="studio-header"><i class="fa-solid fa-display"></i> OLED Studio</div>
+      {#each lpanels as pid (pid)}
+        <PanelWrapper id={pid} icon="fa-{_pd[pid]?.icon||'circle'}" label={panelLabel(pid)} collapsible={panelCollapsible(pid)} onDragStart={pDragStart}>
+          {@render panelContent(pid)}
+        </PanelWrapper>
+      {/each}
     </div>
-
-    <!-- Profil-Leiste -->
-    <div class="profile-bar">
-      <div class="pb-chips">
-        {#each profiles as p}
-          <button class="pb-chip" class:active={activeProfile===p.name} onclick={()=>loadProfile(p)}>{p.name}<span class="pb-del" onclick={(e)=>{e.stopPropagation();deleteProfile(p.name);}}>&times;</span></button>
-        {/each}
+    <div class="canvas-area">
+      <!-- Modus-Umschalter + Profil-Leiste -->
+      <div class="editor-bar">
+        <div class="mode-switch">
+          <button class:active={editorMode==='widget'} onclick={()=>editorMode='widget'}>Widget</button>
+          <button class:active={editorMode==='raster'} onclick={()=>editorMode='raster'}>Raster</button>
+        </div>
+        <div class="pb-chips">
+          {#each profiles as p}
+            <button class="pb-chip" class:active={activeProfile===p.name} onclick={()=>loadProfile(p)}>{p.name}<span class="pb-del" onclick={(e)=>{e.stopPropagation();deleteProfile(p.name);}}>&times;</span></button>
+          {/each}
+        </div>
+        {#if showProfileSave}<input class="pb-input" type="text" placeholder="Name..." bind:value={profileSaveName} onkeydown={(e)=>{if(e.key==='Enter'&&profileSaveName){saveProfile(profileSaveName);showProfileSave=false;profileSaveName='';}if(e.key==='Escape')showProfileSave=false;}} />{/if}
+        <button class="pb-btn" onclick={()=>{if(showProfileSave&&profileSaveName){saveProfile(profileSaveName);showProfileSave=false;profileSaveName='';}else{showProfileSave=!showProfileSave;profileSaveName=activeProfile||'';}}} title="Profil speichern"><i class="fa-solid fa-floppy-disk"></i></button>
       </div>
-      {#if showProfileSave}<input class="pb-input" type="text" placeholder="Name..." bind:value={profileSaveName} onkeydown={(e)=>{if(e.key==='Enter'&&profileSaveName){saveProfile(profileSaveName);showProfileSave=false;profileSaveName='';}if(e.key==='Escape')showProfileSave=false;}} />{/if}
-      <button class="pb-btn" onclick={()=>{if(showProfileSave&&profileSaveName){saveProfile(profileSaveName);showProfileSave=false;profileSaveName='';}else{showProfileSave=!showProfileSave;profileSaveName=activeProfile||'';}}} title="Profil speichern"><i class="fa-solid fa-floppy-disk"></i></button>
-    </div>
 
-    <!-- Canvas -->
-    <div class="canvas-wrap">
-      <div class="canvas-scroll">
-        <canvas bind:this={canvasEl} width={W*zoom} height={H*zoom} onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} oncontextmenu={onContext} ondrop={onCanvasDrop} ondragover={onCanvasDragOver} style="width:{W*zoom}px;height:{H*zoom}px"></canvas>
-      </div>
+      {#if editorMode === 'widget'}
+        <!-- ═══ WIDGET-EDITOR: Golden Ratio Split ═══ -->
+        <div class="widget-editor">
+          <div class="we-canvas">
+            <div class="canvas-scroll"><canvas bind:this={canvasEl} width={W*zoom} height={H*zoom} onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} oncontextmenu={onContext} style="width:{W*zoom}px;height:{H*zoom}px"></canvas></div>
+          </div>
+          <div class="we-browser">
+            <div class="tab-bar">
+              {#each TABS as tab}
+                <button class="tab-btn" class:active={activeTab===tab.id} onclick={()=>{activeTab=tab.id;configSource=null;}}>{tab.label}</button>
+              {/each}
+            </div>
+            <div class="tab-content">
+              {#each getSourcesForTab(activeTab) as src}
+                {@const val = src.getValue ? src.getValue(s.stats, weather, {}) : '—'}
+                <button class="data-row" class:active={configSource?.id===src.id} onclick={()=>selectSource(src)}>
+                  <span class="dk">{src.label}</span>
+                  <span class="dv">{val}{src.unit ? ' '+src.unit : ''}</span>
+                </button>
+              {/each}
+              {#if activeTab === 'wetter'}
+                <div class="we-loc">
+                  <input type="text" class="ti" placeholder="Ort suchen..." value={locationSearch} oninput={onLocationInput}>
+                  {#if locationResults.length > 0}
+                    <div class="loc-results">{#each locationResults as loc}<button class="loc-item" onclick={()=>selectLocation(loc)}>{loc.name}{loc.country ? ', '+loc.country : ''}</button>{/each}</div>
+                  {/if}
+                </div>
+              {/if}
+              {#if configSource}
+                <div class="conf-box">
+                  <div class="conf-title">{configSource.label} — Darstellung</div>
+                  <div class="mode-grid">
+                    {#each getModesForType(configSource.type) as mode}
+                      <button class="mode-btn" class:active={configDisplay===mode.id} onclick={()=>configDisplay=mode.id}>{mode.label}</button>
+                    {/each}
+                  </div>
+                  <button class="add-btn" onclick={addConfiguredWidget}><i class="fa-solid fa-plus"></i> Zum Canvas</button>
+                </div>
+              {/if}
+            </div>
+          </div>
+        </div>
+      {:else}
+        <!-- ═══ RASTER-EDITOR: Voller Canvas ═══ -->
+        <div class="canvas-scroll"><canvas bind:this={canvasEl} width={W*zoom} height={H*zoom} onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} oncontextmenu={onContext} style="width:{W*zoom}px;height:{H*zoom}px"></canvas></div>
+      {/if}
       {#if ctxMenu}
         <div class="ctx-menu" style="left:{ctxMenu.x}px;top:{ctxMenu.y}px">
           <button class="ctx-item" onclick={()=>ctxAction('dup')}><i class="fa-solid fa-copy"></i> Duplizieren</button>
@@ -379,162 +1052,65 @@
           <button class="ctx-item ctx-del" onclick={()=>ctxAction('del')}><i class="fa-solid fa-trash-can"></i> Loeschen</button>
         </div>
       {/if}
-    </div>
-
-    <!-- Vorschau + Aktionen -->
-    <div class="left-bottom">
-      <div class="pv-bezel"><canvas bind:this={previewEl} width={W} height={H} class="pv-canvas"></canvas></div>
-      <div class="left-actions">
-        <button class="act-btn primary" onclick={sendToOled}><i class="fa-solid fa-paper-plane"></i> Senden</button>
-        <button class="act-btn" onclick={loadFromOled}><i class="fa-solid fa-download"></i> Laden</button>
-        <button class="act-btn" onclick={exportScreens}><i class="fa-solid fa-file-export"></i></button>
-        <button class="act-btn" onclick={importScreens}><i class="fa-solid fa-file-import"></i></button>
-      </div>
-    </div>
-
-    <!-- Screen-Galerie -->
-    <div class="screen-gallery">
-      <div class="sg-strip">
-        {#each screens as sc, i}
-          <div class="sg-item" class:active={sc.id===activeScreen} draggable="true" onclick={()=>switchScreen(sc.id)} ondragstart={(e)=>scDragStart(e,i)} ondragover={(e)=>scDragOverFn(e,i)} ondrop={(e)=>scDrop(e,i)} ondragend={scDragEnd}>
-            <div class="sg-thumb">{#if sc.thumbnail}<img src={sc.thumbnail} alt="" />{/if}</div>
-            <span class="sg-name" contenteditable="false" ondblclick={(e)=>{e.stopPropagation();e.target.contentEditable='true';e.target.focus();}} onblur={(e)=>{e.target.contentEditable='false';const idx=screens.findIndex(s2=>s2.id===sc.id);if(idx>=0){screens[idx].name=e.target.textContent;screens=[...screens];}}} onkeydown={(e)=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}}}>{sc.name}</span>
-            {#if screens.length > 1}<button class="sg-del" onclick={(e)=>{e.stopPropagation();removeScreen(sc.id);}}><i class="fa-solid fa-xmark"></i></button>{/if}
-          </div>
-        {/each}
-        <button class="sg-add" onclick={addScreen}>+</button>
-      </div>
-      <div class="sg-ctrl-row">
-        <span>Rotation</span><button class="tog sm" class:on={rotation} onclick={()=>rotation=!rotation}></button>
-        {#if rotation}<input type="range" min="3" max="60" value={rotationInterval} oninput={(e)=>rotationInterval=+e.target.value}><span class="mono">{rotationInterval}s</span>{/if}
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ RECHTE SEITE: Tab-Browser ═══ -->
-  <div class="right-col">
-    {#if editorMode === 'widget'}
-      <!-- Tab-Leiste -->
-      <div class="tab-bar">
-        {#each TABS as tab}
-          <button class="tab-btn" class:active={activeTab===tab.id} onclick={()=>{activeTab=tab.id;configSource=null;}}>{tab.label}</button>
-        {/each}
-      </div>
-
-      <div class="tab-content">
-        <!-- Live Key:Value Tabelle -->
-        <div class="data-table">
-          {#each getSourcesForTab(activeTab) as src}
-            {@const val = src.getValue ? src.getValue(s.stats, weather, {}) : '—'}
-            <button class="data-row" class:active={configSource?.id===src.id} onclick={()=>selectSource(src)}>
-              <span class="dk">{src.label}</span>
-              <span class="dv">{val}{src.unit ? ' '+src.unit : ''}</span>
-            </button>
-          {/each}
-
-          <!-- Wetter-Ortssuche im Wetter-Tab -->
-          {#if activeTab === 'wetter'}
-            <div class="wetter-loc">
-              <div class="data-row static"><span class="dk">Ort</span><span class="dv">{weatherLocation?.name || '—'}</span></div>
-              <input type="text" class="loc-input" placeholder="Ort suchen..." value={locationSearch} oninput={onLocationInput}>
-              {#if locationResults.length > 0}
-                <div class="loc-results">{#each locationResults as loc}<button class="loc-item" onclick={()=>selectLocation(loc)}>{loc.name}{loc.country ? ', '+loc.country : ''}</button>{/each}</div>
+      <!-- Screen-Galerie unten -->
+      <div class="screen-gallery">
+        <div class="sg-strip">
+          {#each screens as sc, i}
+            <div class="sg-item" class:active={sc.id===activeScreen} class:drag-over={scDragOver===i}
+              draggable="true" onclick={()=>switchScreen(sc.id)}
+              ondragstart={(e)=>scDragStart(e,i)} ondragover={(e)=>scDragOverFn(e,i)}
+              ondrop={(e)=>scDrop(e,i)} ondragend={scDragEnd}>
+              <div class="sg-thumb">
+                {#if sc.thumbnail}<img src={sc.thumbnail} alt={sc.name} />{:else}<div class="sg-empty"></div>{/if}
+              </div>
+              <span class="sg-name" contenteditable="false"
+                ondblclick={(e)=>{e.stopPropagation();e.target.contentEditable='true';e.target.focus();}}
+                onblur={(e)=>{e.target.contentEditable='false';const idx=screens.findIndex(s2=>s2.id===sc.id);if(idx>=0){screens[idx].name=e.target.textContent;screens=[...screens];}}}
+                onkeydown={(e)=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}}}>{sc.name}</span>
+              {#if screens.length > 1}
+                <button class="sg-del" onclick={(e)=>{e.stopPropagation();removeScreen(sc.id);}}><i class="fa-solid fa-xmark"></i></button>
               {/if}
             </div>
-          {/if}
-
-          <!-- Disk-Index Auswahl im Disk-Tab -->
-          {#if activeTab === 'disk' && s.stats?.disks?.length > 1}
-            <div class="disk-sel">
-              {#each s.stats.disks as d, i}
-                <button class="disk-btn" class:active={configSource?.opts?.diskIdx===i} onclick={()=>{/* diskIdx wird im Konfigurator gesetzt */}}>{d.label || d.mount}</button>
-              {/each}
-            </div>
+          {/each}
+          <button class="sg-add" onclick={addScreen}><i class="fa-solid fa-plus"></i></button>
+          <button class="sg-dup" onclick={duplicateScreen} title="Aktiven Screen duplizieren"><i class="fa-solid fa-copy"></i></button>
+        </div>
+        <div class="sg-controls">
+          <div class="sg-ctrl"><span>Rotation</span><button class="tog" class:on={rotation} onclick={()=>rotation=!rotation}></button></div>
+          {#if rotation}
+            <div class="sg-ctrl"><span>Intervall</span><input type="range" min="3" max="60" value={rotationInterval} oninput={(e)=>rotationInterval=+e.target.value}><span class="pv">{rotationInterval}s</span></div>
           {/if}
         </div>
-
-        <!-- Konfigurator (wenn Quelle gewaehlt) -->
-        {#if configSource}
-          <div class="configurator">
-            <div class="conf-title">{configSource.label}</div>
-
-            <!-- Display-Modus waehlen -->
-            <div class="conf-section">Darstellung</div>
-            <div class="mode-grid">
-              {#each getModesForType(configSource.type) as mode}
-                <button class="mode-btn" class:active={configDisplay===mode.id} onclick={()=>configDisplay=mode.id}>{mode.label}</button>
-              {/each}
-            </div>
-
-            <button class="add-widget-btn" onclick={addConfiguredWidget}><i class="fa-solid fa-plus"></i> Zum Canvas</button>
-          </div>
-        {/if}
-
-        <!-- Selektiertes Widget bearbeiten -->
-        {#if selectedWidget >= 0 && placedWidgets[selectedWidget]}
-          {@const sw = placedWidgets[selectedWidget]}
-          <div class="widget-props">
-            <div class="conf-section">Selektiert: {sw.name || sw.source}</div>
-            <div class="pr"><span>X</span><input type="range" min="0" max={W-1} value={sw.x} oninput={(e)=>{sw.x=+e.target.value;placedWidgets=[...placedWidgets];renderAll();}}><span class="pv">{sw.x}</span></div>
-            <div class="pr"><span>Y</span><input type="range" min="0" max={H-1} value={sw.y} oninput={(e)=>{sw.y=+e.target.value;placedWidgets=[...placedWidgets];renderAll();}}><span class="pv">{sw.y}</span></div>
-            {#if sw.opts.scaleX !== undefined}
-              <div class="pr"><span>Breite</span><input type="range" min="1" max="8" value={sw.opts.scaleX} oninput={(e)=>updateWidgetOpt(selectedWidget,'scaleX',+e.target.value)}><span class="pv">{sw.opts.scaleX}x</span></div>
-              <div class="pr"><span>Hoehe</span><input type="range" min="1" max="8" value={sw.opts.scaleY??sw.opts.scaleX} oninput={(e)=>updateWidgetOpt(selectedWidget,'scaleY',+e.target.value)}><span class="pv">{sw.opts.scaleY??sw.opts.scaleX}x</span></div>
-            {/if}
-            {#if sw.opts.prefix !== undefined}<div class="pr"><span>Praefix</span><input type="text" class="ti" value={sw.opts.prefix} oninput={(e)=>updateWidgetOpt(selectedWidget,'prefix',e.target.value)}></div>{/if}
-            {#if sw.opts.suffix !== undefined}<div class="pr"><span>Suffix</span><input type="text" class="ti" value={sw.opts.suffix} oninput={(e)=>updateWidgetOpt(selectedWidget,'suffix',e.target.value)}></div>{/if}
-            {#if sw.opts.text !== undefined}<div class="pr"><span>Text</span><input type="text" class="ti" value={sw.opts.text} oninput={(e)=>updateWidgetOpt(selectedWidget,'text',e.target.value)}></div>{/if}
-            {#if sw.opts.width !== undefined}<div class="pr"><span>Breite</span><input type="range" min="4" max="128" value={sw.opts.width} oninput={(e)=>updateWidgetOpt(selectedWidget,'width',+e.target.value)}><span class="pv">{sw.opts.width}</span></div>{/if}
-            {#if sw.opts.height !== undefined}<div class="pr"><span>Hoehe</span><input type="range" min="2" max="64" value={sw.opts.height} oninput={(e)=>updateWidgetOpt(selectedWidget,'height',+e.target.value)}><span class="pv">{sw.opts.height}</span></div>{/if}
-            {#if sw.opts.radius !== undefined}<div class="pr"><span>Radius</span><input type="range" min="6" max="30" value={sw.opts.radius} oninput={(e)=>updateWidgetOpt(selectedWidget,'radius',+e.target.value)}><span class="pv">{sw.opts.radius}</span></div>{/if}
-            {#if sw.opts.diskIdx !== undefined}<div class="pr"><span>Disk</span><input type="range" min="0" max={Math.max(0,(s.stats?.disks?.length||1)-1)} value={sw.opts.diskIdx} oninput={(e)=>updateWidgetOpt(selectedWidget,'diskIdx',+e.target.value)}><span class="pv">{s.stats?.disks?.[sw.opts.diskIdx]?.mount||'?'}</span></div>{/if}
-            <div class="pr"><span>Invertiert</span><button class="tog sm" class:on={sw.opts.invert} onclick={()=>updateWidgetOpt(selectedWidget,'invert',!sw.opts.invert)}></button></div>
-            <div class="pr"><span>Rahmen</span><button class="tog sm" class:on={sw.opts.border} onclick={()=>updateWidgetOpt(selectedWidget,'border',!sw.opts.border)}></button></div>
-            <div class="prop-actions">
-              <button class="act-btn" onclick={()=>{const src=placedWidgets[selectedWidget];placedWidgets=[...placedWidgets,{...JSON.parse(JSON.stringify(src)),id:Date.now(),x:src.x+4,y:src.y+4}];selectedWidget=placedWidgets.length-1;selectedWidgets=new Set([selectedWidget]);renderAll();}}><i class="fa-solid fa-copy"></i></button>
-              <button class="act-btn del" onclick={()=>removeWidget(selectedWidget)}><i class="fa-solid fa-trash-can"></i></button>
-            </div>
-          </div>
-        {/if}
       </div>
-
-    {:else}
-      <!-- ═══ RASTER-EDITOR ═══ -->
-      <div class="raster-tools">
-        <div class="conf-section">Werkzeuge</div>
-        <div class="tool-grid">{#each drawTools as t}<button class="tool-btn" class:active={tool===t.id} onclick={()=>tool=t.id} title="{t.label} ({t.key})"><i class="fa-solid {t.icon}"></i></button>{/each}</div>
-        {#if tool==='pencil'||tool==='eraser'}<div class="pr"><span>Groesse</span><input type="range" min="1" max="8" value={penSize} oninput={(e)=>penSize=+e.target.value}><span class="pv">{penSize}</span></div>{/if}
-        {#if tool==='rect'||tool==='circle'||tool==='ellipse'}<div class="pr"><span>Gefuellt</span><button class="tog sm" class:on={filled} onclick={()=>filled=!filled}></button></div>{/if}
-        {#if tool==='text'}<div class="pr"><span>Text</span><input type="text" class="ti" bind:value={textInput} maxlength="20"></div><div class="pr"><span>Groesse</span><input type="range" min="1" max="3" value={textScale} oninput={(e)=>textScale=+e.target.value}><span class="pv">{textScale}x</span></div>{/if}
-        <div class="ag"><button class="ab" onclick={undo}><i class="fa-solid fa-rotate-left"></i></button><button class="ab" onclick={redo}><i class="fa-solid fa-rotate-right"></i></button><button class="ab" onclick={clearLayer}><i class="fa-solid fa-trash-can"></i></button><button class="ab" onclick={invertLayer}><i class="fa-solid fa-circle-half-stroke"></i></button></div>
-
-        <div class="conf-section">Anzeige</div>
-        <div class="pr"><span>Zoom</span><input type="range" min="2" max="16" value={zoom} oninput={(e)=>zoom=+e.target.value}><span class="pv">{zoom}x</span></div>
-        <div class="pr"><span>Raster</span><button class="tog sm" class:on={showGrid} onclick={()=>showGrid=!showGrid}></button></div>
-        <div class="pr"><span>Snap</span><select class="ti" onchange={(e)=>snapGrid=+e.target.value}><option value="0">Aus</option><option value="4">4px</option><option value="8">8px</option><option value="16">16px</option></select></div>
-
-        <div class="conf-section">Ebenen</div>
-        <div class="layer-list">{#each [...layers].reverse() as layer}{@const idx=layers.indexOf(layer)}<div class="layer-item" class:active={layer.id===activeLayer} onclick={()=>activeLayer=layer.id}><button class="lv" onclick={(e)=>{e.stopPropagation();toggleVis(layer.id);render();}}><i class="fa-solid {layer.visible?'fa-eye':'fa-eye-slash'}"></i></button><span>{layer.name}</span></div>{/each}</div>
-        <div class="ag"><button class="ab" onclick={()=>addLayer()}>+</button><button class="ab" onclick={()=>dupLayer(activeLayer)}><i class="fa-solid fa-copy"></i></button><button class="ab" onclick={()=>rmLayer(activeLayer)}><i class="fa-solid fa-trash"></i></button></div>
-
-        <div class="rr"><span>Cursor</span><span class="mono">{cursorX>=0?`${cursorX}, ${cursorY}`:'—'}</span></div>
-      </div>
-    {/if}
-  </div>
+    </div>
+    <div class="side-panel" ondragover={(e)=>sDragOver(e,'right')} ondragleave={sDragLeave} ondrop={(e)=>sDrop(e,'right')} class:drop-target={pdropSide==='right'}>
+      {#each rpanels as pid (pid)}
+        <PanelWrapper id={pid} icon="fa-{_pd[pid]?.icon||'circle'}" label={panelLabel(pid)} collapsible={panelCollapsible(pid)} onDragStart={pDragStart}>
+          {@render panelContent(pid)}
+        </PanelWrapper>
+      {/each}
+    </div>
 </div>
+
 
 <style>
   .studio { display: flex; height: 100%; overflow: hidden; }
+  .studio-header { font: 700 var(--fs-xl) var(--font); color: var(--text-primary); padding: 10px 10px 6px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .studio-header i { color: var(--accent); }
 
-  /* ═══ LINKE SPALTE (golden ratio ~38%) ═══ */
-  .left-col { width: 38.2%; flex-shrink: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: #1a1a22; overflow: hidden; }
-  .left-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bg-base); flex-shrink: 0; }
-  .studio-title { font: 700 var(--fs-lg) var(--font); color: var(--text-primary); }
-  .mode-switch { display: flex; gap: 2px; background: var(--bg-surface); border-radius: var(--radius-sm); padding: 2px; }
-  .mode-switch button { padding: 4px 12px; border: none; background: none; color: var(--text-muted); font: 500 var(--fs-xs) var(--font); cursor: pointer; border-radius: var(--radius-sm); }
+  .side-panel { width: 300px; flex-shrink: 0; background: var(--bg-base); padding: 4px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+  .side-panel:first-child { border-right: 1px solid var(--border); }
+  .side-panel:last-child { border-left: 1px solid var(--border); }
+  .drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; background: rgba(0,180,255,0.04); }
+
+  .canvas-area { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #1a1a22; }
+  .canvas-scroll { flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: flex-start; padding: 20px; }
+
+  /* Editor-Bar (Modus + Profile) */
+  .editor-bar { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-bottom: 1px solid var(--border); background: var(--bg-base); flex-shrink: 0; }
+  .mode-switch { display: flex; gap: 1px; background: var(--bg-surface); border-radius: var(--radius-sm); padding: 2px; flex-shrink: 0; }
+  .mode-switch button { padding: 4px 12px; border: none; background: none; color: var(--text-muted); font: 600 var(--fs-xs) var(--font); cursor: pointer; border-radius: var(--radius-sm); }
   .mode-switch button.active { background: var(--accent); color: #fff; }
-
-  .profile-bar { display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--bg-base); flex-shrink: 0; min-height: 28px; }
   .pb-chips { display: flex; gap: 3px; overflow-x: auto; flex: 1; }
   .pb-chip { display: flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 9px var(--font); cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .pb-chip:hover { border-color: var(--accent); color: var(--accent); }
@@ -545,110 +1121,143 @@
   .pb-btn { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .pb-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-  .canvas-wrap { flex: 1; overflow: hidden; position: relative; }
-  .canvas-scroll { width: 100%; height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: flex-start; padding: 12px; }
-  .canvas-scroll canvas { image-rendering: pixelated; touch-action: none; cursor: crosshair; box-shadow: 0 0 0 1px var(--border); flex-shrink: 0; }
-
-  .left-bottom { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-top: 1px solid var(--border); background: var(--bg-base); flex-shrink: 0; }
-  .pv-bezel { background: #000; padding: 2px; border-radius: 3px; border: 1px solid #444; flex-shrink: 0; }
-  .pv-canvas { display: block; width: 128px; height: 64px; image-rendering: pixelated; }
-  .left-actions { display: flex; gap: 3px; flex-wrap: wrap; }
-  .act-btn { padding: 5px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 var(--fs-xs) var(--font); cursor: pointer; display: flex; align-items: center; gap: 4px; }
-  .act-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .act-btn.primary { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
-  .act-btn.primary:hover { background: var(--accent); color: #fff; }
-  .act-btn.del { border-color: var(--red); color: var(--red); }
-
-  .screen-gallery { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--bg-base); padding: 6px 8px; }
-  .sg-strip { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 4px; }
-  .sg-item { flex-shrink: 0; cursor: pointer; border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 2px; position: relative; }
-  .sg-item.active { border-color: var(--accent); }
-  .sg-thumb { width: 96px; height: 48px; background: #000; border-radius: 2px; overflow: hidden; }
-  .sg-thumb img { width: 96px; height: 48px; image-rendering: pixelated; display: block; }
-  .sg-name { display: block; font: 500 8px var(--font); color: var(--text-muted); text-align: center; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sg-del { position: absolute; top: -4px; right: -4px; width: 14px; height: 14px; border-radius: 50%; border: none; background: var(--bg-elevated); color: var(--red); cursor: pointer; font-size: 8px; display: none; align-items: center; justify-content: center; }
-  .sg-item:hover .sg-del { display: flex; }
-  .sg-add { width: 48px; height: 48px; flex-shrink: 0; border-radius: var(--radius-sm); border: 2px dashed var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-base); }
-  .sg-add:hover { border-color: var(--accent); color: var(--accent); }
-  .sg-ctrl-row { display: flex; align-items: center; gap: 8px; font: 500 var(--fs-xs) var(--font); color: var(--text-muted); }
-  .sg-ctrl-row input { width: 70px; }
-
-  /* ═══ RECHTE SPALTE (~61.8%) ═══ */
-  .right-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-base); }
-
+  /* Widget-Editor (Golden Ratio) */
+  .widget-editor { flex: 1; display: flex; overflow: hidden; }
+  .we-canvas { width: 38.2%; flex-shrink: 0; overflow: auto; display: flex; align-items: flex-start; justify-content: flex-start; padding: 12px; }
+  .we-browser { flex: 1; display: flex; flex-direction: column; border-left: 1px solid var(--border); background: var(--bg-base); overflow: hidden; }
   .tab-bar { display: flex; gap: 1px; border-bottom: 2px solid var(--border); flex-shrink: 0; overflow-x: auto; background: var(--bg-surface); }
-  .tab-btn { padding: 8px 14px; border: none; background: none; color: var(--text-muted); font: 600 var(--fs-xs) var(--font); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.04em; }
+  .tab-btn { padding: 7px 10px; border: none; background: none; color: var(--text-muted); font: 600 9px var(--font); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.04em; }
   .tab-btn:hover { color: var(--text-primary); }
   .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
-
-  .tab-content { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
-
-  .data-table { display: flex; flex-direction: column; gap: 2px; }
-  .data-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; border-radius: var(--radius-sm); border: 1px solid transparent; background: var(--bg-surface); cursor: pointer; text-align: left; width: 100%; }
+  .tab-content { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+  .data-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid transparent; background: var(--bg-surface); cursor: pointer; text-align: left; width: 100%; }
   .data-row:hover { border-color: var(--accent); background: rgba(0,180,255,0.04); }
   .data-row.active { border-color: var(--accent); background: var(--accent-dim); }
-  .data-row.static { cursor: default; }
   .dk { font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); }
   .dv { font: 600 var(--fs-sm) var(--mono); color: var(--text-primary); }
-
-  .wetter-loc { margin-top: 4px; }
-  .loc-input { width: 100%; padding: 6px 10px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-primary); border-radius: var(--radius-sm); font: 500 var(--fs-sm) var(--font); margin-top: 4px; box-sizing: border-box; }
-  .loc-results { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
-  .loc-item { padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); cursor: pointer; text-align: left; font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); width: 100%; }
-  .loc-item:hover { border-color: var(--accent); color: var(--accent); }
-
-  .configurator { padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-surface); }
-  .conf-title { font: 600 var(--fs-base) var(--font); color: var(--text-primary); margin-bottom: 6px; }
-  .conf-section { font: 600 var(--fs-xs) var(--font); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 8px 0 4px; }
+  .we-loc { margin-top: 4px; }
+  .conf-box { padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-surface); margin-top: 6px; }
+  .conf-title { font: 600 var(--fs-sm) var(--font); color: var(--text-primary); margin-bottom: 6px; }
   .mode-grid { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 8px; }
-  .mode-btn { padding: 5px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 var(--fs-xs) var(--font); cursor: pointer; }
+  .mode-btn { padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 var(--fs-xs) var(--font); cursor: pointer; }
   .mode-btn:hover { border-color: var(--accent); color: var(--accent); }
   .mode-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
-  .add-widget-btn { width: 100%; padding: 8px; border-radius: var(--radius-sm); border: 1px solid var(--accent); background: var(--accent-dim); color: var(--accent); font: 600 var(--fs-sm) var(--font); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
-  .add-widget-btn:hover { background: var(--accent); color: #fff; }
+  .add-btn { width: 100%; padding: 7px; border-radius: var(--radius-sm); border: 1px solid var(--accent); background: var(--accent-dim); color: var(--accent); font: 600 var(--fs-sm) var(--font); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .add-btn:hover { background: var(--accent); color: #fff; }
+  .canvas-scroll canvas { image-rendering: pixelated; touch-action: none; cursor: crosshair; box-shadow: 0 0 0 1px var(--border), 0 4px 20px rgba(0,0,0,0.4); flex-shrink: 0; }
 
-  .widget-props { padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-surface); }
-  .prop-actions { display: flex; gap: 4px; margin-top: 6px; }
-
-  /* Raster-Editor rechte Seite */
-  .raster-tools { padding: 10px; overflow-y: auto; }
+  /* Tool Grid */
   .tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-bottom: 6px; }
-  .tool-btn { height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; font-size: var(--fs-xs); display: flex; align-items: center; justify-content: center; }
-  .tool-btn:hover { color: var(--text-primary); }
+  .tool-btn { height: 34px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; font-size: var(--fs-xs); display: flex; align-items: center; justify-content: center; transition: all 120ms; }
+  .tool-btn:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
   .tool-btn.active { color: var(--accent); background: rgba(0,180,255,0.1); border-color: var(--accent); }
-  .ag { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; margin: 6px 0; }
-  .ab { height: 28px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); cursor: pointer; font-size: var(--fs-xs); display: flex; align-items: center; justify-content: center; }
+  .ag { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; }
+  .ab { height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); cursor: pointer; font-size: var(--fs-xs); display: flex; align-items: center; justify-content: center; }
   .ab:hover { border-color: var(--accent); color: var(--accent); }
-  .layer-list { display: flex; flex-direction: column; gap: 2px; }
-  .layer-item { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: var(--radius-sm); cursor: pointer; font: 500 var(--fs-sm) var(--font); color: var(--text-muted); background: var(--bg-surface); border: 1px solid transparent; }
-  .layer-item.active { border-color: var(--accent); color: var(--accent); }
-  .lv { background: none; border: none; color: inherit; cursor: pointer; font-size: var(--fs-sm); padding: 2px; }
 
-  /* Shared */
-  .pr { display: flex; align-items: center; gap: 6px; font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); margin: 2px 0; }
-  .pr span:first-child { width: 50px; flex-shrink: 0; font-size: var(--fs-xs); }
+  /* Property Rows */
+  .pr { display: flex; align-items: center; gap: 8px; font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); }
+  .pr span:first-child { width: 55px; flex-shrink: 0; }
   .pr input[type=range] { flex: 1; }
-  .pv { font: 600 var(--fs-xs) var(--mono); color: var(--text-primary); min-width: 28px; text-align: right; }
-  .rr { display: flex; justify-content: space-between; font: 500 var(--fs-xs) var(--font); color: var(--text-muted); padding: 2px 0; }
-  .mono { font-family: var(--mono); color: var(--text-secondary); }
-  .ti { flex: 1; min-width: 0; padding: 4px 8px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-primary); border-radius: var(--radius-sm); font: 500 var(--fs-sm) var(--mono); box-sizing: border-box; }
+  .pv { font: 600 var(--fs-sm) var(--mono); color: var(--text-primary); min-width: 32px; text-align: right; }
+  .ti { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-primary); border-radius: var(--radius-sm); font: 500 var(--fs-sm) var(--mono); box-sizing: border-box; }
   .tog { width: 34px; height: 18px; border-radius: 9px; border: none; background: rgba(255,255,255,0.1); cursor: pointer; position: relative; transition: background 150ms; }
-  .tog.sm { width: 28px; height: 14px; border-radius: 7px; }
   .tog.on { background: var(--green); }
   .tog::after { content:''; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:#fff; transition:transform 150ms; }
-  .tog.sm::after { width:10px; height:10px; }
   .tog.on::after { transform: translateX(16px); }
-  .tog.sm.on::after { transform: translateX(14px); }
 
-  .ctx-menu { position: fixed; z-index: 100; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 4px; min-width: 150px; }
-  .ctx-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 10px; border: none; background: none; border-radius: var(--radius-sm); color: var(--text-secondary); font: 500 var(--fs-sm) var(--font); cursor: pointer; text-align: left; }
+  /* Preview */
+  .pv-box { display: flex; justify-content: center; }
+  .pv-bezel { background: #000; padding: 3px; border-radius: 4px; border: 2px solid #444; }
+  .pv-canvas { display: block; width: 128px; height: 64px; image-rendering: pixelated; }
+  .send-btn { width: 100%; padding: 8px; border-radius: var(--radius-sm); border: 1px solid var(--accent); background: var(--accent-dim); color: var(--accent); font: 500 var(--fs-sm) var(--font); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .send-btn:hover { background: var(--accent); color: #fff; }
+  .send-btn.sec { margin-top: 4px; border-color: var(--green); color: var(--green); background: rgba(0,232,138,0.06); }
+  .send-btn.sec:hover { background: var(--green); color: #000; }
+  .send-btn.half { flex: 1; }
+  .btn-row { display: flex; gap: 4px; margin-top: 4px; }
+
+  /* Alignment Buttons */
+  .align-btns { display: flex; gap: 2px; }
+  .align-btn { width: 28px; height: 24px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+  .align-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .align-btn.active { background: rgba(0,180,255,0.1); border-color: var(--accent); color: var(--accent); }
+
+  /* Prop Actions */
+  .prop-actions { display: flex; gap: 4px; margin-top: 6px; }
+  .ab.del { border-color: var(--red); color: var(--red); }
+  .ab.del:hover { background: var(--red); color: #fff; }
+
+  /* Properties */
+  .rr { display: flex; justify-content: space-between; font: 500 var(--fs-sm) var(--font); color: var(--text-muted); padding: 3px 0; }
+  .mono { font-family: var(--mono); color: var(--text-secondary); }
+
+  /* Layers */
+  .ll { display: flex; flex-direction: column; gap: 2px; }
+  .li { display: flex; align-items: center; gap: 4px; padding: 5px 6px; border-radius: var(--radius-sm); cursor: pointer; font: 500 var(--fs-sm) var(--font); color: var(--text-muted); background: var(--bg-surface); border: 1px solid transparent; transition: all 120ms; }
+  .li:hover { background: var(--bg-elevated); }
+  .li.active { border-color: var(--accent); color: var(--accent); background: rgba(0,180,255,0.06); }
+  .li.drag-over { border-color: var(--green); border-style: dashed; }
+  .lh { color: var(--text-muted); cursor: grab; font-size: var(--fs-xs); padding: 0 2px; }
+  .lv { background: none; border: none; color: inherit; cursor: pointer; font-size: var(--fs-sm); padding: 2px; }
+  .ln { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .la { display: flex; gap: 3px; margin-top: 6px; }
+  .lab { flex: 1; padding: 5px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); cursor: pointer; font-size: var(--fs-sm); text-align: center; }
+  .lab:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Ortssuche */
+  .loc-search { margin-top: 4px; }
+  .loc-results { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; max-height: 150px; overflow-y: auto; }
+  .loc-item { display: flex; flex-direction: column; padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); cursor: pointer; text-align: left; font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); transition: all 120ms; }
+  .loc-item:hover { border-color: var(--accent); color: var(--accent); }
+  .loc-name { font-weight: 600; }
+  .loc-detail { font: 500 var(--fs-xs) var(--font); color: var(--text-muted); }
+
+  /* Widgets */
+  .wc-cat { font: 600 var(--fs-xs) var(--font); text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+  .wc-cat i { color: var(--accent); }
+  .wc-grid { display: flex; flex-direction: column; gap: 2px; }
+  .wc-btn { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); font: 500 var(--fs-sm) var(--font); cursor: pointer; transition: all 120ms; text-align: left; width: 100%; }
+  .wc-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .wc-btn:active { background: var(--accent); color: #fff; }
+  .wc-size { font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); }
+
+  /* Screen-Galerie */
+  .screen-gallery { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--bg-base); padding: 8px; }
+  .sg-strip { display: flex; gap: 8px; overflow-x: auto; align-items: flex-end; margin-bottom: 6px; }
+  .sg-item { flex-shrink: 0; cursor: pointer; border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 3px; position: relative; transition: border-color 150ms; }
+  .sg-item.active { border-color: var(--accent); }
+  .sg-item.drag-over { border-color: var(--green); border-style: dashed; }
+  .sg-item:hover { border-color: var(--text-muted); }
+  .sg-thumb { width: 128px; height: 64px; background: #000; border-radius: 2px; overflow: hidden; }
+  .sg-thumb img { width: 128px; height: 64px; image-rendering: pixelated; display: block; }
+  .sg-empty { width: 100%; height: 100%; }
+  .sg-name { display: block; font: 500 var(--fs-xs) var(--font); color: var(--text-muted); text-align: center; margin-top: 2px; max-width: 128px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sg-del { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; border: none; background: var(--bg-elevated); color: var(--red); cursor: pointer; font-size: 8px; display: none; align-items: center; justify-content: center; }
+  .sg-item:hover .sg-del { display: flex; }
+  .sg-add, .sg-dup { width: 128px; height: 64px; flex-shrink: 0; border-radius: var(--radius-sm); border: 2px dashed var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-base); display: flex; align-items: center; justify-content: center; }
+  .sg-add:hover, .sg-dup:hover { border-color: var(--accent); color: var(--accent); }
+  .sg-controls { display: flex; gap: 12px; align-items: center; }
+  .sg-ctrl { display: flex; align-items: center; gap: 6px; font: 500 var(--fs-xs) var(--font); color: var(--text-muted); }
+  .sg-ctrl input { width: 80px; }
+
+  /* Kontextmenue */
+  .ctx-menu {
+    position: fixed; z-index: 100;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    padding: 4px; min-width: 160px;
+  }
+  .ctx-item {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 7px 12px; border: none; background: none; border-radius: var(--radius-sm);
+    color: var(--text-secondary); font: 500 var(--fs-sm) var(--font);
+    cursor: pointer; text-align: left;
+  }
   .ctx-item:hover { background: rgba(0,180,255,0.1); color: var(--accent); }
+  .ctx-item i { width: 16px; text-align: center; font-size: var(--fs-xs); }
   .ctx-del:hover { background: rgba(255,60,60,0.1); color: var(--red); }
   .ctx-sep { height: 1px; background: var(--border); margin: 3px 8px; }
 
-  @media (max-width: 900px) {
-    .studio { flex-direction: column; }
-    .left-col { width: 100%; height: 50%; }
-    .right-col { height: 50%; }
-  }
+  @media (max-width: 900px) { .side-panel { width: 200px; } }
 </style>
