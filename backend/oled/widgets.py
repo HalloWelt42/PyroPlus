@@ -3,6 +3,8 @@ PyroPlus — OLED Widget-Rendering (v2 — dynamisches Datenkatalog-System)
 Rendert Widget-Instanzen: source + display + opts → Pixel-Buffer.
 """
 
+import re
+import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -49,7 +51,6 @@ def _resolve_value(source: str, stats: dict, weather: dict | None, opts: dict) -
     w = weather or {}
     now = datetime.now(TZ)
     # Dynamische Disk-ID: "disk.used.2" → base "disk.used", diskIdx 2
-    import re
     dm = re.match(r'^(disk\.\w+)\.(\d+)$', source)
     if dm:
         source = dm.group(1)
@@ -153,7 +154,6 @@ def _resolve_value(source: str, stats: dict, weather: dict | None, opts: dict) -
 
 def _resolve_percent(source: str, stats: dict, weather: dict | None, opts: dict) -> float:
     """Prozentwert (0-100) einer Datenquelle."""
-    import re
     dm = re.match(r'^(disk\.\w+)\.(\d+)$', source)
     if dm:
         source = dm.group(1)
@@ -218,23 +218,32 @@ def render_widget(buf: bytearray, widget: dict, stats: dict,
     full_text = (opts.get("prefix", "") or "") + val + (opts.get("suffix", "") or "")
     has_ex = invert or border or (align and align != "left")
 
-    import time
+    # ═══ DISPLAY-RENDERING (Prefix-Matching für alle Varianten) ═══
 
-    if display in ("zahl", "zahl_gross", "zahl_xl", "text"):
-        if display == "zahl_gross":
-            sx, sy = max(sx, 2), max(sy, 2)
-        elif display == "zahl_xl":
-            sx, sy = max(sx, 3), max(sy, 3)
+    # Text/Zahl (zahl, zahl_gross, zahl_xl, zahl_xxl, zahl_breit, zahl_hoch, text, text_gross, text_xl)
+    if display.startswith("zahl") or display.startswith("text") and not display.startswith("text_inv") and not display.startswith("text_rahmen"):
         if has_ex:
             draw_text_ex(buf, full_text, x, y, sx, sy,
                          invert=invert, border=border, align=align, box_w=box_w)
         else:
             draw_text(buf, full_text, x, y, sx, sy)
 
-    elif display == "balken":
+    # Invertiert (text_invertiert, text_inv_gross, text_inv_xl)
+    elif display.startswith("text_inv"):
+        draw_text_ex(buf, full_text, x, y, sx, sy,
+                     invert=True, border=False, align=align, box_w=box_w)
+
+    # Rahmen (text_rahmen, text_rahmen_gross)
+    elif display.startswith("text_rahmen"):
+        draw_text_ex(buf, full_text, x, y, sx, sy,
+                     invert=False, border=True, align=align, box_w=box_w)
+
+    # Balken (balken, balken_schmal, balken_breit, balken_hoch, balken_voll)
+    elif display.startswith("balken") and "label" not in display:
         pct = _resolve_percent(source, stats, weather, opts)
         draw_bar(buf, x, y, opts.get("width", 60), opts.get("height", 6), pct)
 
+    # Balken + Label (balken_label)
     elif display == "balken_label":
         pct = _resolve_percent(source, stats, weather, opts)
         bw = opts.get("width", 50)
@@ -243,27 +252,41 @@ def render_widget(buf: bytearray, widget: dict, stats: dict,
         label = full_text or f"{round(pct)}%"
         draw_text(buf, label, x + bw + 2, y, sx, sy)
 
-    elif display == "gauge":
+    # Balken Label innen (balken_label_in)
+    elif display == "balken_label_in":
+        pct = _resolve_percent(source, stats, weather, opts)
+        bw = opts.get("width", 60)
+        bh = opts.get("height", 8)
+        draw_bar(buf, x, y, bw, bh, pct)
+        label = full_text or f"{round(pct)}%"
+        lw = len(label) * 6
+        draw_text(buf, label, x + (bw - lw) // 2, y + 1, 1, 1)
+
+    # Gauge (gauge, gauge_gross, gauge_xl)
+    elif display.startswith("gauge"):
         pct = _resolve_percent(source, stats, weather, opts)
         draw_gauge(buf, pct, x, y, opts.get("radius", 12))
 
-    elif display == "sparkline":
+    # Sparkline (sparkline, sparkline_gross, sparkline_breit, sparkline_voll)
+    elif display.startswith("sparkline"):
         hist_key = HISTORY_KEYS.get(source, "")
         data = _history.get(hist_key, [])
         draw_sparkline(buf, data, x, y, opts.get("width", 60), opts.get("height", 20))
 
+    # Laufschrift
     elif display == "laufschrift":
         text = opts.get("text", val or "Laufschrift")
         offset = int(time.time() * 30) % (len(text) * 6 * sx + W)
         draw_marquee(buf, text, y, offset, sx)
 
+    # Layout-Elemente
     elif display == "linie_h":
         draw_hline(buf, x, y, opts.get("width", 60))
 
     elif display == "linie_v":
         draw_vline(buf, x, y, opts.get("height", 20))
 
-    elif display == "rahmen":
+    elif display in ("rahmen", "rahmen_shape"):
         draw_rect(buf, x, y, x + opts.get("width", 40) - 1,
                   y + opts.get("height", 20) - 1, filled=False)
 
@@ -275,7 +298,7 @@ def render_widget(buf: bytearray, widget: dict, stats: dict,
         draw_section_header(buf, opts.get("text", "Label"), x, y, opts.get("width", 60))
 
     # Lüftersymbol (animiert)
-    elif display in ("fan_icon", "fan_icon_gross", "fan_icon_xl", "fan_icon_rpm"):
+    elif display.startswith("fan_icon"):
         sz = opts.get("size", 16 if "gross" in display else 24 if "xl" in display else 8)
         rpm = 0
         try:

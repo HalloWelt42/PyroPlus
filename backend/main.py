@@ -270,10 +270,9 @@ def oled_get_state():
     return oled.get_state()
 
 @app.get("/api/oled/widget-catalog", tags=["OLED Display"],
-         summary="Verfügbare Widget-Typen für den visuellen Editor")
+         summary="Verfügbare Datenquellen und Display-Modi")
 def oled_widget_catalog():
-    from oled.engine import OLEDEngine
-    return OLEDEngine.WIDGET_CATALOG
+    return {"info": "Widget-Katalog wird im Frontend verwaltet (catalog.js)"}
 
 @app.post("/api/oled/display-raw", tags=["OLED Display"],
           summary="Bild direkt an OLED senden (Base64 PNG)")

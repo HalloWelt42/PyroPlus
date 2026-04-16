@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import PanelWrapper from './oled/PanelWrapper.svelte';
   import * as E from './oled/engine.js';
-  import { TABS, getSource, getModesForType, getSourcesForTab, defaultOpts, createWidget, HISTORY_KEYS } from './oled/catalog.js';
+  import { TABS, getModesForType, getSourcesForTab, defaultOpts, createWidget } from './oled/catalog.js';
   import { renderWidget as renderWidgetNew, getWidgetSize } from './oled/widgetRenderer.js';
   let { state: s } = $props();
   const W = E.W, H = E.H;
@@ -222,21 +222,6 @@
     _searchTimer = setTimeout(() => searchLocation(locationSearch), 300);
   }
 
-  function weatherCodeToText(code) {
-    if (code == null) return '—';
-    if (code === 0) return 'Klar';
-    if (code <= 3) return 'Bewölkt';
-    if (code <= 49) return 'Nebel';
-    if (code <= 59) return 'Nieselregen';
-    if (code <= 69) return 'Regen';
-    if (code <= 79) return 'Schnee';
-    if (code <= 84) return 'Schauer';
-    if (code <= 94) return 'Schneesch.';
-    return 'Gewitter';
-  }
-
-  /* Zahl rechtsbündig mit führenden Leerzeichen */
-  function pad(n, len=3) { const s = String(n); return s.length >= len ? s : ' '.repeat(len - s.length) + s; }
   /* Tausenderpunkt: 24214 → 24.214 */
   function tsd(n) { return Math.round(n).toLocaleString('de-DE'); }
 
@@ -364,13 +349,7 @@
     renderWidgets();
   }
 
-  function moveWidget(idx, dx, dy) {
-    const w = placedWidgets[idx];
-    w.x = Math.max(0, Math.min(W - 1, w.x + dx));
-    w.y = Math.max(0, Math.min(H - 1, w.y + dy));
-    placedWidgets = [...placedWidgets];
-    renderWidgets();
-  }
+
 
   /* Getter fuer Widget-Optionen (opts bei neuen, props bei alten Widgets) */
   function wp(w) { return w.opts || w.props || {}; }
@@ -624,9 +603,10 @@
       _hist.cpu.push(s.stats?.cpu?.percent || 0);
       _hist.temp.push(s.stats?.cpu?.temp || 0);
       _hist.ram.push(s.stats?.ram?.percent || 0);
-      if (_hist.cpu.length > HIST_LEN) _hist.cpu.shift();
-      if (_hist.temp.length > HIST_LEN) _hist.temp.shift();
-      if (_hist.ram.length > HIST_LEN) _hist.ram.shift();
+      _hist.fan_speed.push(s.stats?.fan?.rpm || 0);
+      _hist.net_rx.push(s.stats?.network?.rx_bytes_sec || 0);
+      _hist.net_tx.push(s.stats?.network?.tx_bytes_sec || 0);
+      for (const k of Object.keys(_hist)) if (_hist[k].length > HIST_LEN) _hist[k].shift();
       renderConfigPreview();
     }, 1000);
   }
@@ -1239,7 +1219,7 @@
     <div class="ll">{#each [...layers].reverse() as layer, ri}{@const idx=layers.length-1-ri}<div class="li" class:active={layer.id===activeLayer} class:drag-over={ldOver===idx} draggable="true" onclick={()=>activeLayer=layer.id} ondragstart={(e)=>ldStart(e,idx)} ondragover={(e)=>ldDragOver(e,idx)} ondrop={(e)=>ldDrop(e,idx)} ondragend={ldEnd}><span class="lh"><i class="fa-solid fa-grip-vertical"></i></span><button class="lv" onclick={(e)=>{e.stopPropagation();toggleVis(layer.id);render();}}><i class="fa-solid {layer.visible?'fa-eye':'fa-eye-slash'}"></i></button><span class="ln" contenteditable="false" ondblclick={(e)=>{e.target.contentEditable='true';e.target.focus();}} onblur={(e)=>{e.target.contentEditable='false';layers=layers.map(l=>l.id===layer.id?{...l,name:e.target.textContent}:l);}} onkeydown={(e)=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}}}>{layer.name}</span></div>{/each}</div>
     <div class="la"><button class="lab" onclick={()=>addLayer()}><i class="fa-solid fa-plus"></i></button><button class="lab" onclick={()=>dupLayer(activeLayer)}><i class="fa-solid fa-copy"></i></button><button class="lab" onclick={()=>rmLayer(activeLayer)}><i class="fa-solid fa-trash"></i></button></div>
   {:else if id==='weather'}
-    <div class="rr"><span>Aktueller Ort</span><span class="mono">{weatherLocation?.name || '—'}</span></div>
+    <div class="rr"><span>Aktueller Ort</span><span class="mono">{weatherCities[activeCity]?.name || '—'}</span></div>
     {#if weather}
       <div class="rr"><span>Temperatur</span><span class="mono">{weather.temperature_2m}°C</span></div>
       <div class="rr"><span>Feuchtigkeit</span><span class="mono">{weather.relative_humidity_2m}%</span></div>

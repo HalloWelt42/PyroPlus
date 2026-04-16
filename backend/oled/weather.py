@@ -4,7 +4,6 @@ Daten von Open-Meteo API holen + Wetter-Screens rendern.
 """
 
 import logging
-import math
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
