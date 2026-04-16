@@ -378,6 +378,7 @@
     if (_hist.temp.length > HIST_LEN) _hist.temp.shift();
     if (_hist.ram.length > HIST_LEN) _hist.ram.shift();
     if (placedWidgets.length > 0) renderWidgets();
+    renderAllPreviews();
   }, 1000); }
   function stopWidgetTimer() { clearInterval(_widgetTimer); }
 
@@ -961,7 +962,86 @@
   let showProfileSave = $state(false);
   let profileSaveName = $state('');
 
-  onMount(()=>{loadState();pushH();renderWidgets();startWidgetTimer();fetchWeather();setInterval(fetchWeather,300000);});
+  /* ═══ WIDGET-VORSCHAU-LEISTE ═══ */
+  const PREV_W = 48, PREV_H = 24;
+  let previewCanvases = $state({}); // id -> canvas element
+  const catOrder = ['zeit','cpu','ram','disk','net','sys','wetter','deko'];
+  const catMeta = {zeit:['fa-clock','Zeit'],cpu:['fa-microchip','CPU'],ram:['fa-memory','RAM'],disk:['fa-hard-drive','Disk'],net:['fa-network-wired','Netz'],sys:['fa-server','Sys'],wetter:['fa-cloud-sun','Wetter'],deko:['fa-pen','Deko']};
+
+  function renderWidgetPreview(canvas, wId) {
+    if (!canvas) return;
+    const wt = widgetTypes[wId];
+    if (!wt) return;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, PREV_W, PREV_H);
+    // Mini-Buffer rendern
+    const buf = new Uint8Array(W * H);
+    const fakeProps = { ...wt.props, invert: false, border: false, align: 'left' };
+    if (wt.isShape) {
+      wt.draw(buf, 2, 2, fakeProps);
+    } else {
+      const text = wt.getText(fakeProps);
+      const sx = fakeProps.scaleX ?? fakeProps.scale ?? 1;
+      const sy = fakeProps.scaleY ?? fakeProps.scale ?? 1;
+      E.drawText(buf, text, 2, 2, sx, sy);
+    }
+    // Buffer skaliert auf Preview-Canvas zeichnen
+    ctx.fillStyle = '#fff';
+    const scaleX = PREV_W / W, scaleY = PREV_H / H;
+    // Direkt die relevanten Pixel zeichnen (nur oberer linker Bereich)
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        if (buf[y * W + x]) {
+          ctx.fillRect(Math.floor(x * scaleX), Math.floor(y * scaleY),
+                       Math.max(1, Math.ceil(scaleX)), Math.max(1, Math.ceil(scaleY)));
+        }
+      }
+    }
+  }
+
+  function renderAllPreviews() {
+    for (const [id, canvas] of Object.entries(previewCanvases)) {
+      renderWidgetPreview(canvas, id);
+    }
+  }
+
+  function onPreviewDragStart(e, wId) {
+    e.dataTransfer.setData('application/x-widget-id', wId);
+    e.dataTransfer.effectAllowed = 'copy';
+  }
+
+  function onCanvasDrop(e) {
+    const wId = e.dataTransfer.getData('application/x-widget-id');
+    if (!wId || !widgetTypes[wId]) return;
+    e.preventDefault();
+    const rect = canvasEl.getBoundingClientRect();
+    const x = Math.max(0, Math.min(W-1, Math.floor((e.clientX - rect.left) / zoom)));
+    const y = Math.max(0, Math.min(H-1, Math.floor((e.clientY - rect.top) / zoom)));
+    const wt = widgetTypes[wId];
+    placedWidgets = [...placedWidgets, {
+      id: Date.now(),
+      type: wId,
+      x: snapGrid > 0 ? snapPos(x) : x,
+      y: snapGrid > 0 ? snapPos(y) : y,
+      props: { ...wt.props, invert: false, border: false, align: 'left' },
+    }];
+    selectedWidget = placedWidgets.length - 1;
+    selectedWidgets = new Set([selectedWidget]);
+    tool = 'move';
+    renderWidgets();
+    s.toast(`${wt.label} eingefügt`, 'ok');
+  }
+
+  function onCanvasDragOver(e) {
+    if (e.dataTransfer.types.includes('application/x-widget-id')) e.preventDefault();
+  }
+
+  onMount(()=>{loadState();pushH();renderWidgets();startWidgetTimer();fetchWeather();setInterval(fetchWeather,300000);
+    // Previews nach kurzer Verzögerung rendern (Canvas muss gemountet sein)
+    setTimeout(renderAllPreviews, 200);
+  });
   onDestroy(()=>{stopWidgetTimer();saveState();});
   $effect(()=>{zoom;showGrid;render();autoSave();});
 </script>
@@ -1135,7 +1215,24 @@
         {/if}
         <button class="pb-save" onclick={()=>{if(showProfileSave&&profileSaveName){saveProfile(profileSaveName);showProfileSave=false;profileSaveName='';}else{showProfileSave=!showProfileSave;profileSaveName=activeProfile||'';}}} title="Aktuelles Layout als Profil speichern"><i class="fa-solid fa-floppy-disk"></i></button>
       </div>
-      <div class="canvas-scroll"><canvas bind:this={canvasEl} width={W*zoom} height={H*zoom} onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} oncontextmenu={onContext} style="width:{W*zoom}px;height:{H*zoom}px"></canvas></div>
+      <!-- Widget-Vorschau-Leiste -->
+      <div class="widget-strip">
+        {#each catOrder as cat}
+          {@const items = widgetList.filter(w => w.cat === cat)}
+          {#if items.length > 0}
+            <div class="ws-group">
+              <span class="ws-cat" title={catMeta[cat]?.[1]||cat}><i class="fa-solid {catMeta[cat]?.[0]||'fa-circle'}"></i></span>
+              {#each items as w}
+                <div class="ws-item" draggable="true" ondragstart={(e)=>onPreviewDragStart(e,w.id)} onclick={()=>placeWidget(w)} title="{w.label} ({w.w}×{w.h}) — Klick oder Drag">
+                  <canvas bind:this={previewCanvases[w.id]} width={PREV_W} height={PREV_H} class="ws-canvas"></canvas>
+                  <span class="ws-label">{w.label}</span>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        {/each}
+      </div>
+      <div class="canvas-scroll"><canvas bind:this={canvasEl} width={W*zoom} height={H*zoom} onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} oncontextmenu={onContext} ondrop={onCanvasDrop} ondragover={onCanvasDragOver} style="width:{W*zoom}px;height:{H*zoom}px"></canvas></div>
       {#if ctxMenu}
         <div class="ctx-menu" style="left:{ctxMenu.x}px;top:{ctxMenu.y}px">
           <button class="ctx-item" onclick={()=>ctxAction('dup')}><i class="fa-solid fa-copy"></i> Duplizieren</button>
@@ -1199,6 +1296,46 @@
   .canvas-area { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #1a1a22; }
   .canvas-scroll { flex: 1; overflow: scroll; display: flex; align-items: flex-start; justify-content: flex-start; padding: 20px; }
   .canvas-scroll canvas { image-rendering: pixelated; touch-action: none; cursor: crosshair; box-shadow: 0 0 0 1px var(--border), 0 4px 20px rgba(0,0,0,0.4); flex-shrink: 0; }
+
+  /* Widget-Vorschau-Leiste */
+  .widget-strip {
+    display: flex; gap: 2px; overflow-x: auto; overflow-y: hidden;
+    padding: 6px 8px; border-bottom: 1px solid var(--border);
+    background: var(--bg-base); flex-shrink: 0; min-height: 62px;
+    scrollbar-width: thin;
+  }
+  .ws-group {
+    display: flex; align-items: center; gap: 3px;
+    padding-right: 6px; border-right: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .ws-group:last-child { border-right: none; padding-right: 0; }
+  .ws-cat {
+    writing-mode: vertical-lr; text-orientation: mixed;
+    font-size: 10px; color: var(--accent); padding: 0 2px;
+    flex-shrink: 0; display: flex; align-items: center;
+  }
+  .ws-item {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    cursor: grab; flex-shrink: 0; padding: 2px;
+    border-radius: var(--radius-sm); border: 1px solid transparent;
+    transition: border-color 120ms;
+  }
+  .ws-item:hover { border-color: var(--accent); }
+  .ws-item:active { cursor: grabbing; }
+  .ws-canvas {
+    width: 48px; height: 24px;
+    image-rendering: pixelated;
+    border-radius: 2px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: #000;
+    pointer-events: none;
+  }
+  .ws-label {
+    font: 500 9px var(--font); color: var(--text-muted);
+    max-width: 52px; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; text-align: center;
+  }
 
   /* Tool Grid */
   .tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-bottom: 6px; }
