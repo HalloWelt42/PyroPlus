@@ -126,12 +126,11 @@ class OLEDEngine:
     # ═══ SYSTEM WIDGETS ═══
     def _render_system(self, buf: bytearray, screen: dict, stats: dict):
         """Alle Widgets eines System-Screens rendern."""
+        # Weather-Daten mit Location anreichern
+        w = dict(self.weather.data or {})
+        w["location"] = self.weather.location
         for widget in screen.get("widgets", []):
-            render_widget(
-                buf, widget, stats,
-                weather=self.weather.data,
-                weather_location=self.weather.location,
-            )
+            render_widget(buf, widget, stats, weather=w)
 
     # ═══ CLOCK ═══
     def _render_clock(self, buf: bytearray):
