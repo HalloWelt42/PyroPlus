@@ -124,6 +124,18 @@ def _resolve_value(source: str, stats: dict, weather: dict | None, opts: dict) -
         "zeit.uptime_s":  lambda: str(uptime.get("seconds", 0)),
         "zeit.unix":      lambda: str(int(now.timestamp())),
         "zeit.iso":       lambda: now.strftime("%Y-%m-%dT%H:%M:%S"),
+        # Weltzeituhren
+        "zeit.utc":       lambda: datetime.now(ZoneInfo("UTC")).strftime("%H:%M"),
+        "zeit.new_york":  lambda: datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M"),
+        "zeit.london":    lambda: datetime.now(ZoneInfo("Europe/London")).strftime("%H:%M"),
+        "zeit.paris":     lambda: datetime.now(ZoneInfo("Europe/Paris")).strftime("%H:%M"),
+        "zeit.moskau":    lambda: datetime.now(ZoneInfo("Europe/Moscow")).strftime("%H:%M"),
+        "zeit.dubai":     lambda: datetime.now(ZoneInfo("Asia/Dubai")).strftime("%H:%M"),
+        "zeit.mumbai":    lambda: datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%H:%M"),
+        "zeit.shanghai":  lambda: datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%H:%M"),
+        "zeit.tokio":     lambda: datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%H:%M"),
+        "zeit.sydney":    lambda: datetime.now(ZoneInfo("Australia/Sydney")).strftime("%H:%M"),
+        "zeit.los_angeles": lambda: datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%H:%M"),
         # Wetter
         "wetter.temp":       lambda: f"{w.get('temperature', '--')}",
         "wetter.gefuehlt":   lambda: f"{w.get('apparent_temperature', w.get('feels_like', '--'))}",

@@ -1572,13 +1572,15 @@
   .dv { font: 600 var(--fs-sm) var(--mono); color: var(--text-primary); }
   .data-header { font: 600 9px var(--font); color: var(--accent); padding: 6px 10px 2px; text-transform: uppercase; letter-spacing: 0.04em; }
   .city-bar { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 4px; }
-  .city-chip { padding: 3px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 var(--fs-xs) var(--font); cursor: pointer; display: flex; align-items: center; gap: 3px; }
+  .city-chip { padding: 4px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 var(--fs-xs) var(--font); cursor: pointer; display: flex; align-items: center; gap: 4px; }
   .city-chip:hover { border-color: var(--accent); color: var(--accent); }
   .city-chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
-  .city-del { font-size: 10px; cursor: pointer; }
-  .city-del:hover { color: var(--red); }
+  .city-del { font-size: 12px; cursor: pointer; color: var(--text-muted); opacity: 0.5; margin-left: 2px; }
+  .city-del:hover { color: var(--red); opacity: 1; }
   .city-count { font: 500 9px var(--mono); color: var(--text-muted); align-self: center; }
   .city-actions { display: flex; gap: 3px; margin-bottom: 4px; }
+  .act-btn { padding: 5px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 var(--fs-xs) var(--font); cursor: pointer; display: flex; align-items: center; gap: 4px; }
+  .act-btn:hover { border-color: var(--accent); color: var(--accent); }
   .we-loc { margin-top: 4px; }
   .conf-box { padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-surface); margin-top: 6px; }
   .conf-title { font: 600 var(--fs-sm) var(--font); color: var(--text-primary); margin-bottom: 6px; }
