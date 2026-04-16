@@ -805,6 +805,37 @@
     }
     ctxMenu = null;
   }
+  /* ═══ WIDGET-MODUS: Nur Vorschau + Widget-Drag (kein Zeichnen) ═══ */
+  function _wm2p(e) { const r=canvasEl.getBoundingClientRect(); return [Math.max(0,Math.min(W-1,Math.floor((e.clientX-r.left)/widgetZoom))),Math.max(0,Math.min(H-1,Math.floor((e.clientY-r.top)/widgetZoom)))]; }
+
+  function onWidgetDown(e) {
+    if (!canvasEl) return; ctxMenu = null;
+    const [x,y] = _wm2p(e);
+    const hit = hitTestWidget(x, y);
+    if (hit >= 0) {
+      if (e.shiftKey) { const ns = new Set(selectedWidgets); if (ns.has(hit)) ns.delete(hit); else ns.add(hit); selectedWidgets = ns; selectedWidget = hit; render(); return; }
+      selectedWidget = hit;
+      if (!selectedWidgets.has(hit)) selectedWidgets = new Set([hit]);
+      const origins = new Map(); for (const idx of selectedWidgets) origins.set(idx, { x: placedWidgets[idx].x, y: placedWidgets[idx].y });
+      widgetDrag = { idx: hit, startX: x, startY: y, origX: placedWidgets[hit].x, origY: placedWidgets[hit].y, origins };
+      drawing = true; render();
+    } else {
+      selectedWidget = -1; selectedWidgets = new Set(); render();
+    }
+  }
+
+  function onWidgetMove(e) {
+    if (!canvasEl || !drawing || !widgetDrag) return;
+    const [x,y] = _wm2p(e);
+    const dx = x - widgetDrag.startX, dy = y - widgetDrag.startY;
+    if (widgetDrag.origins && widgetDrag.origins.size > 1) {
+      for (const [idx, orig] of widgetDrag.origins) { placedWidgets[idx].x = Math.max(0, Math.min(W-1, orig.x + dx)); placedWidgets[idx].y = Math.max(0, Math.min(H-1, orig.y + dy)); }
+    } else { placedWidgets[widgetDrag.idx].x = Math.max(0, Math.min(W-1, widgetDrag.origX + dx)); placedWidgets[widgetDrag.idx].y = Math.max(0, Math.min(H-1, widgetDrag.origY + dy)); }
+    placedWidgets = [...placedWidgets]; renderWidgets();
+  }
+
+  function onWidgetUp() { if (widgetDrag) { widgetDrag = null; drawing = false; } }
+
   function clearLayer(){pushH();ap()?.fill(0);render();}
   function invertLayer(){pushH();const px=ap();if(px)for(let i=0;i<px.length;i++)px[i]=px[i]?0:1;render();}
   async function sendToOled() {
@@ -1288,7 +1319,7 @@
         <!-- ═══ WIDGET-EDITOR: Golden Ratio Split ═══ -->
         <div class="widget-editor">
           <div class="we-canvas">
-            <div class="canvas-scroll"><canvas bind:this={canvasEl} width={W*widgetZoom} height={H*widgetZoom} onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} oncontextmenu={onContext} style="width:{W*widgetZoom}px;height:{H*widgetZoom}px"></canvas></div>
+            <div class="canvas-scroll"><canvas bind:this={canvasEl} width={W*widgetZoom} height={H*widgetZoom} onpointerdown={onWidgetDown} onpointermove={onWidgetMove} onpointerup={onWidgetUp} oncontextmenu={onContext} style="width:{W*widgetZoom}px;height:{H*widgetZoom}px;cursor:default"></canvas></div>
           </div>
           <div class="we-browser">
             <div class="tab-bar">
