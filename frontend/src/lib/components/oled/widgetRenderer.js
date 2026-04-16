@@ -30,23 +30,54 @@ export function renderWidget(px, widget, stats, weather, history) {
   const rawPct = src?.getRaw ? src.getRaw(stats, weather, opts) : parseFloat(val) || 0;
   const fullText = (opts.prefix ?? '') + val + (opts.suffix ?? '');
 
+  // Text-Rendering Hilfsfunktion
+  function _drawTxt(text, tx, ty, tsx, tsy) {
+    if (hasEx) {
+      E.drawTextEx(px, text, tx, ty, tsx, tsy, {
+        invert: !!opts.invert, border: !!opts.border,
+        align: opts.align || 'left', boxW: opts.boxW || 0,
+      });
+    } else {
+      E.drawText(px, text, tx, ty, tsx, tsy);
+    }
+  }
+
   switch (display) {
+    // ─── Zahlen/Text in verschiedenen Groessen ───
     case 'zahl':
     case 'zahl_gross':
     case 'zahl_xl':
-    case 'text': {
-      if (hasEx) {
-        E.drawTextEx(px, fullText, x, y, sx, sy, {
-          invert: !!opts.invert, border: !!opts.border,
-          align: opts.align || 'left', boxW: opts.boxW || 0,
-        });
-      } else {
-        E.drawText(px, fullText, x, y, sx, sy);
-      }
+    case 'zahl_xxl':
+    case 'zahl_breit':
+    case 'zahl_hoch':
+    case 'zahl_x3y1':
+    case 'zahl_x1y3':
+    case 'text':
+    case 'text_gross':
+    case 'text_xl': {
+      _drawTxt(fullText, x, y, sx, sy);
       break;
     }
 
-    case 'balken': {
+    // ─── Invertiert / Rahmen ───
+    case 'text_invertiert':
+    case 'text_inv_gross':
+    case 'text_inv_xl': {
+      E.drawTextEx(px, fullText, x, y, sx, sy, { invert: true, border: false, align: opts.align || 'left', boxW: opts.boxW || 0 });
+      break;
+    }
+    case 'text_rahmen':
+    case 'text_rahmen_gross': {
+      E.drawTextEx(px, fullText, x, y, sx, sy, { invert: false, border: true, align: opts.align || 'left', boxW: opts.boxW || 0 });
+      break;
+    }
+
+    // ─── Balken ───
+    case 'balken':
+    case 'balken_schmal':
+    case 'balken_breit':
+    case 'balken_hoch':
+    case 'balken_voll': {
       E.drawBar(px, x, y, opts.width || 60, opts.height || 6, rawPct);
       break;
     }
@@ -58,12 +89,28 @@ export function renderWidget(px, widget, stats, weather, history) {
       break;
     }
 
-    case 'gauge': {
+    case 'balken_label_in': {
+      const bw = opts.width || 60, bh = opts.height || 8;
+      E.drawBar(px, x, y, bw, bh, rawPct);
+      const label = fullText || `${Math.round(rawPct)}%`;
+      const lw = label.length * 6;
+      E.drawText(px, label, x + Math.floor((bw - lw) / 2), y + 1, 1, 1);
+      break;
+    }
+
+    // ─── Gauge ───
+    case 'gauge':
+    case 'gauge_gross':
+    case 'gauge_xl': {
       E.drawGauge(px, rawPct, x, y, opts.radius || 12);
       break;
     }
 
-    case 'sparkline': {
+    // ─── Sparkline ───
+    case 'sparkline':
+    case 'sparkline_gross':
+    case 'sparkline_breit':
+    case 'sparkline_voll': {
       const histKey = HISTORY_KEYS[source];
       const data = histKey && history ? (history[histKey] || []) : [];
       E.drawSparkline(px, data, x, y, opts.width || 60, opts.height || 20);
@@ -94,7 +141,7 @@ export function renderWidget(px, widget, stats, weather, history) {
       break;
     }
 
-    case 'rahmen': {
+    case 'rahmen_shape': {
       const rw = opts.width || 40, rh = opts.height || 20;
       E.drawRect(x, y, x + rw - 1, y + rh - 1, (px2, py) => {
         if (px2 >= 0 && px2 < W && py >= 0 && py < H) px[py * W + px2] = 1;
