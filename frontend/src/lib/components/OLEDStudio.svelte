@@ -303,8 +303,13 @@
     renderWidgets();
   }
 
+  /* Getter fuer Widget-Optionen (opts bei neuen, props bei alten Widgets) */
+  function wp(w) { return w.opts || w.props || {}; }
+
   function updateWidgetProp(idx, key, val) {
-    placedWidgets[idx].props[key] = val;
+    const w = placedWidgets[idx];
+    if (w.opts) w.opts[key] = val;
+    else if (w.props) w.props[key] = val;
     placedWidgets = [...placedWidgets];
     renderWidgets();
   }
@@ -365,11 +370,11 @@
         const wt = widgetTypes[w.type];
         if (!wt) continue;
         if (wt.isShape) {
-          wt.draw(px, w.x, w.y, w.props);
+          wt.draw(px, w.x, w.y, wp(w));
         } else {
-          const text = wt.getText(w.props);
-          const sx = w.props.scaleX ?? w.props.scale ?? 1;
-          const sy = w.props.scaleY ?? w.props.scale ?? 1;
+          const text = wt.getText(wp(w));
+          const sx = wp(w).scaleX ?? wp(w).scale ?? 1;
+          const sy = wp(w).scaleY ?? wp(w).scale ?? 1;
           E.drawText(px, text, w.x, w.y, sx, sy);
         }
       }
@@ -430,8 +435,9 @@
   function _oldWidgetSize(w) {
     const wt = widgetTypes[w.type];
     if (!wt) return { w: 30, h: 7 };
-    const ww = wt.isShape ? (w.props?.width || wt.w) : wt.w * (w.props?.scaleX ?? w.props?.scale ?? 1);
-    const wh = wt.isShape ? (w.props?.height || wt.h) : wt.h * (w.props?.scaleY ?? w.props?.scale ?? 1);
+    const p = wp(w);
+    const ww = wt.isShape ? (p.width || wt.w) : wt.w * (p.scaleX ?? p.scale ?? 1);
+    const wh = wt.isShape ? (p.height || wt.h) : wt.h * (p.scaleY ?? p.scale ?? 1);
     return { w: ww, h: wh };
   }
 
@@ -581,25 +587,12 @@
       const screenConfigs = screens.map(sc => ({
         type: 'system',
         name: sc.name,
-        widgets: (sc.widgets || []).map(w => ({
-          type: w.type,
-          x: w.x,
-          y: w.y,
-          scaleX: w.props?.scaleX ?? w.props?.scale ?? 1,
-          scaleY: w.props?.scaleY ?? w.props?.scale ?? 1,
-          prefix: w.props?.prefix,
-          text: w.props?.text,
-          w: w.props?.width,
-          h: w.props?.height,
-          scale: w.props?.scale,
-          radius: w.props?.radius,
-          diskIdx: w.props?.diskIdx,
-          invert: w.props?.invert || false,
-          border: w.props?.border || false,
-          align: w.props?.align || 'left',
-          boxW: w.props?.boxW || 0,
-          tsep: w.props?.tsep || false,
-        })),
+        widgets: (sc.widgets || []).map(w => {
+          if (w.source) return { source: w.source, display: w.display, x: w.x, y: w.y, name: w.name, opts: w.opts };
+          // Altes Format konvertieren
+          const p = w.props || {};
+          return { type: w.type, x: w.x, y: w.y, scaleX: p.scaleX ?? p.scale ?? 1, scaleY: p.scaleY ?? p.scale ?? 1, prefix: p.prefix, text: p.text, w: p.width, h: p.height, diskIdx: p.diskIdx, invert: p.invert||false, border: p.border||false, align: p.align||'left', boxW: p.boxW||0 };
+        }),
       }));
 
       // Bestehende Screens löschen und neue setzen
@@ -643,27 +636,10 @@
 
       // Backend-Screens in Editor-Format konvertieren
       const newScreens = backendScreens.map((bs, i) => {
-        const widgets = (bs.widgets || []).map(bw => ({
-          id: Date.now() + Math.random(),
-          type: bw.type,
-          x: bw.x || 0,
-          y: bw.y || 0,
-          props: {
-            ...(widgetTypes[bw.type]?.props || {}),
-            scaleX: bw.scaleX ?? bw.scale ?? (widgetTypes[bw.type]?.props?.scale ?? 1),
-            scaleY: bw.scaleY ?? bw.scale ?? (widgetTypes[bw.type]?.props?.scale ?? 1),
-            prefix: bw.prefix ?? widgetTypes[bw.type]?.props?.prefix,
-            text: bw.text ?? widgetTypes[bw.type]?.props?.text,
-            width: bw.w ?? widgetTypes[bw.type]?.props?.width,
-            height: bw.h ?? widgetTypes[bw.type]?.props?.height,
-            diskIdx: bw.diskIdx ?? widgetTypes[bw.type]?.props?.diskIdx,
-            invert: bw.invert || false,
-            border: bw.border || false,
-            align: bw.align || 'left',
-            boxW: bw.boxW || 0,
-            tsep: bw.tsep || false,
-          },
-        }));
+        const widgets = (bs.widgets || []).map(bw => {
+          if (bw.source) return { id: Date.now()+Math.random(), source: bw.source, display: bw.display, x: bw.x||0, y: bw.y||0, name: bw.name||'', opts: bw.opts||{} };
+          return { id: Date.now()+Math.random(), type: bw.type, x: bw.x||0, y: bw.y||0, props: { scale: 1, ...bw } };
+        });
         return {
           id: i,
           name: bs.name || `Screen ${i + 1}`,
@@ -901,50 +877,50 @@
   {:else if id==='props'}
     {#if selectedWidget >= 0 && placedWidgets[selectedWidget]}
       {@const sw = placedWidgets[selectedWidget]}
-      {@const wt = widgetTypes[sw.type]}
-      <div class="rr"><span>Widget</span><span class="mono">{wt?.label}</span></div>
+      {@const wt = sw.type ? widgetTypes[sw.type] : null}
+      <div class="rr"><span>Widget</span><span class="mono">{sw.name || wt?.label || sw.source || '?'}</span></div>
       <div class="rr"><span>Position</span><span class="mono">{sw.x}, {sw.y}</span></div>
       <div class="pr"><span>X</span><input type="range" min="0" max={W-1} value={sw.x} oninput={(e)=>{sw.x=+e.target.value;placedWidgets=[...placedWidgets];renderWidgets();}}><span class="pv">{sw.x}</span></div>
       <div class="pr"><span>Y</span><input type="range" min="0" max={H-1} value={sw.y} oninput={(e)=>{sw.y=+e.target.value;placedWidgets=[...placedWidgets];renderWidgets();}}><span class="pv">{sw.y}</span></div>
-      {#if sw.props.scale !== undefined}
-        <div class="pr"><span>Breite</span><input type="range" min="1" max="8" value={sw.props.scaleX||sw.props.scale} oninput={(e)=>updateWidgetProp(selectedWidget,'scaleX',+e.target.value)}><span class="pv">{sw.props.scaleX||sw.props.scale}×</span></div>
-        <div class="pr"><span>Höhe</span><input type="range" min="1" max="8" value={sw.props.scaleY||sw.props.scale} oninput={(e)=>updateWidgetProp(selectedWidget,'scaleY',+e.target.value)}><span class="pv">{sw.props.scaleY||sw.props.scale}×</span></div>
+      {#if wp(sw).scale !== undefined || wp(sw).scaleX !== undefined}
+        <div class="pr"><span>Breite</span><input type="range" min="1" max="8" value={wp(sw).scaleX??wp(sw).scale??1} oninput={(e)=>updateWidgetProp(selectedWidget,'scaleX',+e.target.value)}><span class="pv">{wp(sw).scaleX??wp(sw).scale??1}x</span></div>
+        <div class="pr"><span>Hoehe</span><input type="range" min="1" max="8" value={wp(sw).scaleY??wp(sw).scaleX??wp(sw).scale??1} oninput={(e)=>updateWidgetProp(selectedWidget,'scaleY',+e.target.value)}><span class="pv">{wp(sw).scaleY??wp(sw).scaleX??wp(sw).scale??1}x</span></div>
       {/if}
-      {#if sw.props.text !== undefined}
-        <div class="pr"><span>Text</span><input type="text" class="ti" value={sw.props.text} oninput={(e)=>updateWidgetProp(selectedWidget,'text',e.target.value)}></div>
+      {#if wp(sw).text !== undefined}
+        <div class="pr"><span>Text</span><input type="text" class="ti" value={wp(sw).text} oninput={(e)=>updateWidgetProp(selectedWidget,'text',e.target.value)}></div>
       {/if}
-      {#if sw.props.prefix !== undefined}
-        <div class="pr"><span>Präfix</span><input type="text" class="ti" value={sw.props.prefix} oninput={(e)=>updateWidgetProp(selectedWidget,'prefix',e.target.value)}></div>
+      {#if wp(sw).prefix !== undefined}
+        <div class="pr"><span>Präfix</span><input type="text" class="ti" value={wp(sw).prefix} oninput={(e)=>updateWidgetProp(selectedWidget,'prefix',e.target.value)}></div>
       {/if}
-      {#if sw.props.tsep !== undefined}
-        <div class="pr"><span>1.000er</span><button class="tog" class:on={sw.props.tsep} onclick={()=>updateWidgetProp(selectedWidget,'tsep',!sw.props.tsep)}></button></div>
+      {#if wp(sw).tsep !== undefined}
+        <div class="pr"><span>1.000er</span><button class="tog" class:on={wp(sw).tsep} onclick={()=>updateWidgetProp(selectedWidget,'tsep',!wp(sw).tsep)}></button></div>
       {/if}
-      {#if sw.props.diskIdx !== undefined}
-        <div class="pr"><span>Disk</span><input type="range" min="0" max={Math.max(0,(s.stats?.disks?.length||1)-1)} value={sw.props.diskIdx} oninput={(e)=>updateWidgetProp(selectedWidget,'diskIdx',+e.target.value)}><span class="pv">{s.stats?.disks?.[sw.props.diskIdx]?.mount||'?'}</span></div>
+      {#if wp(sw).diskIdx !== undefined}
+        <div class="pr"><span>Disk</span><input type="range" min="0" max={Math.max(0,(s.stats?.disks?.length||1)-1)} value={wp(sw).diskIdx} oninput={(e)=>updateWidgetProp(selectedWidget,'diskIdx',+e.target.value)}><span class="pv">{s.stats?.disks?.[wp(sw).diskIdx]?.mount||'?'}</span></div>
       {/if}
-      {#if sw.props.width !== undefined}
-        <div class="pr"><span>Breite</span><input type="range" min="4" max="128" value={sw.props.width} oninput={(e)=>updateWidgetProp(selectedWidget,'width',+e.target.value)}><span class="pv">{sw.props.width}</span></div>
+      {#if wp(sw).width !== undefined}
+        <div class="pr"><span>Breite</span><input type="range" min="4" max="128" value={wp(sw).width} oninput={(e)=>updateWidgetProp(selectedWidget,'width',+e.target.value)}><span class="pv">{wp(sw).width}</span></div>
       {/if}
-      {#if sw.props.height !== undefined}
-        <div class="pr"><span>Höhe</span><input type="range" min="2" max="64" value={sw.props.height} oninput={(e)=>updateWidgetProp(selectedWidget,'height',+e.target.value)}><span class="pv">{sw.props.height}</span></div>
+      {#if wp(sw).height !== undefined}
+        <div class="pr"><span>Höhe</span><input type="range" min="2" max="64" value={wp(sw).height} oninput={(e)=>updateWidgetProp(selectedWidget,'height',+e.target.value)}><span class="pv">{wp(sw).height}</span></div>
       {/if}
-      {#if sw.props.radius !== undefined}
-        <div class="pr"><span>Radius</span><input type="range" min="6" max="30" value={sw.props.radius} oninput={(e)=>updateWidgetProp(selectedWidget,'radius',+e.target.value)}><span class="pv">{sw.props.radius}px</span></div>
+      {#if wp(sw).radius !== undefined}
+        <div class="pr"><span>Radius</span><input type="range" min="6" max="30" value={wp(sw).radius} oninput={(e)=>updateWidgetProp(selectedWidget,'radius',+e.target.value)}><span class="pv">{wp(sw).radius}px</span></div>
       {/if}
       <!-- Erweiterte Darstellung -->
       <div class="rr" style="margin-top:6px;color:var(--text-muted);font-size:var(--fs-xs)"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent)"></i> Darstellung</div>
-      <div class="pr"><span>Invertiert</span><button class="tog" class:on={sw.props.invert} onclick={()=>updateWidgetProp(selectedWidget,'invert',!sw.props.invert)}></button></div>
-      <div class="pr"><span>Rahmen</span><button class="tog" class:on={sw.props.border} onclick={()=>updateWidgetProp(selectedWidget,'border',!sw.props.border)}></button></div>
+      <div class="pr"><span>Invertiert</span><button class="tog" class:on={wp(sw).invert} onclick={()=>updateWidgetProp(selectedWidget,'invert',!wp(sw).invert)}></button></div>
+      <div class="pr"><span>Rahmen</span><button class="tog" class:on={wp(sw).border} onclick={()=>updateWidgetProp(selectedWidget,'border',!wp(sw).border)}></button></div>
       {#if !wt?.isShape}
         <div class="pr"><span>Ausr.</span>
           <div class="align-btns">
-            <button class="align-btn" class:active={!sw.props.align||sw.props.align==='left'} onclick={()=>updateWidgetProp(selectedWidget,'align','left')} title="Links"><i class="fa-solid fa-align-left"></i></button>
-            <button class="align-btn" class:active={sw.props.align==='center'} onclick={()=>updateWidgetProp(selectedWidget,'align','center')} title="Mitte"><i class="fa-solid fa-align-center"></i></button>
-            <button class="align-btn" class:active={sw.props.align==='right'} onclick={()=>updateWidgetProp(selectedWidget,'align','right')} title="Rechts"><i class="fa-solid fa-align-right"></i></button>
+            <button class="align-btn" class:active={!wp(sw).align||wp(sw).align==='left'} onclick={()=>updateWidgetProp(selectedWidget,'align','left')} title="Links"><i class="fa-solid fa-align-left"></i></button>
+            <button class="align-btn" class:active={wp(sw).align==='center'} onclick={()=>updateWidgetProp(selectedWidget,'align','center')} title="Mitte"><i class="fa-solid fa-align-center"></i></button>
+            <button class="align-btn" class:active={wp(sw).align==='right'} onclick={()=>updateWidgetProp(selectedWidget,'align','right')} title="Rechts"><i class="fa-solid fa-align-right"></i></button>
           </div>
         </div>
-        {#if sw.props.align && sw.props.align !== 'left'}
-          <div class="pr"><span>Box-B.</span><input type="range" min="0" max="128" value={sw.props.boxW||0} oninput={(e)=>updateWidgetProp(selectedWidget,'boxW',+e.target.value)}><span class="pv">{sw.props.boxW||0}</span></div>
+        {#if wp(sw).align && wp(sw).align !== 'left'}
+          <div class="pr"><span>Box-B.</span><input type="range" min="0" max="128" value={wp(sw).boxW||0} oninput={(e)=>updateWidgetProp(selectedWidget,'boxW',+e.target.value)}><span class="pv">{wp(sw).boxW||0}</span></div>
         {/if}
       {/if}
       <div class="prop-actions">
