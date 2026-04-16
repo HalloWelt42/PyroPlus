@@ -318,39 +318,95 @@
   let activeTab = $state('cpu');
   let configSource = $state(null);
   let configDisplay = $state(null);
+  let configPreviewEl = $state(null);
+
+  // Widget-Konfigurator: Eigene Bounding-Box + Optionen + Simulation
+  let cfgBoxW = $state(60);   // Bounding-Box Breite
+  let cfgBoxH = $state(16);   // Bounding-Box Hoehe
+  let cfgOpts = $state({});   // Aktuelle Optionen
+  let cfgSimVal = $state(null); // Simulierter Wert (null = Live)
+  let cfgName = $state('');
 
   function selectSource(src) {
     configSource = src;
-    configDisplay = getModesForType(src.type)[0]?.id || 'zahl';
+    const modes = getModesForType(src.type);
+    configDisplay = modes[0]?.id || 'zahl';
+    cfgOpts = { ...defaultOpts(configDisplay) };
+    cfgName = src.label;
+    cfgSimVal = null;
+    _autoBoxSize();
   }
+
+  function setConfigDisplay(mode) {
+    configDisplay = mode;
+    cfgOpts = { ...defaultOpts(mode) };
+    _autoBoxSize();
+  }
+
+  function _autoBoxSize() {
+    // Box automatisch an Display-Modus anpassen
+    const o = cfgOpts;
+    if (o.width) cfgBoxW = Math.min(128, o.width + 4);
+    else if (o.radius) cfgBoxW = Math.min(128, o.radius * 2 + 4);
+    else cfgBoxW = Math.min(128, Math.max(20, (cfgName?.length || 4) * 6 * (o.scaleX || 1) + 6));
+    if (o.height) cfgBoxH = Math.min(64, o.height + 4);
+    else if (o.radius) cfgBoxH = Math.min(64, o.radius + 6);
+    else cfgBoxH = Math.min(64, 7 * (o.scaleY || o.scaleX || 1) + 4);
+  }
+
+  function renderConfigPreview() {
+    if (!configPreviewEl || !configSource || !configDisplay) return;
+    const bw = cfgBoxW, bh = cfgBoxH;
+    configPreviewEl.width = bw;
+    configPreviewEl.height = bh;
+    const ctx = configPreviewEl.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    // Schwarzer Hintergrund
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, bw, bh);
+    // Widget rendern in Buffer
+    const buf = new Uint8Array(W * H);
+    const tmpWidget = { source: configSource.id, display: configDisplay, x: 2, y: 2, opts: { ...cfgOpts } };
+    // Simulierter Wert
+    const simStats = cfgSimVal !== null ? _buildSimStats() : s.stats;
+    renderWidgetNew(buf, tmpWidget, simStats, weather, s.stats?.history || _hist);
+    // Pixel in Box-Bereich zeichnen
+    ctx.fillStyle = '#fff';
+    for (let y = 0; y < bh && y < H; y++)
+      for (let x = 0; x < bw && x < W; x++)
+        if (buf[y * W + x]) ctx.fillRect(x, y, 1, 1);
+    // Box-Rand
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, bw - 1, bh - 1);
+  }
+
+  function _buildSimStats() {
+    // Simulierte Stats mit cfgSimVal fuer die aktive Quelle
+    const base = JSON.parse(JSON.stringify(s.stats || {}));
+    const v = cfgSimVal;
+    const src = configSource?.id || '';
+    if (src.startsWith('cpu.')) { if (!base.cpu) base.cpu = {}; base.cpu.temp = v; base.cpu.percent = v; base.cpu.temp_min = v*0.8; base.cpu.temp_max = v*1.1; }
+    if (src.startsWith('ram.')) { if (!base.ram) base.ram = {}; base.ram.percent = v; base.ram.used_gb = v/100*16; base.ram.total_gb = 16; base.ram.available_gb = 16-v/100*16; }
+    if (src.startsWith('disk.')) { if (!base.disks?.[0]) base.disks = [{}]; base.disks[0].percent = v; base.disks[0].used_gb = v/100*500; base.disks[0].total_gb = 500; }
+    if (src.startsWith('fan.')) { if (!base.fan) base.fan = {}; base.fan.rpm = Math.round(v*40); base.fan.current_duty = v; }
+    return base;
+  }
+
+  $effect(() => { if (configSource && configDisplay) { cfgBoxW; cfgBoxH; cfgOpts; cfgSimVal; setTimeout(renderConfigPreview, 30); } });
+
   function placeNewWidget(sourceId, displayMode, x = 4, y = 4) {
     const w = createWidget(sourceId, displayMode, x, y);
+    w.opts = { ...w.opts, ...cfgOpts };
+    w.name = cfgName || w.name;
+    w.opts._boxW = cfgBoxW;
+    w.opts._boxH = cfgBoxH;
     placedWidgets = [...placedWidgets, w];
     selectedWidget = placedWidgets.length - 1;
     tool = 'move';
     renderWidgets();
-    s.toast(`${w.name} eingefuegt`, 'ok');
+    s.toast(`${w.name} hinzugefuegt`, 'ok');
   }
-  let configPreviewEl = $state(null);
-
-  function renderConfigPreview() {
-    if (!configPreviewEl || !configSource || !configDisplay) return;
-    const ctx = configPreviewEl.getContext('2d');
-    ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, 128, 64);
-    // Temporaeres Widget rendern
-    const tmpWidget = createWidget(configSource.id, configDisplay, 4, 4);
-    const buf = new Uint8Array(W * H);
-    renderWidgetNew(buf, tmpWidget, s.stats, weather, s.stats?.history || _hist);
-    ctx.fillStyle = '#fff';
-    for (let y = 0; y < H; y++)
-      for (let x = 0; x < W; x++)
-        if (buf[y * W + x]) ctx.fillRect(x, y, 1, 1);
-  }
-
-  // Vorschau bei Quell-Wechsel und periodisch aktualisieren
-  $effect(() => { if (configSource && configDisplay) setTimeout(renderConfigPreview, 50); });
 
   function addConfiguredWidget() {
     if (!configSource) return;
@@ -1029,17 +1085,69 @@
               {/if}
               {#if configSource}
                 <div class="conf-box">
-                  <div class="conf-title">{configSource.label} — Darstellung</div>
+                  <div class="conf-title">{configSource.label}</div>
+
+                  <!-- Darstellungsmodus -->
+                  <div class="conf-label">Darstellung</div>
                   <div class="mode-grid">
                     {#each getModesForType(configSource.type) as mode}
-                      <button class="mode-btn" class:active={configDisplay===mode.id} onclick={()=>{configDisplay=mode.id;renderConfigPreview();}}>{mode.label}</button>
+                      <button class="mode-btn" class:active={configDisplay===mode.id} onclick={()=>setConfigDisplay(mode.id)}>{mode.label}</button>
                     {/each}
                   </div>
-                  <!-- Live-Vorschau -->
+
+                  <!-- Live-Vorschau in Bounding-Box -->
+                  <div class="conf-label">Vorschau <span class="conf-dim">{cfgBoxW}×{cfgBoxH}px</span></div>
                   <div class="conf-preview">
-                    <canvas bind:this={configPreviewEl} width="128" height="64" class="conf-canvas"></canvas>
+                    <canvas bind:this={configPreviewEl} width={cfgBoxW} height={cfgBoxH} class="conf-canvas" style="width:{cfgBoxW*3}px;height:{cfgBoxH*3}px"></canvas>
                   </div>
-                  <button class="add-btn" onclick={addConfiguredWidget}><i class="fa-solid fa-plus"></i> Zum Canvas</button>
+
+                  <!-- Bounding-Box Größe -->
+                  <div class="conf-label">Bounding-Box</div>
+                  <div class="pr"><span>Breite</span><input type="range" min="8" max="128" bind:value={cfgBoxW}><span class="pv">{cfgBoxW}px</span></div>
+                  <div class="pr"><span>Hoehe</span><input type="range" min="6" max="64" bind:value={cfgBoxH}><span class="pv">{cfgBoxH}px</span></div>
+
+                  <!-- Optionen je nach Modus -->
+                  {#if cfgOpts.scaleX !== undefined}
+                    <div class="conf-label">Skalierung</div>
+                    <div class="pr"><span>X</span><input type="range" min="1" max="6" bind:value={cfgOpts.scaleX}><span class="pv">{cfgOpts.scaleX}x</span></div>
+                    <div class="pr"><span>Y</span><input type="range" min="1" max="6" value={cfgOpts.scaleY??cfgOpts.scaleX} oninput={(e)=>cfgOpts.scaleY=+e.target.value}><span class="pv">{cfgOpts.scaleY??cfgOpts.scaleX}x</span></div>
+                  {/if}
+                  {#if cfgOpts.prefix !== undefined}
+                    <div class="pr"><span>Praefix</span><input type="text" class="ti" bind:value={cfgOpts.prefix}></div>
+                  {/if}
+                  {#if cfgOpts.suffix !== undefined}
+                    <div class="pr"><span>Suffix</span><input type="text" class="ti" bind:value={cfgOpts.suffix}></div>
+                  {/if}
+                  {#if cfgOpts.text !== undefined}
+                    <div class="pr"><span>Text</span><input type="text" class="ti" bind:value={cfgOpts.text}></div>
+                  {/if}
+                  {#if cfgOpts.width !== undefined}
+                    <div class="pr"><span>Breite</span><input type="range" min="4" max="126" bind:value={cfgOpts.width}><span class="pv">{cfgOpts.width}</span></div>
+                  {/if}
+                  {#if cfgOpts.height !== undefined}
+                    <div class="pr"><span>Hoehe</span><input type="range" min="2" max="62" bind:value={cfgOpts.height}><span class="pv">{cfgOpts.height}</span></div>
+                  {/if}
+                  {#if cfgOpts.radius !== undefined}
+                    <div class="pr"><span>Radius</span><input type="range" min="6" max="30" bind:value={cfgOpts.radius}><span class="pv">{cfgOpts.radius}</span></div>
+                  {/if}
+
+                  <!-- Simulation -->
+                  <div class="conf-label">Simulation</div>
+                  <div class="pr">
+                    <span>Wert</span>
+                    {#if cfgSimVal !== null}
+                      <input type="range" min="0" max="100" bind:value={cfgSimVal}>
+                      <span class="pv">{cfgSimVal}</span>
+                      <button class="sim-reset" onclick={()=>cfgSimVal=null}>Live</button>
+                    {:else}
+                      <button class="sim-start" onclick={()=>cfgSimVal=50}>Simulieren</button>
+                    {/if}
+                  </div>
+
+                  <!-- Name -->
+                  <div class="pr"><span>Name</span><input type="text" class="ti" bind:value={cfgName}></div>
+
+                  <button class="add-btn" onclick={addConfiguredWidget}><i class="fa-solid fa-plus"></i> Zum Screen hinzufuegen</button>
                 </div>
               {/if}
             </div>
@@ -1148,12 +1256,20 @@
   .mode-btn { padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 var(--fs-xs) var(--font); cursor: pointer; }
   .mode-btn:hover { border-color: var(--accent); color: var(--accent); }
   .mode-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
-  .conf-preview { display: flex; justify-content: center; padding: 8px 0; }
+  .conf-label { font: 600 9px var(--font); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 8px 0 3px; }
+  .conf-dim { font: 500 9px var(--mono); color: var(--accent); margin-left: 6px; }
+  .conf-preview { display: flex; justify-content: center; padding: 8px 0; background: #111; border-radius: var(--radius-sm); margin: 4px 0; }
   .conf-canvas {
-    width: 256px; height: 128px;
     image-rendering: pixelated; image-rendering: crisp-edges;
-    border: 1px solid #333; border-radius: 3px; background: #000;
+    border: none; background: #000;
   }
+  .sim-start, .sim-reset {
+    padding: 2px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--bg-elevated); color: var(--text-muted); font: 500 9px var(--font);
+    cursor: pointer; flex-shrink: 0;
+  }
+  .sim-start:hover, .sim-reset:hover { border-color: var(--accent); color: var(--accent); }
+  .sim-reset { border-color: var(--green); color: var(--green); }
   .add-btn { width: 100%; padding: 7px; border-radius: var(--radius-sm); border: 1px solid var(--accent); background: var(--accent-dim); color: var(--accent); font: 600 var(--fs-sm) var(--font); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
   .add-btn:hover { background: var(--accent); color: #fff; }
   .canvas-scroll canvas { image-rendering: pixelated; touch-action: none; cursor: crosshair; box-shadow: 0 0 0 1px var(--border), 0 4px 20px rgba(0,0,0,0.4); flex-shrink: 0; }
