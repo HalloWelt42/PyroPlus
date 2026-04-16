@@ -219,45 +219,18 @@
     /* ─── System ─── */
     uptime:    { cat:'sys',  label:'Uptime',         w:48, h:7, props:{ scale:1, prefix:'' },
                  getText: (p) => (p.prefix||'')+(s.stats?.uptime?.formatted||'0:00') },
-    /* ─── Deko Sprites ─── */
-    snowman:   { cat:'deko', label:'Schneemann',     w:8, h:10, props:{ scale:1 }, isShape: true,
-                 draw: (px,x,y,p) => E.drawSprite(px,'snowman',x,y,p.scale||1) },
-    snowflake: { cat:'deko', label:'Schneeflocke',   w:8, h:8, props:{ scale:1 }, isShape: true,
-                 draw: (px,x,y,p) => E.drawSprite(px,'snowflake',x,y,p.scale||1) },
-    heart:     { cat:'deko', label:'Herz',           w:8, h:8, props:{ scale:1 }, isShape: true,
-                 draw: (px,x,y,p) => E.drawSprite(px,'heart',x,y,p.scale||1) },
-    star:      { cat:'deko', label:'Stern',          w:8, h:8, props:{ scale:1 }, isShape: true,
-                 draw: (px,x,y,p) => E.drawSprite(px,'star',x,y,p.scale||1) },
-    cat_spr:   { cat:'deko', label:'Katze',          w:8, h:8, props:{ scale:1 }, isShape: true,
-                 draw: (px,x,y,p) => E.drawSprite(px,'cat',x,y,p.scale||1) },
-    dog_spr:   { cat:'deko', label:'Hund',           w:8, h:8, props:{ scale:1 }, isShape: true,
-                 draw: (px,x,y,p) => E.drawSprite(px,'dog',x,y,p.scale||1) },
-    tree_spr:  { cat:'deko', label:'Tannenbaum',     w:8, h:8, props:{ scale:1 }, isShape: true,
-                 draw: (px,x,y,p) => E.drawSprite(px,'tree',x,y,p.scale||1) },
-    sun_spr:   { cat:'deko', label:'Sonne',          w:8, h:8, props:{ scale:1 }, isShape: true,
-                 draw: (px,x,y,p) => E.drawSprite(px,'sun_deco',x,y,p.scale||1) },
-    moon_spr:  { cat:'deko', label:'Mond',           w:8, h:8, props:{ scale:1 }, isShape: true,
-                 draw: (px,x,y,p) => E.drawSprite(px,'moon_deco',x,y,p.scale||1) },
-    music_spr: { cat:'deko', label:'Musik',          w:8, h:8, props:{ scale:1 }, isShape: true,
-                 draw: (px,x,y,p) => E.drawSprite(px,'music',x,y,p.scale||1) },
-    skull_spr: { cat:'deko', label:'Totenkopf',      w:8, h:8, props:{ scale:1 }, isShape: true,
-                 draw: (px,x,y,p) => E.drawSprite(px,'skull',x,y,p.scale||1) },
-    gift_spr:  { cat:'deko', label:'Geschenk',       w:8, h:8, props:{ scale:1 }, isShape: true,
-                 draw: (px,x,y,p) => E.drawSprite(px,'gift',x,y,p.scale||1) },
-    bell_spr:  { cat:'deko', label:'Glocke',         w:8, h:8, props:{ scale:1 }, isShape: true,
-                 draw: (px,x,y,p) => E.drawSprite(px,'bell',x,y,p.scale||1) },
-    /* ─── Text + Linien ─── */
-    marquee:   { cat:'deko', label:'Laufschrift',    w:128, h:7, props:{ scale:1, text:'Hallo Welt!' },
-                 getText: (p) => p.text || 'Laufschrift' },
-    label:     { cat:'deko', label:'Textfeld',       w:48, h:7, props:{ scale:1, text:'Text' },
+    /* ─── Layout ─── */
+    label:     { cat:'layout', label:'Textfeld',       w:48, h:7, props:{ scale:1, text:'Text' },
                  getText: (p) => p.text || 'Text' },
-    line_h:    { cat:'deko', label:'Linie ─',        w:60, h:1, props:{ width:60 }, isShape: true,
+    marquee:   { cat:'layout', label:'Laufschrift',    w:128, h:7, props:{ scale:1, text:'Hallo Welt!' },
+                 getText: (p) => p.text || 'Laufschrift' },
+    line_h:    { cat:'layout', label:'Linie ─',        w:60, h:1, props:{ width:60 }, isShape: true,
                  draw: (px,x,y,p) => { for(let i=0;i<(p.width||60);i++) if(x+i>=0&&x+i<W) px[y*W+x+i]=1; }},
-    line_v:    { cat:'deko', label:'Linie │',        w:1, h:20, props:{ height:20 }, isShape: true,
+    line_v:    { cat:'layout', label:'Linie │',        w:1, h:20, props:{ height:20 }, isShape: true,
                  draw: (px,x,y,p) => { for(let i=0;i<(p.height||20);i++) if(y+i>=0&&y+i<H) px[(y+i)*W+x]=1; }},
-    rect_o:    { cat:'deko', label:'Rahmen □',       w:40, h:20, props:{ width:40, height:20 }, isShape: true,
+    rect_o:    { cat:'layout', label:'Rahmen □',       w:40, h:20, props:{ width:40, height:20 }, isShape: true,
                  draw: (px,x,y,p) => E.drawRect(x,y,x+(p.width||40)-1,y+(p.height||20)-1,(px2,py)=>{if(px2>=0&&px2<W&&py>=0&&py<H)px[py*W+px2]=1;},false) },
-    rect_f:    { cat:'deko', label:'Block ■',        w:40, h:20, props:{ width:40, height:20 }, isShape: true,
+    rect_f:    { cat:'layout', label:'Block ■',        w:40, h:20, props:{ width:40, height:20 }, isShape: true,
                  draw: (px,x,y,p) => E.drawRect(x,y,x+(p.width||40)-1,y+(p.height||20)-1,(px2,py)=>{if(px2>=0&&px2<W&&py>=0&&py<H)px[py*W+px2]=1;},true) },
     /* ─── Sparklines (Verlaufsgraph) ─── */
     spark_cpu: { cat:'cpu',  label:'CPU Verlauf',    w:60, h:20, props:{ width:60, height:20 }, isShape: true,
@@ -276,7 +249,7 @@
     gauge_temp:{ cat:'cpu',  label:'Temp Gauge',     w:32, h:18, props:{ radius:12 }, isShape: true,
                  draw: (px,x,y,p) => E.drawGauge(px, Math.min(100,(s.stats?.cpu?.temp||0)/80*100), x, y, p.radius||12) },
     /* ─── Section Header ─── */
-    section:   { cat:'deko', label:'── Header ──',   w:60, h:7, props:{ width:60, text:'CPU' }, isShape: true,
+    section:   { cat:'layout', label:'── Header ──',   w:60, h:7, props:{ width:60, text:'CPU' }, isShape: true,
                  draw: (px,x,y,p) => E.drawSectionHeader(px, p.text||'Label', x, y, p.width||60) },
   };
   const widgetList = Object.entries(widgetTypes).map(([id,v])=>({id,...v}));
@@ -851,8 +824,8 @@
 
   /* ═══ WIDGET-VORSCHAU-LEISTE ═══ */
   let previewCanvases = $state({}); // id -> canvas element
-  const catOrder = ['zeit','cpu','ram','disk','net','sys','wetter','deko'];
-  const catLabels = {zeit:'Zeit',cpu:'CPU',ram:'RAM',disk:'Disk',net:'Netz',sys:'System',wetter:'Wetter',deko:'Deko'};
+  const catOrder = ['zeit','cpu','ram','disk','net','sys','wetter','layout'];
+  const catLabels = {zeit:'Zeit',cpu:'CPU',ram:'RAM',disk:'Disk',net:'Netz',sys:'System',wetter:'Wetter',layout:'Layout'};
 
   function getWidgetSize(wId) {
     const wt = widgetTypes[wId];
@@ -1055,11 +1028,11 @@
       {/if}
     </div>
   {:else if id==='widgets'}
-    {#each ['zeit','cpu','ram','disk','net','sys','wetter','deko'] as cat}
+    {#each ['zeit','cpu','ram','disk','net','sys','wetter','layout'] as cat}
       {@const items = widgetList.filter(w => w.cat === cat)}
       {#if items.length > 0}
-        {@const catInfo = {zeit:['fa-clock','Zeit'],cpu:['fa-microchip','CPU'],ram:['fa-memory','RAM'],disk:['fa-hard-drive','Festplatten'],net:['fa-network-wired','Netzwerk'],sys:['fa-server','System'],wetter:['fa-cloud-sun','Wetter'],deko:['fa-pen','Dekoration']}[cat] || ['fa-circle',cat]}
-        <div class="wc-cat"><i class="fa-solid {catInfo[0]}"></i> {catInfo[1]}</div>
+        {@const catName = {zeit:'Zeit',cpu:'CPU',ram:'RAM',disk:'Festplatten',net:'Netzwerk',sys:'System',wetter:'Wetter',layout:'Layout'}[cat] || cat}
+        <div class="wc-cat">{catName}</div>
         <div class="wc-grid">
           {#each items as w}
             <button class="wc-btn" onclick={() => placeWidget(w)} title="{w.label} ({w.w}×{w.h})">
