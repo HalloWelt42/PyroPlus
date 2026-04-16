@@ -209,6 +209,64 @@ def draw_marquee(buf: bytearray, text: str, y: int, offset: int, scale: int = 1)
     draw_text(buf, text, x, y, scale)
 
 
+def draw_sparkline(buf: bytearray, values: list, x: int, y: int, w: int, h: int):
+    """Mini-Verlaufsgraph mit Rahmen."""
+    if not values or len(values) < 2:
+        return
+    mx = max(max(values), 1)
+    mn = min(min(values), 0)
+    rng = mx - mn or 1
+    step = w / (len(values) - 1)
+    # Rahmen
+    draw_rect(buf, x, y, x + w - 1, y + h - 1, filled=False)
+    # Linie
+    for i in range(len(values) - 1):
+        x0 = round(x + 1 + i * step)
+        y0 = round(y + h - 2 - ((values[i] - mn) / rng) * (h - 3))
+        x1 = round(x + 1 + (i + 1) * step)
+        y1 = round(y + h - 2 - ((values[i + 1] - mn) / rng) * (h - 3))
+        draw_line(buf, x0, y0, x1, y1)
+
+
+def draw_gauge(buf: bytearray, pct: float, x: int, y: int, r: int):
+    """Halbkreis-Fortschrittsanzeige mit Prozentwert."""
+    import math
+    cx, cy = x + r, y + r
+    clamped = max(0, min(100, pct))
+    # Halbkreis-Outline
+    for a in range(180, 361, 2):
+        rad = math.radians(a)
+        px = round(cx + r * math.cos(rad))
+        py = round(cy + r * math.sin(rad))
+        set_pixel(buf, px, py, 1)
+    # Gefuellter Bogen
+    end_angle = 180 + (clamped / 100) * 180
+    a = 180.0
+    while a <= end_angle:
+        rad = math.radians(a)
+        for ri in range(r - 2, r + 1):
+            px = round(cx + ri * math.cos(rad))
+            py = round(cy + ri * math.sin(rad))
+            set_pixel(buf, px, py, 1)
+        a += 1.0
+    # Wert zentriert
+    text = f"{round(clamped)}%"
+    tw = len(text) * 6
+    draw_text(buf, text, cx - tw // 2, cy - 3, 1)
+
+
+def draw_section_header(buf: bytearray, text: str, x: int, y: int, w: int):
+    """Section Header: ── LABEL ──"""
+    tw = len(text) * 6
+    line_l = max(0, (w - tw - 4) // 2)
+    line_r = max(0, w - tw - 4 - line_l)
+    for i in range(line_l):
+        set_pixel(buf, x + i, y + 3, 1)
+    draw_text(buf, text, x + line_l + 2, y, 1)
+    for i in range(line_r):
+        set_pixel(buf, x + line_l + 2 + tw + 2 + i, y + 3, 1)
+
+
 def buf_to_pil(buf: bytearray):
     """Pixel-Buffer zu PIL Image (1-bit) konvertieren."""
     from PIL import Image

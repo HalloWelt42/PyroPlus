@@ -10,10 +10,27 @@ from zoneinfo import ZoneInfo
 from oled.renderer import (
     draw_text, draw_text_ex, draw_bar, draw_hline, draw_vline,
     draw_rect, draw_sprite, draw_icon, draw_marquee,
+    draw_sparkline, draw_gauge, draw_section_header,
 )
 from oled.icons import ICONS_8x8, condition_to_icon
 
 TZ = ZoneInfo("Europe/Berlin")
+
+# History für Sparklines (Backend sammelt selbst)
+_history = {"cpu": [], "temp": [], "ram": []}
+HIST_LEN = 30
+
+
+def update_history(stats: dict):
+    """Wird jede Sekunde vom Render-Loop aufgerufen."""
+    cpu = stats.get("cpu", {})
+    ram = stats.get("ram", {})
+    _history["cpu"].append(cpu.get("percent", 0))
+    _history["temp"].append(cpu.get("temp", 0))
+    _history["ram"].append(ram.get("percent", 0))
+    for k in _history:
+        if len(_history[k]) > HIST_LEN:
+            _history[k] = _history[k][-HIST_LEN:]
 
 
 def _pad(n: int, length: int = 3) -> str:
@@ -274,3 +291,44 @@ def render_widget(buf: bytearray, widget: dict, stats: dict,
         }.get(wt, wt)
         sp_scale = widget.get("scale", widget.get("scaleX", 1))
         draw_sprite(buf, sprite_name, x, y, int(sp_scale) if sp_scale else 1)
+
+    # ═══ SPARKLINES ═══
+    elif wt == "spark_cpu":
+        bw = widget.get("w", widget.get("width", 60))
+        bh = widget.get("h", widget.get("height", 20))
+        draw_sparkline(buf, _history["cpu"], x, y, bw, bh)
+
+    elif wt == "spark_temp":
+        bw = widget.get("w", widget.get("width", 60))
+        bh = widget.get("h", widget.get("height", 20))
+        draw_sparkline(buf, _history["temp"], x, y, bw, bh)
+
+    elif wt == "spark_ram":
+        bw = widget.get("w", widget.get("width", 60))
+        bh = widget.get("h", widget.get("height", 20))
+        draw_sparkline(buf, _history["ram"], x, y, bw, bh)
+
+    # ═══ GAUGES ═══
+    elif wt == "gauge_cpu":
+        r = widget.get("radius", 12)
+        draw_gauge(buf, cpu.get("percent", 0), x, y, r)
+
+    elif wt == "gauge_ram":
+        r = widget.get("radius", 12)
+        draw_gauge(buf, ram.get("percent", 0), x, y, r)
+
+    elif wt == "gauge_disk":
+        di = widget.get("diskIdx", 0)
+        d = disks[di] if di < len(disks) else {}
+        r = widget.get("radius", 12)
+        draw_gauge(buf, d.get("percent", 0), x, y, r)
+
+    elif wt == "gauge_temp":
+        r = widget.get("radius", 12)
+        draw_gauge(buf, min(100, cpu.get("temp", 0) / 80 * 100), x, y, r)
+
+    # ═══ SECTION HEADER ═══
+    elif wt == "section":
+        sw = widget.get("w", widget.get("width", 60))
+        text = widget.get("text", "Label")
+        draw_section_header(buf, text, x, y, sw)

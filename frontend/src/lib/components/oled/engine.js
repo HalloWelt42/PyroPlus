@@ -343,6 +343,68 @@ export function drawMarquee(pixels, text, y, offset, scale = 1) {
   drawText(pixels, text, x, y, scale);
 }
 
+/* ═══ Sparkline (Mini-Verlaufsgraph) ═══ */
+export function drawSparkline(pixels, values, x, y, w, h) {
+  if (!values || values.length < 2) return;
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const step = w / (values.length - 1);
+  // Rahmen
+  for (let i = 0; i < w; i++) { if (x+i>=0&&x+i<W) { if(y>=0&&y<H) pixels[y*W+x+i]=1; if(y+h-1>=0&&y+h-1<H) pixels[(y+h-1)*W+x+i]=1; } }
+  for (let j = 0; j < h; j++) { if (y+j>=0&&y+j<H) { if(x>=0&&x<W) pixels[(y+j)*W+x]=1; if(x+w-1>=0&&x+w-1<W) pixels[(y+j)*W+x+w-1]=1; } }
+  // Linie zeichnen
+  for (let i = 0; i < values.length - 1; i++) {
+    const x0 = Math.round(x + 1 + i * step);
+    const y0 = Math.round(y + h - 2 - ((values[i] - min) / range) * (h - 3));
+    const x1 = Math.round(x + 1 + (i + 1) * step);
+    const y1 = Math.round(y + h - 2 - ((values[i + 1] - min) / range) * (h - 3));
+    bresenhamLine(x0, y0, x1, y1, (px, py) => {
+      if (px >= x+1 && px < x+w-1 && py >= y+1 && py < y+h-1) pixels[py * W + px] = 1;
+    });
+  }
+}
+
+/* ═══ Gauge (Halbkreis-Fortschritt) ═══ */
+export function drawGauge(pixels, pct, x, y, r) {
+  const cx = x + r, cy = y + r;
+  const clamped = Math.max(0, Math.min(100, pct));
+  // Halbkreis-Outline (180°)
+  for (let a = 180; a <= 360; a += 2) {
+    const rad = a * Math.PI / 180;
+    const px = Math.round(cx + r * Math.cos(rad));
+    const py = Math.round(cy + r * Math.sin(rad));
+    if (px >= 0 && px < W && py >= 0 && py < H) pixels[py * W + px] = 1;
+  }
+  // Gefüllter Bogen bis pct
+  const endAngle = 180 + (clamped / 100) * 180;
+  for (let a = 180; a <= endAngle; a += 1) {
+    const rad = a * Math.PI / 180;
+    for (let ri = r - 2; ri <= r; ri++) {
+      const px = Math.round(cx + ri * Math.cos(rad));
+      const py = Math.round(cy + ri * Math.sin(rad));
+      if (px >= 0 && px < W && py >= 0 && py < H) pixels[py * W + px] = 1;
+    }
+  }
+  // Wert zentriert unter dem Gauge
+  const text = `${Math.round(clamped)}%`;
+  const tw = text.length * 6;
+  drawText(pixels, text, cx - Math.floor(tw / 2), cy - 3, 1);
+}
+
+/* ═══ Section Header (── LABEL ──) ═══ */
+export function drawSectionHeader(pixels, text, x, y, w) {
+  const tw = text.length * 6;
+  const lineL = Math.max(0, Math.floor((w - tw - 4) / 2));
+  const lineR = Math.max(0, w - tw - 4 - lineL);
+  // Linke Linie
+  for (let i = 0; i < lineL; i++) { const px = x+i; if(px>=0&&px<W&&y+3>=0&&y+3<H) pixels[(y+3)*W+px]=1; }
+  // Text
+  drawText(pixels, text, x + lineL + 2, y, 1);
+  // Rechte Linie
+  for (let i = 0; i < lineR; i++) { const px = x+lineL+2+tw+2+i; if(px>=0&&px<W&&y+3>=0&&y+3<H) pixels[(y+3)*W+px]=1; }
+}
+
 /* ═══ Composite: Alle sichtbaren Layer zusammenrechnen ═══ */
 export function composite(layers) {
   const result = new Uint8Array(W * H);

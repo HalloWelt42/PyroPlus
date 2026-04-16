@@ -17,7 +17,7 @@ import hw_client
 from config import OLED_WIDTH, OLED_HEIGHT, OLED_DEFAULT_BRIGHTNESS, OLED_ROTATION_INTERVAL, DATA_DIR
 from stats import get_system_stats
 from oled.renderer import W, H, create_buffer, buf_to_pil, buf_to_png_base64, draw_text
-from oled.widgets import render_widget
+from oled.widgets import render_widget, update_history
 from oled.weather import WeatherProvider, render_weather_compact, render_weather_hourly, render_weather_daily
 
 logger = logging.getLogger("oled")
@@ -361,6 +361,7 @@ class OLEDEngine:
                     self._rotation_reset = False
 
                 stats = get_system_stats()
+                update_history(stats)
 
                 # Wetter updaten
                 if self.weather.needs_update():

@@ -259,8 +259,31 @@
                  draw: (px,x,y,p) => E.drawRect(x,y,x+(p.width||40)-1,y+(p.height||20)-1,(px2,py)=>{if(px2>=0&&px2<W&&py>=0&&py<H)px[py*W+px2]=1;},false) },
     rect_f:    { cat:'deko', label:'Block ■',        w:40, h:20, props:{ width:40, height:20 }, isShape: true,
                  draw: (px,x,y,p) => E.drawRect(x,y,x+(p.width||40)-1,y+(p.height||20)-1,(px2,py)=>{if(px2>=0&&px2<W&&py>=0&&py<H)px[py*W+px2]=1;},true) },
+    /* ─── Sparklines (Verlaufsgraph) ─── */
+    spark_cpu: { cat:'cpu',  label:'CPU Verlauf',    w:60, h:20, props:{ width:60, height:20 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawSparkline(px, _hist.cpu, x, y, p.width||60, p.height||20) },
+    spark_temp:{ cat:'cpu',  label:'Temp Verlauf',   w:60, h:20, props:{ width:60, height:20 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawSparkline(px, _hist.temp, x, y, p.width||60, p.height||20) },
+    spark_ram: { cat:'ram',  label:'RAM Verlauf',    w:60, h:20, props:{ width:60, height:20 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawSparkline(px, _hist.ram, x, y, p.width||60, p.height||20) },
+    /* ─── Gauges (Halbkreis) ─── */
+    gauge_cpu: { cat:'cpu',  label:'CPU Gauge',      w:32, h:18, props:{ radius:12 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawGauge(px, s.stats?.cpu?.percent||0, x, y, p.radius||12) },
+    gauge_ram: { cat:'ram',  label:'RAM Gauge',      w:32, h:18, props:{ radius:12 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawGauge(px, s.stats?.ram?.percent||0, x, y, p.radius||12) },
+    gauge_disk:{ cat:'disk', label:'Disk Gauge',     w:32, h:18, props:{ radius:12, diskIdx:0 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawGauge(px, s.stats?.disks?.[p.diskIdx||0]?.percent||0, x, y, p.radius||12) },
+    gauge_temp:{ cat:'cpu',  label:'Temp Gauge',     w:32, h:18, props:{ radius:12 }, isShape: true,
+                 draw: (px,x,y,p) => E.drawGauge(px, Math.min(100,(s.stats?.cpu?.temp||0)/80*100), x, y, p.radius||12) },
+    /* ─── Section Header ─── */
+    section:   { cat:'deko', label:'── Header ──',   w:60, h:7, props:{ width:60, text:'CPU' }, isShape: true,
+                 draw: (px,x,y,p) => E.drawSectionHeader(px, p.text||'Label', x, y, p.width||60) },
   };
   const widgetList = Object.entries(widgetTypes).map(([id,v])=>({id,...v}));
+
+  /* ═══ HISTORY für Sparklines ═══ */
+  const _hist = { cpu: [], temp: [], ram: [] };
+  const HIST_LEN = 30;
 
   /* Platzierte Widgets — jedes hat Position, Typ, eigene Eigenschaften */
   let placedWidgets = $state([]);
@@ -340,9 +363,18 @@
     autoSave();
   }
 
-  /* Widget-Rendering alle Sekunde aktualisieren (für Uhr etc.) */
+  /* Widget-Rendering alle Sekunde aktualisieren (für Uhr etc.) + History sammeln */
   let _widgetTimer;
-  function startWidgetTimer() { _widgetTimer = setInterval(() => { if (placedWidgets.length > 0) renderWidgets(); }, 1000); }
+  function startWidgetTimer() { _widgetTimer = setInterval(() => {
+    // History für Sparklines sammeln
+    _hist.cpu.push(s.stats?.cpu?.percent || 0);
+    _hist.temp.push(s.stats?.cpu?.temp || 0);
+    _hist.ram.push(s.stats?.ram?.percent || 0);
+    if (_hist.cpu.length > HIST_LEN) _hist.cpu.shift();
+    if (_hist.temp.length > HIST_LEN) _hist.temp.shift();
+    if (_hist.ram.length > HIST_LEN) _hist.ram.shift();
+    if (placedWidgets.length > 0) renderWidgets();
+  }, 1000); }
   function stopWidgetTimer() { clearInterval(_widgetTimer); }
 
   /* ═══ CANVAS ═══ */
@@ -465,6 +497,7 @@
           w: w.props?.width,
           h: w.props?.height,
           scale: w.props?.scale,
+          radius: w.props?.radius,
           diskIdx: w.props?.diskIdx,
           invert: w.props?.invert || false,
           border: w.props?.border || false,
@@ -594,7 +627,7 @@
   }
 
   /* ═══ PANEL D&D ═══ */
-  let lpanels=$state(['preview','props','layers','widgets','templates']), rpanels=$state(['tools','display','color','weather']);
+  let lpanels=$state(['preview','props','layers','widgets','templates']), rpanels=$state(['tools','display','color','weather','clock']);
   let pdragId=$state(null), pdropSide=$state(null);
   function pDragStart(e,id){pdragId=id;e.dataTransfer.setData('application/x-oled-panel',id);e.dataTransfer.effectAllowed='move';}
   function pDragEnd(){pdragId=null;pdropSide=null;}
@@ -631,7 +664,7 @@
   }
 
   /* Panel-Metadaten */
-  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, color:{icon:'palette',label:'Farbe',c:false}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, widgets:{icon:'puzzle-piece',label:'Widgets',c:true}, weather:{icon:'cloud-sun',label:'Wetter-Ort',c:true}, templates:{icon:'bookmark',label:'Vorlagen',c:true} };
+  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, color:{icon:'palette',label:'Farbe',c:false}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, widgets:{icon:'puzzle-piece',label:'Widgets',c:true}, weather:{icon:'cloud-sun',label:'Wetter-Ort',c:true}, templates:{icon:'bookmark',label:'Vorlagen',c:true}, clock:{icon:'clock',label:'Uhr-Einst.',c:true} };
 
   /* Vordefinierte Vorlagen */
   const templates = [
@@ -722,6 +755,26 @@
       {type:'net_rx',x:0,y:30,props:{scale:1,prefix:'DL '}},
       {type:'net_tx',x:0,y:40,props:{scale:1,prefix:'UL '}},
       {type:'uptime',x:0,y:54,props:{scale:1,prefix:'Up '}},
+    ]},
+    { name: 'Dashboard', widgets: [
+      {type:'section',x:0,y:0,props:{width:62,text:'CPU'}},
+      {type:'gauge_cpu',x:2,y:10,props:{radius:12}},
+      {type:'cpu_temp',x:30,y:14,props:{scale:1,prefix:''}},
+      {type:'section',x:66,y:0,props:{width:62,text:'RAM'}},
+      {type:'gauge_ram',x:68,y:10,props:{radius:12}},
+      {type:'ram_pct',x:96,y:14,props:{scale:1,prefix:''}},
+      {type:'section',x:0,y:36,props:{width:128,text:'VERLAUF'}},
+      {type:'spark_cpu',x:0,y:44,props:{width:62,height:18}},
+      {type:'spark_ram',x:66,y:44,props:{width:62,height:18}},
+    ]},
+    { name: 'Gauges', widgets: [
+      {type:'gauge_cpu',x:2,y:2,props:{radius:16}},
+      {type:'label',x:2,y:36,props:{scale:1,text:'CPU'}},
+      {type:'gauge_ram',x:42,y:2,props:{radius:16}},
+      {type:'label',x:42,y:36,props:{scale:1,text:'RAM'}},
+      {type:'gauge_disk',x:82,y:2,props:{radius:16,diskIdx:0}},
+      {type:'label',x:82,y:36,props:{scale:1,text:'Disk'}},
+      {type:'clock_s',x:36,y:54,props:{scale:1}},
     ]},
   ];
 
@@ -841,6 +894,9 @@
       {#if sw.props.height !== undefined}
         <div class="pr"><span>Höhe</span><input type="range" min="2" max="64" value={sw.props.height} oninput={(e)=>updateWidgetProp(selectedWidget,'height',+e.target.value)}><span class="pv">{sw.props.height}</span></div>
       {/if}
+      {#if sw.props.radius !== undefined}
+        <div class="pr"><span>Radius</span><input type="range" min="6" max="30" value={sw.props.radius} oninput={(e)=>updateWidgetProp(selectedWidget,'radius',+e.target.value)}><span class="pv">{sw.props.radius}px</span></div>
+      {/if}
       <!-- Erweiterte Darstellung -->
       <div class="rr" style="margin-top:6px;color:var(--text-muted);font-size:var(--fs-xs)"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent)"></i> Darstellung</div>
       <div class="pr"><span>Invertiert</span><button class="tog" class:on={sw.props.invert} onclick={()=>updateWidgetProp(selectedWidget,'invert',!sw.props.invert)}></button></div>
@@ -893,6 +949,14 @@
     {#each templates as t}
       <button class="wc-btn" onclick={() => loadTemplate(t)}><i class="fa-solid fa-download"></i> <span class="wc-name">{t.name}</span><span class="wc-size">{t.widgets.length} Widgets</span></button>
     {/each}
+  {:else if id==='clock'}
+    {@const cs = s.oled?.clock_settings || {}}
+    <div class="pr"><span>Blinken</span><button class="tog" class:on={cs.blink!==false} onclick={()=>s.setClockSettings({blink:!(cs.blink!==false)})}></button></div>
+    <div class="pr"><span>Sekunden</span><button class="tog" class:on={cs.seconds} onclick={()=>s.setClockSettings({seconds:!cs.seconds})}></button></div>
+    <div class="pr"><span>Zehntel</span><button class="tog" class:on={cs.tenths} onclick={()=>s.setClockSettings({tenths:!cs.tenths})}></button></div>
+    <div class="pr"><span>Datum</span><button class="tog" class:on={cs.date!==false} onclick={()=>s.setClockSettings({date:!(cs.date!==false)})}></button></div>
+    <div class="pr"><span>Wochentag</span><button class="tog" class:on={cs.weekday!==false} onclick={()=>s.setClockSettings({weekday:!(cs.weekday!==false)})}></button></div>
+    <div class="pr"><span>24h</span><button class="tog" class:on={cs.format_24h!==false} onclick={()=>s.setClockSettings({format_24h:!(cs.format_24h!==false)})}></button></div>
   {:else if id==='widgets'}
     {#each ['zeit','cpu','ram','disk','net','sys','wetter','deko'] as cat}
       {@const items = widgetList.filter(w => w.cat === cat)}
