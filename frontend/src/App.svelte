@@ -4,8 +4,10 @@ import { getState } from './lib/stores/state.svelte.js';
 import FanControl from './lib/components/FanControl.svelte';
 import LEDLab from './lib/components/LEDLab.svelte';
 import OLEDStudio from './lib/components/OLEDStudio.svelte';
+import Bedanken from './lib/components/Bedanken.svelte';
 
 const s = getState();
+let bedankenOpen = $state(false);
 
 const nav = [
   { id: 'fan', icon: 'fa-solid fa-fan', label: 'Lüfter' },
@@ -115,6 +117,20 @@ const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
       </div>
     {/if}
 
+    <!-- Spenden-Button -->
+    {#if sidebarOpen}
+      <div class="sb-donate">
+        <button class="donate-btn" onclick={() => bedankenOpen = true}>
+          <i class="fa-solid fa-heart"></i>
+          <span>Danke!</span>
+        </button>
+      </div>
+    {:else}
+      <button class="donate-mini" onclick={() => bedankenOpen = true} title="Danke sagen">
+        <i class="fa-solid fa-heart"></i>
+      </button>
+    {/if}
+
     <div class="sb-footer">
       <div class="sb-status"><span class="status-dot" class:on={s.connected}></span>{#if sidebarOpen}{s.connected ? 'Verbunden' : 'Getrennt'}{/if}</div>
       {#if sidebarOpen}
@@ -147,6 +163,8 @@ const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
     {/each}
   </nav>
 </div>
+
+<Bedanken bind:visible={bedankenOpen} />
 
 <style>
   /* ═══ APP SHELL ═══ */
@@ -272,7 +290,26 @@ const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
   }
   .toggle-switch.on::after { transform: translateX(18px); }
 
-  .sb-footer { margin-top: auto; padding: 12px 10px; border-top: 1px solid var(--border); }
+  /* Spenden */
+  .sb-donate { display: flex; justify-content: center; padding: 12px 10px; margin-top: auto; }
+  .donate-btn {
+    display: flex; align-items: center; gap: 8px; padding: 10px 20px;
+    background: none; border: 1px solid rgba(204,34,68,0.3); border-radius: 8px;
+    color: #cc2244; font: 600 var(--fs-sm) var(--font); cursor: pointer;
+    transition: all 0.2s;
+  }
+  .donate-btn:hover { background: rgba(204,34,68,0.08); border-color: #cc2244; transform: translateY(-1px); }
+  .donate-btn i { font-size: var(--fs-base); animation: heartbeat 2s infinite; }
+  .donate-mini {
+    margin: auto auto 0; display: flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(204,34,68,0.3);
+    background: none; color: #cc2244; cursor: pointer; font-size: var(--fs-sm);
+    animation: heartbeat 2s infinite;
+  }
+  .donate-mini:hover { background: rgba(204,34,68,0.1); border-color: #cc2244; }
+  @keyframes heartbeat { 0%,100% { transform: scale(1); } 15% { transform: scale(1.15); } 30% { transform: scale(1); } }
+
+  .sb-footer { padding: 12px 10px; border-top: 1px solid var(--border); }
   .sb-status { display: flex; align-items: center; gap: 8px; font: 500 var(--fs-xs) var(--font); color: var(--text-muted); }
   .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
   .status-dot.on { background: var(--green); box-shadow: 0 0 8px rgba(0,232,138,0.4); }

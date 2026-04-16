@@ -1,9 +1,36 @@
-PRIVATE USE LICENSE
+Creative Commons Namensnennung - Weitergabe unter gleichen Bedingungen 4.0 International
+(CC BY-SA 4.0)
 
 Copyright (c) 2026 HalloWelt42
 
-Dieses Projekt ist ausschließlich für den privaten Gebrauch bestimmt.
-Eine kommerzielle Nutzung, Verbreitung oder Modifikation ohne
-ausdrückliche schriftliche Genehmigung ist nicht gestattet.
+Sie dürfen:
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+- Teilen — das Material in jedwedem Format oder Medium vervielfältigen und weiterverbreiten
+- Bearbeiten — das Material remixen, verändern und darauf aufbauen
+
+Unter folgenden Bedingungen:
+
+- Namensnennung — Sie müssen angemessene Urheber- und Rechteangaben machen, einen Link zur
+  Lizenz beifügen und angeben, ob Änderungen vorgenommen wurden. Diese Angaben dürfen in jeder
+  angemessenen Art und Weise gemacht werden, allerdings nicht so, dass der Eindruck entsteht,
+  der Lizenzgeber unterstütze gerade Sie oder Ihre Nutzung besonders.
+
+- Weitergabe unter gleichen Bedingungen — Wenn Sie das Material remixen, verändern oder
+  anderweitig direkt darauf aufbauen, dürfen Sie Ihre Beiträge nur unter derselben Lizenz wie
+  das Original verbreiten.
+
+- Keine weiteren Einschränkungen — Sie dürfen keine zusätzlichen Klauseln oder technische
+  Verfahren einsetzen, die anderen rechtlich irgendetwas untersagen, was die Lizenz erlaubt.
+
+Vollständiger Lizenztext: https://creativecommons.org/licenses/by-sa/4.0/legalcode.de
+
+HAFTUNGSAUSSCHLUSS
+
+Die Software wird ohne jede Gewährleistung bereitgestellt. In keinem Fall sind die Autoren
+haftbar für Schäden, die aus der Nutzung der Software entstehen. Die Nutzung erfolgt auf
+eigenes Risiko.
+
+---
+
+PyroPlus — Raspberry Pi 5 Hardware Management System
+https://github.com/HalloWelt42/PyroPlus
