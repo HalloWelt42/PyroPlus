@@ -48,48 +48,104 @@ def _resolve_value(source: str, stats: dict, weather: dict | None, opts: dict) -
     uptime = stats.get("uptime", {})
     w = weather or {}
     now = datetime.now(TZ)
+    # Dynamische Disk-ID: "disk.used.2" → base "disk.used", diskIdx 2
+    import re
+    dm = re.match(r'^(disk\.\w+)\.(\d+)$', source)
+    if dm:
+        source = dm.group(1)
+        opts = {**opts, "diskIdx": int(dm.group(2))}
+
     di = opts.get("diskIdx", 0)
     disk = disks[di] if di < len(disks) else {}
 
+    days_de = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+    days_lang = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+    colon = ":" if now.second % 2 == 0 else " "
+
     resolvers = {
-        "cpu.temp":      lambda: f"{cpu.get('temp', 0):.1f}",
-        "cpu.percent":   lambda: str(round(cpu.get("percent", 0))),
-        "cpu.cores":     lambda: str(cpu.get("cores", 4)),
-        "cpu.temp_min":  lambda: f"{cpu.get('temp_min', 0):.1f}",
-        "cpu.temp_max":  lambda: f"{cpu.get('temp_max', 0):.1f}",
-        "ram.used":      lambda: f"{ram.get('used_gb', 0):.1f}",
-        "ram.total":     lambda: f"{ram.get('total_gb', 0):.1f}",
-        "ram.available": lambda: f"{ram.get('available_gb', 0):.1f}",
-        "ram.percent":   lambda: str(round(ram.get("percent", 0))),
-        "disk.label":    lambda: disk.get("label", disk.get("mount", "?")),
-        "disk.mount":    lambda: disk.get("mount", "?"),
-        "disk.used":     lambda: f"{disk.get('used_gb', 0):.1f}",
-        "disk.total":    lambda: f"{disk.get('total_gb', 0):.1f}",
-        "disk.percent":  lambda: str(round(disk.get("percent", 0))),
-        "disk.model":    lambda: disk.get("model", ""),
-        "net.ip":        lambda: net.get("ip", "0.0.0.0"),
-        "net.interface": lambda: net.get("interface", "?"),
-        "net.rx":        lambda: _fmt_bytes(net.get("rx_bytes_sec", 0)),
-        "net.tx":        lambda: _fmt_bytes(net.get("tx_bytes_sec", 0)),
-        "fan.rpm":       lambda: str(fan.get("rpm", 0)),
-        "fan.duty":      lambda: str(round(fan.get("current_duty", 0))),
-        "fan.level":     lambda: fan.get("level_name", "?"),
-        "fan.case":      lambda: "An" if fan.get("case_on") else "Aus",
-        "zeit.uhr":      lambda: now.strftime("%H:%M"),
-        "zeit.uhr_s":    lambda: now.strftime("%H:%M:%S"),
-        "zeit.datum":    lambda: now.strftime("%d.%m.%Y"),
-        "zeit.tag":      lambda: ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][now.weekday()],
-        "zeit.uptime":   lambda: uptime.get("formatted", "0:00"),
-        "wetter.temp":   lambda: str(w.get("temperature", "--")),
-        "wetter.feuchte": lambda: str(w.get("humidity", "--")),
-        "wetter.wind":   lambda: str(w.get("wind_speed", "--")),
-        "wetter.druck":  lambda: str(w.get("pressure", "--")),
-        "wetter.zustand": lambda: w.get("condition_text", "--"),
-        "wetter.ort":    lambda: w.get("location", "--"),
-        "wetter.sunrise": lambda: str(w.get("sunrise", "--")),
-        "wetter.sunset": lambda: str(w.get("sunset", "--")),
-        "text.frei":     lambda: opts.get("text", "Text"),
-        "text.laufschrift": lambda: opts.get("text", "Laufschrift"),
+        # CPU
+        "cpu.temp":       lambda: f"{cpu.get('temp', 0):.1f}",
+        "cpu.percent":    lambda: str(round(cpu.get("percent", 0))),
+        "cpu.cores":      lambda: str(cpu.get("cores", 4)),
+        "cpu.temp_min":   lambda: f"{cpu.get('temp_min', 0):.1f}",
+        "cpu.temp_max":   lambda: f"{cpu.get('temp_max', 0):.1f}",
+        "cpu.temp_range": lambda: f"{cpu.get('temp_min', 0):.1f}-{cpu.get('temp_max', 0):.1f}",
+        "cpu.temp_pct":   lambda: str(round(min(100, cpu.get("temp", 0) / 85 * 100))),
+        "cpu.load":       lambda: f"{round(cpu.get('percent', 0))}% {cpu.get('temp', 0):.1f}C",
+        # RAM
+        "ram.used":       lambda: f"{ram.get('used_gb', 0):.1f}",
+        "ram.total":      lambda: f"{ram.get('total_gb', 0):.1f}",
+        "ram.available":  lambda: f"{ram.get('available_gb', 0):.1f}",
+        "ram.percent":    lambda: str(round(ram.get("percent", 0))),
+        "ram.ratio":      lambda: f"{ram.get('used_gb', 0):.1f}/{ram.get('total_gb', 0):.1f}",
+        "ram.free_pct":   lambda: str(round(100 - ram.get("percent", 0))),
+        # Disk
+        "disk.label":     lambda: disk.get("label", disk.get("mount", "?")),
+        "disk.mount":     lambda: disk.get("mount", "?"),
+        "disk.used":      lambda: f"{disk.get('used_gb', 0):.1f}",
+        "disk.total":     lambda: f"{disk.get('total_gb', 0):.1f}",
+        "disk.available": lambda: f"{disk.get('available_gb', 0):.1f}",
+        "disk.percent":   lambda: str(round(disk.get("percent", 0))),
+        "disk.ratio":     lambda: f"{disk.get('used_gb', 0):.1f}/{disk.get('total_gb', 0):.1f}",
+        "disk.free_pct":  lambda: str(round(100 - disk.get("percent", 0))),
+        "disk.model":     lambda: disk.get("model", ""),
+        "disk.fstype":    lambda: disk.get("fstype", ""),
+        # Netzwerk
+        "net.ip":         lambda: net.get("ip", "0.0.0.0"),
+        "net.interface":  lambda: net.get("interface", "?"),
+        "net.rx":         lambda: _fmt_bytes(net.get("rx_bytes_sec", 0)),
+        "net.tx":         lambda: _fmt_bytes(net.get("tx_bytes_sec", 0)),
+        "net.rx_raw":     lambda: str(net.get("rx_bytes_sec", 0)),
+        "net.tx_raw":     lambda: str(net.get("tx_bytes_sec", 0)),
+        "net.traffic":    lambda: f"{_fmt_bytes(net.get('rx_bytes_sec', 0))} {_fmt_bytes(net.get('tx_bytes_sec', 0))}",
+        "net.hostname":   lambda: "PyroPlus",
+        # Luefter
+        "fan.rpm":        lambda: str(fan.get("rpm", 0)),
+        "fan.duty":       lambda: str(round(fan.get("current_duty", 0))),
+        "fan.level":      lambda: fan.get("level_name", "?"),
+        "fan.case":       lambda: "An" if fan.get("case_on") else "Aus",
+        "fan.mode":       lambda: fan.get("mode", "?"),
+        "fan.rpm_pct":    lambda: str(round(min(100, fan.get("rpm", 0) / 4000 * 100))),
+        # Zeiten
+        "zeit.uhr":       lambda: now.strftime("%H:%M"),
+        "zeit.uhr_s":     lambda: now.strftime("%H:%M:%S"),
+        "zeit.uhr_blink": lambda: f"{now.strftime('%H')}{colon}{now.strftime('%M')}",
+        "zeit.stunde":    lambda: str(now.hour),
+        "zeit.minute":    lambda: str(now.minute),
+        "zeit.sekunde":   lambda: str(now.second),
+        "zeit.datum":     lambda: now.strftime("%d.%m.%Y"),
+        "zeit.datum_kurz":lambda: now.strftime("%d.%m."),
+        "zeit.jahr":      lambda: str(now.year),
+        "zeit.tag":       lambda: days_de[now.weekday()],
+        "zeit.tag_lang":  lambda: days_lang[now.weekday()],
+        "zeit.tag_datum": lambda: f"{days_de[now.weekday()]} {now.strftime('%d.%m.%Y')}",
+        "zeit.uptime":    lambda: uptime.get("formatted", "0:00"),
+        "zeit.uptime_s":  lambda: str(uptime.get("seconds", 0)),
+        "zeit.unix":      lambda: str(int(now.timestamp())),
+        "zeit.iso":       lambda: now.strftime("%Y-%m-%dT%H:%M:%S"),
+        # Wetter
+        "wetter.temp":       lambda: f"{w.get('temperature', '--')}",
+        "wetter.gefuehlt":   lambda: f"{w.get('apparent_temperature', w.get('feels_like', '--'))}",
+        "wetter.feuchte":    lambda: str(w.get("humidity", w.get("relative_humidity_2m", "--"))),
+        "wetter.wind":       lambda: str(w.get("wind_speed", w.get("wind_speed_10m", "--"))),
+        "wetter.windricht":  lambda: str(w.get("wind_direction_10m", w.get("wind_dir", "--"))),
+        "wetter.boeen":      lambda: str(w.get("wind_gusts_10m", w.get("wind_gust", "--"))),
+        "wetter.wolken":     lambda: str(w.get("cloud_cover", "--")),
+        "wetter.druck":      lambda: f"{w.get('surface_pressure', w.get('pressure', '--')):.0f}" if isinstance(w.get("surface_pressure", w.get("pressure")), (int, float)) else "--",
+        "wetter.druck_msl":  lambda: f"{w.get('pressure_msl', '--')}",
+        "wetter.niederschlag": lambda: f"{w.get('precipitation', 0)}",
+        "wetter.zustand":    lambda: w.get("condition_text", "--"),
+        "wetter.tag_nacht":  lambda: "Tag" if w.get("is_day") else "Nacht",
+        "wetter.ort":        lambda: w.get("location", "--"),
+        "wetter.sunrise":    lambda: str(w.get("sunrise", "--")),
+        "wetter.sunset":     lambda: str(w.get("sunset", "--")),
+        "wetter.kombi":      lambda: f"{w.get('temperature', '--')} {w.get('condition_text', '')}",
+        "wetter.wind_kombi": lambda: f"{w.get('wind_speed', w.get('wind_speed_10m', '--'))} ({w.get('wind_gusts_10m', w.get('wind_gust', '--'))}) km/h",
+        # Text
+        "text.frei":         lambda: opts.get("text", "Text"),
+        "text.laufschrift":  lambda: opts.get("text", "Laufschrift"),
+        "text.mehrzeilig":   lambda: opts.get("text", "Zeile 1"),
+        "text.leer":         lambda: "",
     }
     resolver = resolvers.get(source)
     return resolver() if resolver else opts.get("text", "?")
@@ -97,19 +153,31 @@ def _resolve_value(source: str, stats: dict, weather: dict | None, opts: dict) -
 
 def _resolve_percent(source: str, stats: dict, weather: dict | None, opts: dict) -> float:
     """Prozentwert (0-100) einer Datenquelle."""
+    import re
+    dm = re.match(r'^(disk\.\w+)\.(\d+)$', source)
+    if dm:
+        source = dm.group(1)
+        opts = {**opts, "diskIdx": int(dm.group(2))}
     cpu = stats.get("cpu", {})
     ram = stats.get("ram", {})
     disks = stats.get("disks", [])
     fan = stats.get("fan", {})
+    w = weather or {}
     di = opts.get("diskIdx", 0)
     disk = disks[di] if di < len(disks) else {}
 
     pct_map = {
-        "cpu.percent":  cpu.get("percent", 0),
-        "cpu.temp":     min(100, cpu.get("temp", 0) / 80 * 100),
-        "ram.percent":  ram.get("percent", 0),
-        "disk.percent": disk.get("percent", 0),
-        "fan.duty":     fan.get("current_duty", 0),
+        "cpu.percent":   cpu.get("percent", 0),
+        "cpu.temp":      min(100, cpu.get("temp", 0) / 85 * 100),
+        "cpu.temp_pct":  min(100, cpu.get("temp", 0) / 85 * 100),
+        "ram.percent":   ram.get("percent", 0),
+        "ram.free_pct":  100 - ram.get("percent", 0),
+        "disk.percent":  disk.get("percent", 0),
+        "disk.free_pct": 100 - disk.get("percent", 0),
+        "fan.duty":      fan.get("current_duty", 0),
+        "fan.rpm_pct":   min(100, fan.get("rpm", 0) / 4000 * 100),
+        "wetter.feuchte": float(w.get("humidity", w.get("relative_humidity_2m", 0)) or 0),
+        "wetter.wolken":  float(w.get("cloud_cover", 0) or 0),
     }
     return pct_map.get(source, float(_resolve_value(source, stats, weather, opts) or 0))
 

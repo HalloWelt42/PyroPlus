@@ -9,7 +9,7 @@ export const TABS = [
   { id: 'ram',     label: 'RAM' },
   { id: 'disk',    label: 'Festplatten' },
   { id: 'net',     label: 'Netzwerk' },
-  { id: 'fan',     label: 'Luefter' },
+  { id: 'fan',     label: 'Lüfter' },
   { id: 'zeit',    label: 'Zeiten' },
   { id: 'wetter',  label: 'Wetter' },
   { id: 'text',    label: 'Texte' },
@@ -47,7 +47,7 @@ export const DATA_SOURCES = [
     getValue: (s) => _fmt(s?.ram?.used_gb) },
   { id: 'ram.total',      tab: 'ram', label: 'Gesamt',           unit: 'GB',  type: 'number',
     getValue: (s) => _fmt(s?.ram?.total_gb) },
-  { id: 'ram.available',  tab: 'ram', label: 'Verfuegbar',       unit: 'GB',  type: 'number',
+  { id: 'ram.available',  tab: 'ram', label: 'Verfügbar',       unit: 'GB',  type: 'number',
     getValue: (s) => _fmt(s?.ram?.available_gb) },
   { id: 'ram.percent',    tab: 'ram', label: 'Auslastung',       unit: '%',   type: 'percent',
     getValue: (s) => _pct(s?.ram?.percent), getRaw: (s) => s?.ram?.percent ?? 0 },
@@ -66,7 +66,7 @@ export const DATA_SOURCES = [
     getValue: (s, w, o) => _fmt(s?.disks?.[o?.diskIdx??0]?.used_gb) },
   { id: 'disk.total',     tab: 'disk', label: 'Gesamt',          unit: 'GB',  type: 'number', perDisk: true,
     getValue: (s, w, o) => _fmt(s?.disks?.[o?.diskIdx??0]?.total_gb) },
-  { id: 'disk.available', tab: 'disk', label: 'Verfuegbar',      unit: 'GB',  type: 'number', perDisk: true,
+  { id: 'disk.available', tab: 'disk', label: 'Verfügbar',      unit: 'GB',  type: 'number', perDisk: true,
     getValue: (s, w, o) => _fmt(s?.disks?.[o?.diskIdx??0]?.available_gb) },
   { id: 'disk.percent',   tab: 'disk', label: 'Auslastung',      unit: '%',   type: 'percent', perDisk: true,
     getValue: (s, w, o) => _pct(s?.disks?.[o?.diskIdx??0]?.percent),
@@ -107,7 +107,7 @@ export const DATA_SOURCES = [
     getRaw: (s) => s?.fan?.current_duty ?? 0 },
   { id: 'fan.level',      tab: 'fan', label: 'Stufe',            unit: '',    type: 'string',
     getValue: (s) => s?.fan?.level_name ?? '?' },
-  { id: 'fan.case',       tab: 'fan', label: 'Gehaeuseluefter',  unit: '',    type: 'string',
+  { id: 'fan.case',       tab: 'fan', label: 'Gehäuselüfter',  unit: '',    type: 'string',
     getValue: (s) => s?.fan?.case_on ? 'An' : 'Aus' },
   { id: 'fan.mode',       tab: 'fan', label: 'Modus',            unit: '',    type: 'string',
     getValue: (s) => s?.fan?.mode ?? '?' },
@@ -219,7 +219,7 @@ export const DISPLAY_MODES = [
   // ─── Zahlenwerte (alle Groessen) ───
   { id: 'zahl',            label: 'Zahl Klein (1x)',     forTypes: ALL_DATA },
   { id: 'zahl_gross',      label: 'Zahl Mittel (2x)',    forTypes: ALL_DATA },
-  { id: 'zahl_xl',         label: 'Zahl Gross (3x)',     forTypes: ALL_DATA },
+  { id: 'zahl_xl',         label: 'Zahl Groß (3x)',     forTypes: ALL_DATA },
   { id: 'zahl_xxl',        label: 'Zahl XXL (4x)',       forTypes: ALL_DATA },
   { id: 'zahl_breit',      label: 'Breit (X2 Y1)',       forTypes: ALL_DATA },
   { id: 'zahl_hoch',       label: 'Hoch (X1 Y2)',        forTypes: ALL_DATA },
@@ -228,7 +228,7 @@ export const DISPLAY_MODES = [
   // ─── Invertiert / Rahmen ───
   { id: 'text_invertiert',  label: 'Invertiert',          forTypes: ALL_DATA },
   { id: 'text_inv_gross',   label: 'Invertiert Mittel',   forTypes: ALL_DATA },
-  { id: 'text_inv_xl',      label: 'Invertiert Gross',    forTypes: ALL_DATA },
+  { id: 'text_inv_xl',      label: 'Invertiert Groß',    forTypes: ALL_DATA },
   { id: 'text_rahmen',      label: 'Mit Rahmen',          forTypes: ALL_DATA },
   { id: 'text_rahmen_gross', label: 'Rahmen Mittel',      forTypes: ALL_DATA },
   // ─── Balken (alle Numerischen) ───
@@ -241,23 +241,23 @@ export const DISPLAY_MODES = [
   { id: 'balken_voll',      label: 'Balken Volle Breite', forTypes: NUMERIC },
   // ─── Gauge ───
   { id: 'gauge',            label: 'Gauge Klein',         forTypes: NUMERIC },
-  { id: 'gauge_gross',      label: 'Gauge Gross',         forTypes: NUMERIC },
+  { id: 'gauge_gross',      label: 'Gauge Groß',         forTypes: NUMERIC },
   { id: 'gauge_xl',         label: 'Gauge XL',            forTypes: NUMERIC },
   // ─── Verlauf / Sparkline ───
   { id: 'sparkline',        label: 'Verlauf Klein',       forTypes: NUMERIC },
-  { id: 'sparkline_gross',  label: 'Verlauf Gross',       forTypes: NUMERIC },
+  { id: 'sparkline_gross',  label: 'Verlauf Groß',       forTypes: NUMERIC },
   { id: 'sparkline_breit',  label: 'Verlauf Breit',       forTypes: NUMERIC },
   { id: 'sparkline_voll',   label: 'Verlauf Volle Breite',forTypes: NUMERIC },
   // ─── Text / Laufschrift ───
   { id: 'text',             label: 'Text Klein',          forTypes: TEXT_LIKE },
   { id: 'text_gross',       label: 'Text Mittel',         forTypes: TEXT_LIKE },
-  { id: 'text_xl',          label: 'Text Gross',          forTypes: TEXT_LIKE },
+  { id: 'text_xl',          label: 'Text Groß',          forTypes: TEXT_LIKE },
   { id: 'laufschrift',      label: 'Laufschrift',         forTypes: ['string'] },
   // ─── Layout ───
   { id: 'linie_h',          label: 'Linie horizontal',    forTypes: ['shape'] },
   { id: 'linie_v',          label: 'Linie vertikal',      forTypes: ['shape'] },
   { id: 'rahmen_shape',     label: 'Rahmen',              forTypes: ['shape'] },
-  { id: 'block',            label: 'Block gefuellt',      forTypes: ['shape'] },
+  { id: 'block',            label: 'Block gefüllt',      forTypes: ['shape'] },
   { id: 'section',          label: 'Trennlinie',          forTypes: ['shape'] },
 ];
 
