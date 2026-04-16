@@ -412,14 +412,10 @@
       for (const idx of selSet) {
         const w = placedWidgets[idx];
         if (!w) continue;
-        const wt = widgetTypes[w.type];
-        if (!wt) continue;
-        const ww = wt.isShape ? (w.props.width || w.props.radius*2 || wt.w) : wt.w * (w.props.scaleX ?? w.props.scale ?? 1);
-        const wh = wt.isShape ? (w.props.height || w.props.radius*2 || wt.h) : wt.h * (w.props.scaleY ?? w.props.scale ?? 1);
+        const sz = w.source ? getWidgetSize(w) : _oldWidgetSize(w);
         ctx.strokeStyle = idx === selectedWidget ? 'rgba(0,180,255,0.7)' : 'rgba(0,232,138,0.5)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 2]);
-        ctx.strokeRect(w.x * zoom - 1, w.y * zoom - 1, ww * zoom + 2, wh * zoom + 2);
+        ctx.lineWidth = 1; ctx.setLineDash([4, 2]);
+        ctx.strokeRect(w.x * z - 1, w.y * z - 1, sz.w * z + 2, sz.h * z + 2);
         ctx.setLineDash([]);
       }
     }
@@ -430,13 +426,20 @@
   let drawing=$state(false), sx=0, sy=0, lx=-1, ly=-1, snap=null, mvStart=null;
   function m2p(e) { const r=canvasEl.getBoundingClientRect(); return [Math.max(0,Math.min(W-1,Math.floor((e.clientX-r.left)/zoom))),Math.max(0,Math.min(H-1,Math.floor((e.clientY-r.top)/zoom)))]; }
 
+  /* Alte Widget-Groesse berechnen (Abwaertskompatibilitaet) */
+  function _oldWidgetSize(w) {
+    const wt = widgetTypes[w.type];
+    if (!wt) return { w: 30, h: 7 };
+    const ww = wt.isShape ? (w.props?.width || wt.w) : wt.w * (w.props?.scaleX ?? w.props?.scale ?? 1);
+    const wh = wt.isShape ? (w.props?.height || wt.h) : wt.h * (w.props?.scaleY ?? w.props?.scale ?? 1);
+    return { w: ww, h: wh };
+  }
+
   function hitTestWidget(x, y) {
     for (let i = placedWidgets.length - 1; i >= 0; i--) {
       const w = placedWidgets[i];
-      const wt = widgetTypes[w.type];
-      if (!wt) continue;
-      const ww = wt.isShape ? (w.props.width || wt.w) : wt.w * (w.props.scaleX ?? w.props.scale ?? 1);
-      const wh = wt.isShape ? (w.props.height || wt.h) : wt.h * (w.props.scaleY ?? w.props.scale ?? 1);
+      const sz = w.source ? getWidgetSize(w) : _oldWidgetSize(w);
+      const ww = sz.w, wh = sz.h;
       if (x >= w.x && x < w.x + ww && y >= w.y && y < w.y + wh) return i;
     }
     return -1;

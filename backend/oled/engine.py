@@ -72,13 +72,12 @@ class OLEDEngine:
     def _create_defaults(self):
         self.screens = [
             {"type": "system", "name": "Uhr + System", "widgets": [
-                {"type": "clock", "x": 0, "y": 0, "font": "lg"},
-                {"type": "date", "x": 0, "y": 18, "font": "sm"},
-                {"type": "cpu_temp", "x": 0, "y": 30, "font": "sm", "prefix": "CPU "},
-                {"type": "ram_pct", "x": 0, "y": 40, "font": "sm", "prefix": "RAM "},
-                {"type": "net_ip", "x": 0, "y": 50, "font": "sm"},
+                {"source": "zeit.uhr_blink", "display": "zahl_xl", "x": 0, "y": 0, "opts": {"scaleX": 3, "scaleY": 3, "prefix": "", "suffix": ""}},
+                {"source": "zeit.tag_datum", "display": "zahl", "x": 0, "y": 24, "opts": {"scaleX": 1, "scaleY": 1, "prefix": "", "suffix": ""}},
+                {"source": "cpu.temp", "display": "zahl", "x": 0, "y": 36, "opts": {"scaleX": 1, "scaleY": 1, "prefix": "CPU ", "suffix": "C"}},
+                {"source": "ram.percent", "display": "zahl", "x": 0, "y": 46, "opts": {"scaleX": 1, "scaleY": 1, "prefix": "RAM ", "suffix": "%"}},
+                {"source": "net.ip", "display": "zahl", "x": 0, "y": 56, "opts": {"scaleX": 1, "scaleY": 1, "prefix": "", "suffix": ""}},
             ]},
-            {"type": "weather_compact", "name": "Wetter"},
         ]
         self._save_settings()
 
