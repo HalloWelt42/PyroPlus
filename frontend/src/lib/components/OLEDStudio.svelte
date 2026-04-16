@@ -478,6 +478,28 @@
     localStorage.setItem('pp-widget-presets', JSON.stringify(widgetPresets));
   }
 
+  /* Preset-Canvas rendern (Svelte Action) */
+  function renderPresetCanvas(canvas, preset) {
+    function draw() {
+      if (!canvas) return;
+      const bw = preset.boxW || 40, bh = preset.boxH || 12;
+      canvas.width = bw; canvas.height = bh;
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, bw, bh);
+      const buf = new Uint8Array(W * H);
+      const w = { source: preset.source, display: preset.display, x: 1, y: 1, opts: preset.opts || {} };
+      renderWidgetNew(buf, w, s.stats, weather, s.stats?.history || _hist);
+      ctx.fillStyle = '#fff';
+      for (let y = 0; y < bh && y < H; y++)
+        for (let x = 0; x < bw && x < W; x++)
+          if (buf[y * W + x]) ctx.fillRect(x, y, 1, 1);
+    }
+    draw();
+    const iv = setInterval(draw, 1000);
+    return { destroy() { clearInterval(iv); } };
+  }
+
   function placePresetOnScreen(preset) {
     const w = {
       id: Date.now() + Math.random(),
@@ -1136,6 +1158,19 @@
         <button class="pb-btn" onclick={()=>{if(showProfileSave&&profileSaveName){saveProfile(profileSaveName);showProfileSave=false;profileSaveName='';}else{showProfileSave=!showProfileSave;profileSaveName=activeProfile||'';}}} title="Profil speichern"><i class="fa-solid fa-floppy-disk"></i></button>
       </div>
 
+      <!-- Top-Bar: Gespeicherte Widgets -->
+      {#if widgetPresets.length > 0}
+        <div class="preset-bar">
+          {#each widgetPresets as pr}
+            <div class="preset-item" onclick={()=>placePresetOnScreen(pr)} title="{pr.name} — Klick zum Platzieren">
+              <canvas class="preset-canvas" use:renderPresetCanvas={pr} width={pr.boxW||40} height={pr.boxH||12} style="width:{(pr.boxW||40)*2}px;height:{(pr.boxH||12)*2}px"></canvas>
+              <span class="preset-label">{pr.name}</span>
+              <button class="preset-del" onclick={(e)=>{e.stopPropagation();deleteWidgetPreset(pr.id);}}>&times;</button>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
       {#if editorMode === 'widget'}
         <!-- ═══ WIDGET-EDITOR: Golden Ratio Split ═══ -->
         <div class="widget-editor">
@@ -1307,6 +1342,39 @@
 
   /* Editor-Bar (Modus + Profile) */
   .editor-bar { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-bottom: 1px solid var(--border); background: var(--bg-base); flex-shrink: 0; }
+
+  /* Preset-Bar (gespeicherte Widgets) */
+  .preset-bar {
+    display: flex; gap: 6px; overflow-x: auto; padding: 5px 10px;
+    border-bottom: 1px solid var(--border); background: var(--bg-surface);
+    flex-shrink: 0; align-items: flex-end; scrollbar-width: thin;
+  }
+  .preset-item {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    cursor: pointer; flex-shrink: 0; padding: 3px;
+    border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--bg-elevated); position: relative;
+    transition: border-color 120ms;
+  }
+  .preset-item:hover { border-color: var(--accent); }
+  .preset-canvas {
+    image-rendering: pixelated; image-rendering: crisp-edges;
+    background: #000; border-radius: 2px; display: block;
+  }
+  .preset-label {
+    font: 500 8px var(--font); color: var(--text-muted);
+    max-width: 80px; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; text-align: center; line-height: 1;
+  }
+  .preset-del {
+    position: absolute; top: -4px; right: -4px;
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--bg-elevated);
+    color: var(--text-muted); cursor: pointer; font-size: 9px;
+    display: none; align-items: center; justify-content: center; line-height: 1;
+  }
+  .preset-item:hover .preset-del { display: flex; }
+  .preset-del:hover { color: var(--red); border-color: var(--red); }
   .mode-switch { display: flex; gap: 1px; background: var(--bg-surface); border-radius: var(--radius-sm); padding: 2px; flex-shrink: 0; }
   .mode-switch button { padding: 4px 12px; border: none; background: none; color: var(--text-muted); font: 600 var(--fs-xs) var(--font); cursor: pointer; border-radius: var(--radius-sm); }
   .mode-switch button.active { background: var(--accent); color: #fff; }
