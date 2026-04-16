@@ -100,7 +100,7 @@
   /* ═══ WERKZEUGE ═══ */
   let tool = $state('pencil'), penSize = $state(1), filled = $state(false);
   let textInput = $state('HELLO'), textScale = $state(1);
-  let showGrid = $state(true), zoom = $state(6);
+  let showGrid = $state(true), zoom = $state(6), widgetZoom = $state(2);
   let cursorX = $state(-1), cursorY = $state(-1);
 
   const drawTools = [
@@ -382,7 +382,8 @@
   function render() {
     const comp = E.composite(layers);
     if (canvasEl) {
-      E.renderCanvas(canvasEl.getContext('2d'), comp, zoom, showGrid);
+      const z = editorMode === 'widget' ? widgetZoom : zoom;
+      E.renderCanvas(canvasEl.getContext('2d'), comp, z, editorMode === 'raster' && showGrid);
       const ctx = canvasEl.getContext('2d');
       // Multi-Select Rahmen
       const selSet = selectedWidgets.size > 0 ? selectedWidgets : (selectedWidget >= 0 ? new Set([selectedWidget]) : new Set());
@@ -696,7 +697,7 @@
   }
 
   /* ═══ PANEL D&D ═══ */
-  let lpanels=$state(['preview','props','layers','widgets']), rpanels=$state(['tools','display','weather']);
+  let lpanels=$state(['preview','props','layers']), rpanels=$state(['tools','display']);
   let pdragId=$state(null), pdropSide=$state(null);
   function pDragStart(e,id){pdragId=id;e.dataTransfer.setData('application/x-oled-panel',id);e.dataTransfer.effectAllowed='move';}
   function pDragEnd(){pdragId=null;pdropSide=null;}
@@ -754,7 +755,7 @@
   }
 
   /* Panel-Metadaten */
-  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, widgets:{icon:'puzzle-piece',label:'Widgets',c:true}, weather:{icon:'cloud-sun',label:'Wetter-Ort',c:true} };
+  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, weather:{icon:'cloud-sun',label:'Wetter-Ort',c:true} };
 
   /* Vorlagen entfernt — Profile ersetzen Vorlagen */
   function panelIcon(id) { return _pd[id]?.icon || 'circle'; }
@@ -1001,7 +1002,7 @@
         <!-- ═══ WIDGET-EDITOR: Golden Ratio Split ═══ -->
         <div class="widget-editor">
           <div class="we-canvas">
-            <div class="canvas-scroll"><canvas bind:this={canvasEl} width={W*zoom} height={H*zoom} onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} oncontextmenu={onContext} style="width:{W*zoom}px;height:{H*zoom}px"></canvas></div>
+            <div class="canvas-scroll"><canvas bind:this={canvasEl} width={W*widgetZoom} height={H*widgetZoom} onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} oncontextmenu={onContext} style="width:{W*widgetZoom}px;height:{H*widgetZoom}px"></canvas></div>
           </div>
           <div class="we-browser">
             <div class="tab-bar">
@@ -1123,7 +1124,7 @@
 
   /* Widget-Editor (Golden Ratio) */
   .widget-editor { flex: 1; display: flex; overflow: hidden; }
-  .we-canvas { width: 38.2%; flex-shrink: 0; overflow: auto; display: flex; align-items: flex-start; justify-content: flex-start; padding: 12px; }
+  .we-canvas { flex-shrink: 0; overflow: auto; display: flex; align-items: flex-start; justify-content: flex-start; padding: 12px; }
   .we-browser { flex: 1; display: flex; flex-direction: column; border-left: 1px solid var(--border); background: var(--bg-base); overflow: hidden; }
   .tab-bar { display: flex; gap: 1px; border-bottom: 2px solid var(--border); flex-shrink: 0; overflow-x: auto; background: var(--bg-surface); }
   .tab-btn { padding: 7px 10px; border: none; background: none; color: var(--text-muted); font: 600 9px var(--font); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.04em; }
