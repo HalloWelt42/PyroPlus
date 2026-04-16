@@ -367,20 +367,25 @@
     autoSave();
   }
 
-  /* Widget-Rendering alle Sekunde aktualisieren (für Uhr etc.) + History sammeln */
-  let _widgetTimer;
-  function startWidgetTimer() { _widgetTimer = setInterval(() => {
-    // History für Sparklines sammeln
-    _hist.cpu.push(s.stats?.cpu?.percent || 0);
-    _hist.temp.push(s.stats?.cpu?.temp || 0);
-    _hist.ram.push(s.stats?.ram?.percent || 0);
-    if (_hist.cpu.length > HIST_LEN) _hist.cpu.shift();
-    if (_hist.temp.length > HIST_LEN) _hist.temp.shift();
-    if (_hist.ram.length > HIST_LEN) _hist.ram.shift();
-    if (placedWidgets.length > 0) renderWidgets();
-    renderAllPreviews();
-  }, 1000); }
-  function stopWidgetTimer() { clearInterval(_widgetTimer); }
+  /* Widget-Rendering 5fps, History + Previews 1x/s */
+  let _renderTimer, _statsTimer;
+  function startWidgetTimer() {
+    // Rendering 5fps (200ms)
+    _renderTimer = setInterval(() => {
+      if (placedWidgets.length > 0) renderWidgets();
+    }, 200);
+    // History + Vorschau-Leiste nur 1x/s
+    _statsTimer = setInterval(() => {
+      _hist.cpu.push(s.stats?.cpu?.percent || 0);
+      _hist.temp.push(s.stats?.cpu?.temp || 0);
+      _hist.ram.push(s.stats?.ram?.percent || 0);
+      if (_hist.cpu.length > HIST_LEN) _hist.cpu.shift();
+      if (_hist.temp.length > HIST_LEN) _hist.temp.shift();
+      if (_hist.ram.length > HIST_LEN) _hist.ram.shift();
+      renderAllPreviews();
+    }, 1000);
+  }
+  function stopWidgetTimer() { clearInterval(_renderTimer); clearInterval(_statsTimer); }
 
   /* ═══ CANVAS ═══ */
   let canvasEl = $state(null), previewEl = $state(null);
