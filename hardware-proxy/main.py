@@ -31,7 +31,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("hw-proxy")
 
-VERSION = "3.3.0"
+VERSION = "3.4.0"
 PORT = 8072
 
 # ─── Hardware State ─────────────────────────────────────────

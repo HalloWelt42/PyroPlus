@@ -288,6 +288,10 @@
   /* Platzierte Widgets — jedes hat Position, Typ, eigene Eigenschaften */
   let placedWidgets = $state([]);
   let selectedWidget = $state(-1);
+  let selectedWidgets = $state(new Set()); // Multi-Select
+
+  /* Kontextmenü */
+  let ctxMenu = $state(null); // { x, y, widgetIdx }
 
   let snapGrid = $state(0); // 0=aus, 4/8/16=Rasterweite
 
@@ -383,20 +387,21 @@
     const comp = E.composite(layers);
     if (canvasEl) {
       E.renderCanvas(canvasEl.getContext('2d'), comp, zoom, showGrid);
-      // Widget-Rahmen zeichnen
-      if (selectedWidget >= 0 && placedWidgets[selectedWidget]) {
-        const ctx = canvasEl.getContext('2d');
-        const w = placedWidgets[selectedWidget];
+      const ctx = canvasEl.getContext('2d');
+      // Multi-Select Rahmen
+      const selSet = selectedWidgets.size > 0 ? selectedWidgets : (selectedWidget >= 0 ? new Set([selectedWidget]) : new Set());
+      for (const idx of selSet) {
+        const w = placedWidgets[idx];
+        if (!w) continue;
         const wt = widgetTypes[w.type];
-        if (wt) {
-          const ww = wt.isShape ? (w.props.width || wt.w) : wt.w * (w.props.scaleX ?? w.props.scale ?? 1);
-          const wh = wt.isShape ? (w.props.height || wt.h) : wt.h * (w.props.scaleY ?? w.props.scale ?? 1);
-          ctx.strokeStyle = 'rgba(0,180,255,0.7)';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([4, 2]);
-          ctx.strokeRect(w.x * zoom - 1, w.y * zoom - 1, ww * zoom + 2, wh * zoom + 2);
-          ctx.setLineDash([]);
-        }
+        if (!wt) continue;
+        const ww = wt.isShape ? (w.props.width || w.props.radius*2 || wt.w) : wt.w * (w.props.scaleX ?? w.props.scale ?? 1);
+        const wh = wt.isShape ? (w.props.height || w.props.radius*2 || wt.h) : wt.h * (w.props.scaleY ?? w.props.scale ?? 1);
+        ctx.strokeStyle = idx === selectedWidget ? 'rgba(0,180,255,0.7)' : 'rgba(0,232,138,0.5)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 2]);
+        ctx.strokeRect(w.x * zoom - 1, w.y * zoom - 1, ww * zoom + 2, wh * zoom + 2);
+        ctx.setLineDash([]);
       }
     }
     if (previewEl) E.renderPreview(previewEl.getContext('2d'), comp);
@@ -421,22 +426,38 @@
   let widgetDrag = null;
   function onDown(e) {
     if (!canvasEl) return;
+    ctxMenu = null; // Kontextmenü schließen
     const [x,y]=m2p(e);
 
-    // Widget-Klick prüfen (im Move-Modus oder bei Rechtsklick)
+    // Widget-Klick prüfen (im Move-Modus)
     if (tool === 'move') {
       const hit = hitTestWidget(x, y);
       if (hit >= 0) {
+        // Shift+Klick = Multi-Select toggle
+        if (e.shiftKey) {
+          const ns = new Set(selectedWidgets);
+          if (ns.has(hit)) ns.delete(hit); else ns.add(hit);
+          selectedWidgets = ns;
+          selectedWidget = hit;
+          render();
+          return;
+        }
         selectedWidget = hit;
-        widgetDrag = { idx: hit, startX: x, startY: y, origX: placedWidgets[hit].x, origY: placedWidgets[hit].y };
+        if (!selectedWidgets.has(hit)) selectedWidgets = new Set([hit]);
+        // Multi-Drag: Startpositionen aller selektierten Widgets merken
+        const origins = new Map();
+        for (const idx of selectedWidgets) origins.set(idx, { x: placedWidgets[idx].x, y: placedWidgets[idx].y });
+        widgetDrag = { idx: hit, startX: x, startY: y, origX: placedWidgets[hit].x, origY: placedWidgets[hit].y, origins };
         drawing = true;
         render();
         return;
       }
     }
 
-    // Klick ohne Tool-Aktion = Widget abwählen
-    selectedWidget = hitTestWidget(x, y);
+    // Klick ohne Shift = Einzel-Select oder abwählen
+    const hit2 = hitTestWidget(x, y);
+    selectedWidget = hit2;
+    selectedWidgets = hit2 >= 0 ? new Set([hit2]) : new Set();
     render();
 
     drawing=true; sx=x; sy=y; lx=x; ly=y;
@@ -450,11 +471,19 @@
     if (!canvasEl) return;
     const [x,y]=m2p(e); cursorX=x; cursorY=y;
     if (!drawing) return;
-    // Widget-Drag
+    // Widget-Drag (Multi oder Einzel)
     if (widgetDrag) {
       const dx = x - widgetDrag.startX, dy = y - widgetDrag.startY;
-      placedWidgets[widgetDrag.idx].x = Math.max(0, Math.min(W-1, widgetDrag.origX + dx));
-      placedWidgets[widgetDrag.idx].y = Math.max(0, Math.min(H-1, widgetDrag.origY + dy));
+      if (widgetDrag.origins && widgetDrag.origins.size > 1) {
+        // Multi-Drag
+        for (const [idx, orig] of widgetDrag.origins) {
+          placedWidgets[idx].x = Math.max(0, Math.min(W-1, orig.x + dx));
+          placedWidgets[idx].y = Math.max(0, Math.min(H-1, orig.y + dy));
+        }
+      } else {
+        placedWidgets[widgetDrag.idx].x = Math.max(0, Math.min(W-1, widgetDrag.origX + dx));
+        placedWidgets[widgetDrag.idx].y = Math.max(0, Math.min(H-1, widgetDrag.origY + dy));
+      }
       placedWidgets = [...placedWidgets];
       renderWidgets();
       return;
@@ -476,6 +505,50 @@
     }
   }
   function onUp(){if(!drawing)return;if(widgetDrag){widgetDrag=null;drawing=false;return;}if(snap)pushH();if(tool==='move'&&mvStart){pushH();mvStart=null;}drawing=false;snap=null;}
+
+  function onContext(e) {
+    e.preventDefault();
+    if (!canvasEl) return;
+    const [x,y]=m2p(e);
+    const hit = hitTestWidget(x, y);
+    if (hit >= 0) {
+      selectedWidget = hit;
+      if (!selectedWidgets.has(hit)) selectedWidgets = new Set([hit]);
+      ctxMenu = { x: e.clientX, y: e.clientY, widgetIdx: hit };
+      render();
+    } else {
+      ctxMenu = null;
+    }
+  }
+
+  function ctxAction(action) {
+    const idx = ctxMenu?.widgetIdx;
+    if (idx == null || idx < 0) { ctxMenu = null; return; }
+    if (action === 'dup') {
+      const src = placedWidgets[idx];
+      placedWidgets = [...placedWidgets, { ...JSON.parse(JSON.stringify(src)), id: Date.now(), x: src.x+4, y: src.y+4 }];
+      selectedWidget = placedWidgets.length - 1;
+      selectedWidgets = new Set([selectedWidget]);
+      renderWidgets();
+    } else if (action === 'del') {
+      placedWidgets = placedWidgets.filter((_, i) => i !== idx);
+      selectedWidget = -1; selectedWidgets = new Set();
+      renderWidgets();
+    } else if (action === 'front') {
+      const [w] = placedWidgets.splice(idx, 1);
+      placedWidgets = [...placedWidgets, w];
+      selectedWidget = placedWidgets.length - 1;
+      selectedWidgets = new Set([selectedWidget]);
+      renderWidgets();
+    } else if (action === 'back') {
+      const [w] = placedWidgets.splice(idx, 1);
+      placedWidgets = [w, ...placedWidgets];
+      selectedWidget = 0;
+      selectedWidgets = new Set([0]);
+      renderWidgets();
+    }
+    ctxMenu = null;
+  }
   function clearLayer(){pushH();ap()?.fill(0);render();}
   function invertLayer(){pushH();const px=ap();if(px)for(let i=0;i<px.length;i++)px[i]=px[i]?0:1;render();}
   async function sendToOled() {
@@ -639,23 +712,44 @@
     if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
     if(e.ctrlKey&&e.key==='z'){undo();e.preventDefault();}
     if(e.ctrlKey&&e.key==='y'){redo();e.preventDefault();}
-    if(e.ctrlKey&&e.key==='d'&&selectedWidget>=0){
-      // Duplizieren
-      const src=placedWidgets[selectedWidget];
-      placedWidgets=[...placedWidgets,{...JSON.parse(JSON.stringify(src)),id:Date.now(),x:src.x+4,y:src.y+4}];
-      selectedWidget=placedWidgets.length-1;renderWidgets();e.preventDefault();return;
+    if(e.ctrlKey&&e.key==='d'){
+      // Duplizieren (Multi oder Einzel)
+      const indices = selectedWidgets.size > 0 ? [...selectedWidgets] : (selectedWidget >= 0 ? [selectedWidget] : []);
+      if(indices.length > 0){
+        const newSel = new Set();
+        for(const idx of indices){
+          const src=placedWidgets[idx];
+          placedWidgets=[...placedWidgets,{...JSON.parse(JSON.stringify(src)),id:Date.now()+Math.random(),x:src.x+4,y:src.y+4}];
+          newSel.add(placedWidgets.length-1);
+        }
+        selectedWidgets=newSel;selectedWidget=[...newSel][0];renderWidgets();e.preventDefault();return;
+      }
     }
-    if((e.key==='Delete'||e.key==='Backspace')&&selectedWidget>=0){removeWidget(selectedWidget);e.preventDefault();return;}
-    // Arrow-Key Nudge (1px, Shift=8px)
-    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)&&selectedWidget>=0){
-      const step=e.shiftKey?(snapGrid||8):1;
-      const w=placedWidgets[selectedWidget];
-      if(e.key==='ArrowLeft')w.x=Math.max(0,w.x-step);
-      if(e.key==='ArrowRight')w.x=Math.min(W-1,w.x+step);
-      if(e.key==='ArrowUp')w.y=Math.max(0,w.y-step);
-      if(e.key==='ArrowDown')w.y=Math.min(H-1,w.y+step);
-      if(snapGrid>0){w.x=snapPos(w.x);w.y=snapPos(w.y);}
-      placedWidgets=[...placedWidgets];renderWidgets();e.preventDefault();return;
+    if(e.ctrlKey&&e.key==='a'){
+      // Alle selektieren
+      selectedWidgets=new Set(placedWidgets.map((_,i)=>i));
+      if(placedWidgets.length>0)selectedWidget=0;
+      render();e.preventDefault();return;
+    }
+    if((e.key==='Delete'||e.key==='Backspace')){
+      const indices = selectedWidgets.size > 0 ? [...selectedWidgets].sort((a,b)=>b-a) : (selectedWidget >= 0 ? [selectedWidget] : []);
+      if(indices.length > 0){ for(const idx of indices) placedWidgets.splice(idx,1); placedWidgets=[...placedWidgets]; selectedWidget=-1; selectedWidgets=new Set(); renderWidgets(); e.preventDefault(); return; }
+    }
+    // Arrow-Key Nudge (Multi oder Einzel)
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
+      const indices = selectedWidgets.size > 0 ? [...selectedWidgets] : (selectedWidget >= 0 ? [selectedWidget] : []);
+      if(indices.length > 0){
+        const step=e.shiftKey?(snapGrid||8):1;
+        for(const idx of indices){
+          const w=placedWidgets[idx];
+          if(e.key==='ArrowLeft')w.x=Math.max(0,w.x-step);
+          if(e.key==='ArrowRight')w.x=Math.min(W-1,w.x+step);
+          if(e.key==='ArrowUp')w.y=Math.max(0,w.y-step);
+          if(e.key==='ArrowDown')w.y=Math.min(H-1,w.y+step);
+          if(snapGrid>0){w.x=snapPos(w.x);w.y=snapPos(w.y);}
+        }
+        placedWidgets=[...placedWidgets];renderWidgets();e.preventDefault();return;
+      }
     }
     if(e.key==='g'){showGrid=!showGrid;render();}
     if(e.key==='+')zoom=Math.min(16,zoom+1);
@@ -829,6 +923,44 @@
   let _saveTimer = 0;
   function autoSave() { clearTimeout(_saveTimer); _saveTimer = setTimeout(saveState, 1000); }
 
+  /* ═══ PROFIL-SYSTEM ═══ */
+  let profiles = $state(JSON.parse(localStorage.getItem('pp-oled-profiles') || '[]'));
+  let activeProfile = $state('');
+
+  function saveProfile(name) {
+    if (!name) return;
+    saveCurrentScreen();
+    const profile = {
+      name, created: new Date().toISOString(),
+      screens: JSON.parse(JSON.stringify(screens)),
+      rotation, rotationInterval,
+    };
+    profiles = [...profiles.filter(p => p.name !== name), profile];
+    localStorage.setItem('pp-oled-profiles', JSON.stringify(profiles));
+    activeProfile = name;
+    s.toast(`Profil "${name}" gespeichert`, 'ok');
+  }
+
+  function loadProfile(p) {
+    screens = p.screens.map((sc, i) => ({ ...sc, id: i }));
+    _screenId = screens.length;
+    rotation = p.rotation || false;
+    rotationInterval = p.rotationInterval || 10;
+    activeProfile = p.name;
+    switchScreen(screens[0]?.id ?? 0);
+    s.toast(`Profil "${p.name}" geladen`, 'ok');
+  }
+
+  function deleteProfile(name) {
+    profiles = profiles.filter(p => p.name !== name);
+    localStorage.setItem('pp-oled-profiles', JSON.stringify(profiles));
+    if (activeProfile === name) activeProfile = '';
+    s.toast(`Profil "${name}" gelöscht`, 'ok');
+  }
+
+  let showProfileSave = $state(false);
+  let profileSaveName = $state('');
+
   onMount(()=>{loadState();pushH();renderWidgets();startWidgetTimer();fetchWeather();setInterval(fetchWeather,300000);});
   onDestroy(()=>{stopWidgetTimer();saveState();});
   $effect(()=>{zoom;showGrid;render();autoSave();});
@@ -986,7 +1118,33 @@
       {/each}
     </div>
     <div class="canvas-area">
-      <div class="canvas-scroll"><canvas bind:this={canvasEl} width={W*zoom} height={H*zoom} onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} style="width:{W*zoom}px;height:{H*zoom}px"></canvas></div>
+      <!-- Profil-Leiste -->
+      <div class="profile-bar">
+        <span class="pb-label"><i class="fa-solid fa-bookmark"></i></span>
+        <div class="pb-chips">
+          {#each profiles as p}
+            <button class="pb-chip" class:active={activeProfile===p.name} onclick={()=>loadProfile(p)} title="Profil laden: {p.name}">
+              {p.name}
+              <span class="pb-del" onclick={(e)=>{e.stopPropagation();deleteProfile(p.name);}}><i class="fa-solid fa-xmark"></i></span>
+            </button>
+          {/each}
+          {#if profiles.length === 0}<span class="pb-empty">Keine Profile</span>{/if}
+        </div>
+        {#if showProfileSave}
+          <input class="pb-input" type="text" placeholder="Name..." bind:value={profileSaveName} onkeydown={(e)=>{if(e.key==='Enter'&&profileSaveName){saveProfile(profileSaveName);showProfileSave=false;profileSaveName='';}if(e.key==='Escape')showProfileSave=false;}} />
+        {/if}
+        <button class="pb-save" onclick={()=>{if(showProfileSave&&profileSaveName){saveProfile(profileSaveName);showProfileSave=false;profileSaveName='';}else{showProfileSave=!showProfileSave;profileSaveName=activeProfile||'';}}} title="Aktuelles Layout als Profil speichern"><i class="fa-solid fa-floppy-disk"></i></button>
+      </div>
+      <div class="canvas-scroll"><canvas bind:this={canvasEl} width={W*zoom} height={H*zoom} onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} oncontextmenu={onContext} style="width:{W*zoom}px;height:{H*zoom}px"></canvas></div>
+      {#if ctxMenu}
+        <div class="ctx-menu" style="left:{ctxMenu.x}px;top:{ctxMenu.y}px">
+          <button class="ctx-item" onclick={()=>ctxAction('dup')}><i class="fa-solid fa-copy"></i> Duplizieren</button>
+          <button class="ctx-item" onclick={()=>ctxAction('front')}><i class="fa-solid fa-arrow-up"></i> Nach vorne</button>
+          <button class="ctx-item" onclick={()=>ctxAction('back')}><i class="fa-solid fa-arrow-down"></i> Nach hinten</button>
+          <div class="ctx-sep"></div>
+          <button class="ctx-item ctx-del" onclick={()=>ctxAction('del')}><i class="fa-solid fa-trash-can"></i> Löschen</button>
+        </div>
+      {/if}
       <!-- Screen-Galerie unten -->
       <div class="screen-gallery">
         <div class="sg-strip">
@@ -1142,6 +1300,57 @@
   .sg-controls { display: flex; gap: 12px; align-items: center; }
   .sg-ctrl { display: flex; align-items: center; gap: 6px; font: 500 var(--fs-xs) var(--font); color: var(--text-muted); }
   .sg-ctrl input { width: 80px; }
+
+  /* Profil-Leiste */
+  .profile-bar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-bottom: 1px solid var(--border);
+    background: var(--bg-surface); flex-shrink: 0; min-height: 36px;
+  }
+  .pb-label { color: var(--accent); font-size: var(--fs-sm); flex-shrink: 0; }
+  .pb-chips { display: flex; gap: 4px; overflow-x: auto; flex: 1; }
+  .pb-chip {
+    display: flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 12px;
+    border: 1px solid var(--border); background: var(--bg-elevated);
+    color: var(--text-secondary); font: 500 var(--fs-xs) var(--font);
+    cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  }
+  .pb-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .pb-chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .pb-del { font-size: 9px; color: var(--text-muted); cursor: pointer; margin-left: 2px; }
+  .pb-del:hover { color: var(--red); }
+  .pb-empty { font: 500 var(--fs-xs) var(--font); color: var(--text-muted); }
+  .pb-input {
+    width: 120px; padding: 3px 8px; border: 1px solid var(--accent);
+    background: var(--bg-elevated); color: var(--text-primary);
+    border-radius: 12px; font: 500 var(--fs-xs) var(--mono); flex-shrink: 0;
+  }
+  .pb-save {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--bg-elevated);
+    color: var(--text-muted); cursor: pointer; font-size: var(--fs-xs);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .pb-save:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Kontextmenue */
+  .ctx-menu {
+    position: fixed; z-index: 100;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    padding: 4px; min-width: 160px;
+  }
+  .ctx-item {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 7px 12px; border: none; background: none; border-radius: var(--radius-sm);
+    color: var(--text-secondary); font: 500 var(--fs-sm) var(--font);
+    cursor: pointer; text-align: left;
+  }
+  .ctx-item:hover { background: rgba(0,180,255,0.1); color: var(--accent); }
+  .ctx-item i { width: 16px; text-align: center; font-size: var(--fs-xs); }
+  .ctx-del:hover { background: rgba(255,60,60,0.1); color: var(--red); }
+  .ctx-sep { height: 1px; background: var(--border); margin: 3px 8px; }
 
   @media (max-width: 900px) { .side-panel { width: 200px; } }
 </style>
