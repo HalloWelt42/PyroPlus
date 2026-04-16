@@ -260,9 +260,55 @@ export const LAYOUT_SOURCES = [
 
 export const ALL_SOURCES = [...DATA_SOURCES, ...LAYOUT_SOURCES];
 
-export function getSource(id) { return ALL_SOURCES.find(s => s.id === id); }
+export function getSource(id) {
+  // Direkt finden
+  const direct = ALL_SOURCES.find(s => s.id === id);
+  if (direct) return direct;
+  // Dynamische Disk-ID: "disk.used.2" → base "disk.used", diskIdx 2
+  const m = id?.match(/^(disk\.\w+)\.(\d+)$/);
+  if (m) {
+    const base = ALL_SOURCES.find(s => s.id === m[1]);
+    if (base) {
+      const di = parseInt(m[2]);
+      return { ...base, id, _diskIdx: di,
+        getValue: (s, w, o) => base.getValue(s, w, { ...o, diskIdx: di }),
+        getRaw: base.getRaw ? (s, w, o) => base.getRaw(s, w, { ...o, diskIdx: di }) : undefined,
+      };
+    }
+  }
+  return null;
+}
 export function getModesForType(type) { return DISPLAY_MODES.filter(m => m.forTypes.includes(type)); }
-export function getSourcesForTab(tab) { return ALL_SOURCES.filter(s => s.tab === tab); }
+
+/**
+ * Quellen fuer einen Tab holen.
+ * Fuer 'disk': dynamisch pro gefundener Disk expandieren.
+ * stats muss uebergeben werden damit Disk-Anzahl bekannt ist.
+ */
+export function getSourcesForTab(tab, stats) {
+  if (tab === 'disk' && stats?.disks?.length > 0) {
+    const result = [];
+    for (let i = 0; i < stats.disks.length; i++) {
+      const d = stats.disks[i];
+      const lbl = d.label || d.mount || `Disk ${i}`;
+      // Separator pro Disk
+      result.push({ id: `_disk_header_${i}`, tab: 'disk', label: `── ${lbl} (${d.mount}) ──`, type: '_header', isHeader: true });
+      // Alle Disk-Quellen mit fixem diskIdx
+      for (const src of ALL_SOURCES.filter(s => s.tab === 'disk' && s.perDisk)) {
+        result.push({
+          ...src,
+          id: `${src.id}.${i}`,
+          label: src.label,
+          _diskIdx: i,
+          getValue: (s, w, o) => src.getValue(s, w, { ...o, diskIdx: i }),
+          getRaw: src.getRaw ? (s, w, o) => src.getRaw(s, w, { ...o, diskIdx: i }) : undefined,
+        });
+      }
+    }
+    return result;
+  }
+  return ALL_SOURCES.filter(s => s.tab === tab && !s.perDisk);
+}
 
 export const HISTORY_KEYS = {
   'cpu.percent': 'cpu', 'cpu.temp': 'temp', 'cpu.temp_pct': 'temp',

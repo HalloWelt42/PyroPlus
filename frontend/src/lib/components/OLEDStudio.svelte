@@ -382,14 +382,60 @@
   }
 
   function _buildSimStats() {
-    // Simulierte Stats mit cfgSimVal fuer die aktive Quelle
     const base = JSON.parse(JSON.stringify(s.stats || {}));
     const v = cfgSimVal;
     const src = configSource?.id || '';
-    if (src.startsWith('cpu.')) { if (!base.cpu) base.cpu = {}; base.cpu.temp = v; base.cpu.percent = v; base.cpu.temp_min = v*0.8; base.cpu.temp_max = v*1.1; }
-    if (src.startsWith('ram.')) { if (!base.ram) base.ram = {}; base.ram.percent = v; base.ram.used_gb = v/100*16; base.ram.total_gb = 16; base.ram.available_gb = 16-v/100*16; }
-    if (src.startsWith('disk.')) { if (!base.disks?.[0]) base.disks = [{}]; base.disks[0].percent = v; base.disks[0].used_gb = v/100*500; base.disks[0].total_gb = 500; }
-    if (src.startsWith('fan.')) { if (!base.fan) base.fan = {}; base.fan.rpm = Math.round(v*40); base.fan.current_duty = v; }
+    const di = configSource?._diskIdx ?? 0;
+    const totalRam = base.ram?.total_gb || 16;
+    const totalDisk = base.disks?.[di]?.total_gb || 500;
+
+    // CPU
+    if (!base.cpu) base.cpu = {};
+    if (src.startsWith('cpu.') || src === 'cpu.temp_pct') {
+      base.cpu.temp = v; base.cpu.percent = v;
+      base.cpu.temp_min = Math.round(v * 0.7);
+      base.cpu.temp_max = Math.round(v * 1.2);
+      base.cpu.cores = base.cpu.cores || 4;
+    }
+    // RAM
+    if (!base.ram) base.ram = {};
+    if (src.startsWith('ram.')) {
+      base.ram.percent = v;
+      base.ram.used_gb = v / 100 * totalRam;
+      base.ram.total_gb = totalRam;
+      base.ram.available_gb = totalRam - v / 100 * totalRam;
+    }
+    // Disk
+    if (!base.disks) base.disks = [];
+    while (base.disks.length <= di) base.disks.push({ label: `Disk ${base.disks.length}`, mount: '/', total_gb: 500 });
+    if (src.startsWith('disk.')) {
+      base.disks[di].percent = v;
+      base.disks[di].used_gb = v / 100 * totalDisk;
+      base.disks[di].available_gb = totalDisk - v / 100 * totalDisk;
+      base.disks[di].total_gb = totalDisk;
+    }
+    // Fan
+    if (!base.fan) base.fan = {};
+    if (src.startsWith('fan.')) {
+      base.fan.rpm = Math.round(v * 40);
+      base.fan.current_duty = v;
+      base.fan.level_name = v > 66 ? 'Voll' : v > 33 ? 'Mittel' : v > 0 ? 'Leise' : 'Aus';
+      base.fan.case_on = v > 50;
+    }
+    // Net
+    if (!base.network) base.network = {};
+    if (src.startsWith('net.')) {
+      base.network.rx_bytes_sec = Math.round(v * 10240);
+      base.network.tx_bytes_sec = Math.round(v * 5120);
+    }
+    // Uptime
+    if (!base.uptime) base.uptime = {};
+    if (src.startsWith('zeit.uptime')) {
+      const sec = Math.round(v * 864);
+      const h = Math.floor(sec / 3600); const m = Math.floor((sec % 3600) / 60);
+      base.uptime.seconds = sec;
+      base.uptime.formatted = h > 24 ? `${Math.floor(h/24)}d ${h%24}h ${m}m` : `${h}h ${m}m`;
+    }
     return base;
   }
 
@@ -1103,12 +1149,16 @@
               {/each}
             </div>
             <div class="tab-content">
-              {#each getSourcesForTab(activeTab) as src}
-                {@const val = src.getValue ? src.getValue(s.stats, weather, {}) : '—'}
-                <button class="data-row" class:active={configSource?.id===src.id} onclick={()=>selectSource(src)}>
-                  <span class="dk">{src.label}</span>
-                  <span class="dv">{val}{src.unit ? ' '+src.unit : ''}</span>
-                </button>
+              {#each getSourcesForTab(activeTab, s.stats) as src}
+                {#if src.isHeader}
+                  <div class="data-header">{src.label}</div>
+                {:else}
+                  {@const val = src.getValue ? src.getValue(s.stats, weather, {}) : '—'}
+                  <button class="data-row" class:active={configSource?.id===src.id} onclick={()=>selectSource(src)}>
+                    <span class="dk">{src.label}</span>
+                    <span class="dv">{val}{src.unit ? ' '+src.unit : ''}</span>
+                  </button>
+                {/if}
               {/each}
               {#if activeTab === 'wetter'}
                 <div class="we-loc">
@@ -1284,6 +1334,7 @@
   .data-row.active { border-color: var(--accent); background: var(--accent-dim); }
   .dk { font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); }
   .dv { font: 600 var(--fs-sm) var(--mono); color: var(--text-primary); }
+  .data-header { font: 600 9px var(--font); color: var(--accent); padding: 6px 10px 2px; text-transform: uppercase; letter-spacing: 0.04em; }
   .we-loc { margin-top: 4px; }
   .conf-box { padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-surface); margin-top: 6px; }
   .conf-title { font: 600 var(--fs-sm) var(--font); color: var(--text-primary); margin-bottom: 6px; }
