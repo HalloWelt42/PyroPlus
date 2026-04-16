@@ -386,7 +386,7 @@ export function drawSparkline(pixels, values, x, y, w, h) {
 }
 
 /* ═══ Gauge (Halbkreis-Fortschritt) ═══ */
-export function drawGauge(pixels, pct, x, y, r) {
+export function drawGauge(pixels, pct, x, y, r, opts = {}) {
   const cx = x + r, cy = y + r;
   const clamped = Math.max(0, Math.min(100, pct));
   // Halbkreis-Outline (180°)
@@ -406,10 +406,14 @@ export function drawGauge(pixels, pct, x, y, r) {
       if (px >= 0 && px < W && py >= 0 && py < H) pixels[py * W + px] = 1;
     }
   }
-  // Wert zentriert unter dem Gauge
-  const text = `${Math.round(clamped)}%`;
-  const tw = text.length * 6;
-  drawText(pixels, text, cx - Math.floor(tw / 2), cy - 3, 1);
+  // Label: Prefix + Wert + Suffix (konfigurierbar)
+  const prefix = opts.prefix ?? '';
+  const suffix = opts.suffix ?? '%';
+  const valText = opts.valText ?? `${Math.round(clamped)}`;
+  const label = prefix + valText + suffix;
+  const tw = label.length * 6;
+  const labelY = opts.labelY ?? (cy - 3);
+  drawText(pixels, label, cx - Math.floor(tw / 2), labelY, 1);
 }
 
 /* ═══ Section Header (── LABEL ──) ═══ */

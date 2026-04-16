@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import PanelWrapper from './oled/PanelWrapper.svelte';
   import * as E from './oled/engine.js';
+  import { api } from '../api/client.js';
   import { TABS, getModesForType, getSourcesForTab, defaultOpts, createWidget } from './oled/catalog.js';
   import { renderWidget as renderWidgetNew, getWidgetSize } from './oled/widgetRenderer.js';
   let { state: s } = $props();
@@ -222,10 +223,7 @@
     _searchTimer = setTimeout(() => searchLocation(locationSearch), 300);
   }
 
-  /* Tausenderpunkt: 24214 → 24.214 */
-  function tsd(n) { return Math.round(n).toLocaleString('de-DE'); }
-
-  /* ═══ WIDGETS MIT LIVE-DATEN ═══ */
+  /* ═══ LEGACY WIDGET-TYPEN (Abwärtskompatibilität für alte gespeicherte Screens) ═══ */
   const widgetTypes = {
     clock:     { cat:'zeit', label:'Uhr HH:MM',    w:58, h:14, props:{ scale:2, format:'HH:MM' },
                  getText: (p) => { const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }},
@@ -311,7 +309,7 @@
     section:   { cat:'layout', label:'── Header ──',   w:60, h:7, props:{ width:60, text:'CPU' }, isShape: true,
                  draw: (px,x,y,p) => E.drawSectionHeader(px, p.text||'Label', x, y, p.width||60) },
   };
-  const widgetList = Object.entries(widgetTypes).map(([id,v])=>({id,...v}));
+  // widgetList entfernt — neues System nutzt catalog.js
 
   /* ═══ HISTORY für Sparklines ═══ */
   const _hist = { cpu: [], temp: [], ram: [], fan_speed: [], net_rx: [], net_tx: [] };
@@ -329,19 +327,7 @@
 
   function snapPos(v) { return snapGrid > 0 ? Math.round(v / snapGrid) * snapGrid : v; }
 
-  function placeWidget(w) {
-    const wt = widgetTypes[w.id];
-    placedWidgets = [...placedWidgets, {
-      id: Date.now(),
-      type: w.id,
-      x: 4, y: 4,
-      props: { ...wt.props, invert: false, border: false, align: 'left' },
-    }];
-    selectedWidget = placedWidgets.length - 1;
-    tool = 'move';
-    renderWidgets();
-    s.toast(`${wt.label} eingefügt`, 'ok');
-  }
+  // placeWidget entfernt — neues System nutzt placePresetOnScreen
 
   function removeWidget(idx) {
     placedWidgets = placedWidgets.filter((_, i) => i !== idx);
@@ -1076,6 +1062,34 @@
     s.toast(`Profil "${p.name}" geladen`, 'ok');
   }
 
+  async function backupToHost() {
+    saveCurrentScreen();
+    try {
+      const data = { screens, weatherCities, widgetPresets, profiles, rotation, rotationInterval, version: '2.0', timestamp: new Date().toISOString() };
+      const r = await api.backup.save(data);
+      if (r?.ok) s.toast(`Backup gespeichert (${Math.round(r.size/1024)} KB)`, 'ok');
+      else s.toast('Backup-Fehler', 'err');
+    } catch (e) { s.toast('Fehler: ' + e.message, 'err'); }
+  }
+
+  async function restoreFromHost() {
+    try {
+      const data = await api.backup.load();
+      if (data?.error) { s.toast(data.error, 'info'); return; }
+      if (data?.screens?.length > 0) {
+        screens = data.screens.map((sc, i) => ({ ...sc, id: i, layers: sc.layers || [{ id: 0, name: 'Hintergrund', pixels: Array.from(new Uint8Array(W*H)), visible: true }] }));
+        _screenId = screens.length;
+        if (data.weatherCities) { weatherCities = data.weatherCities; localStorage.setItem('pp-weather-cities', JSON.stringify(weatherCities)); }
+        if (data.widgetPresets) { widgetPresets = data.widgetPresets; localStorage.setItem('pp-widget-presets', JSON.stringify(widgetPresets)); }
+        if (data.profiles) { profiles = data.profiles; localStorage.setItem('pp-oled-profiles', JSON.stringify(profiles)); }
+        if (data.rotation !== undefined) rotation = data.rotation;
+        if (data.rotationInterval) rotationInterval = data.rotationInterval;
+        switchScreen(screens[0].id);
+        s.toast('Vom Host-Backup wiederhergestellt', 'ok');
+      }
+    } catch (e) { s.toast('Fehler: ' + e.message, 'err'); }
+  }
+
   function resetAll() {
     if (!confirm('Alle Daten zurücksetzen? Screens, Widgets, Profile und Städte werden gelöscht.')) return;
     localStorage.removeItem('pp-oled-state');
@@ -1203,57 +1217,52 @@
   {:else if id==='datei'}
     <div class="datei-info">
       <div class="rr"><span>Screens</span><span class="mono">{screens.length}</span></div>
-      <div class="rr"><span>Widgets</span><span class="mono">{widgetPresets.length}</span></div>
+      <div class="rr"><span>Widget-Vorlagen</span><span class="mono">{widgetPresets.length}</span></div>
       <div class="rr"><span>Profile</span><span class="mono">{profiles.length}</span></div>
       <div class="rr"><span>Wetter-Städte</span><span class="mono">{weatherCities.length}</span></div>
     </div>
-    <div class="datei-section">Exportieren</div>
-    <div class="datei-desc">Speichert alles als JSON-Datei: Screens, Widgets, Profile, Städte, Rotation</div>
-    <button class="send-btn" onclick={exportScreens}><i class="fa-solid fa-file-export"></i> Alles exportieren</button>
-    <div class="datei-section">Importieren</div>
-    <div class="datei-desc">Lädt eine zuvor exportierte JSON-Datei. Ersetzt alle aktuellen Daten.</div>
-    <button class="send-btn" onclick={importScreens}><i class="fa-solid fa-file-import"></i> Datei importieren</button>
+    <!-- Profilverwaltung -->
+    <div class="datei-section">Profile</div>
+    {#if profiles.length > 0}
+      {#each profiles as p, i}
+        <div class="profile-row">
+          <button class="profile-load" onclick={()=>loadProfile(p)} title="Profil laden">{p.name}</button>
+          <span class="profile-date">{p.created?.slice(0,10) || ''}</span>
+          <button class="profile-del" onclick={()=>deleteProfile(p.name)} title="Löschen"><i class="fa-solid fa-trash-can"></i></button>
+        </div>
+      {/each}
+    {:else}
+      <div class="datei-desc">Keine Profile gespeichert</div>
+    {/if}
+    <div class="profile-save-row">
+      <input type="text" class="ti" placeholder="Neues Profil..." bind:value={profileSaveName}>
+      <button class="profile-save-btn" onclick={()=>{if(profileSaveName){saveProfile(profileSaveName);profileSaveName='';}}} title="Aktuellen Stand als Profil speichern"><i class="fa-solid fa-floppy-disk"></i></button>
+    </div>
+    <!-- Export/Import -->
+    <div class="datei-section">Datei</div>
+    <div class="datei-desc">Export: Screens + Widgets + Profile + Städte + Rotation</div>
+    <div class="btn-row">
+      <button class="send-btn half" onclick={exportScreens}><i class="fa-solid fa-file-export"></i> Export</button>
+      <button class="send-btn half" onclick={importScreens}><i class="fa-solid fa-file-import"></i> Import</button>
+    </div>
+    <!-- Backend Sync -->
+    <div class="datei-section">Backend</div>
+    <div class="btn-row">
+      <button class="send-btn half" onclick={sendToOled}><i class="fa-solid fa-paper-plane"></i> Senden</button>
+      <button class="send-btn half sec" onclick={loadFromOled}><i class="fa-solid fa-download"></i> Laden</button>
+    </div>
+    <!-- Host-Backup -->
+    <div class="datei-section">Host-Speicher</div>
+    <div class="datei-desc">Auf der Festplatte des Pi speichern (überlebt Docker-Reset)</div>
+    <div class="btn-row">
+      <button class="send-btn half" onclick={backupToHost}><i class="fa-solid fa-hard-drive"></i> Sichern</button>
+      <button class="send-btn half sec" onclick={restoreFromHost}><i class="fa-solid fa-hard-drive"></i> Laden</button>
+    </div>
     <div class="datei-section">Zurücksetzen</div>
-    <button class="send-btn del" onclick={resetAll}><i class="fa-solid fa-trash-can"></i> Alles zurücksetzen</button>
+    <button class="send-btn del" onclick={resetAll}><i class="fa-solid fa-trash-can"></i> Alles löschen</button>
   {:else if id==='layers'}
     <div class="ll">{#each [...layers].reverse() as layer, ri}{@const idx=layers.length-1-ri}<div class="li" class:active={layer.id===activeLayer} class:drag-over={ldOver===idx} draggable="true" onclick={()=>activeLayer=layer.id} ondragstart={(e)=>ldStart(e,idx)} ondragover={(e)=>ldDragOver(e,idx)} ondrop={(e)=>ldDrop(e,idx)} ondragend={ldEnd}><span class="lh"><i class="fa-solid fa-grip-vertical"></i></span><button class="lv" onclick={(e)=>{e.stopPropagation();toggleVis(layer.id);render();}}><i class="fa-solid {layer.visible?'fa-eye':'fa-eye-slash'}"></i></button><span class="ln" contenteditable="false" ondblclick={(e)=>{e.target.contentEditable='true';e.target.focus();}} onblur={(e)=>{e.target.contentEditable='false';layers=layers.map(l=>l.id===layer.id?{...l,name:e.target.textContent}:l);}} onkeydown={(e)=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}}}>{layer.name}</span></div>{/each}</div>
     <div class="la"><button class="lab" onclick={()=>addLayer()}><i class="fa-solid fa-plus"></i></button><button class="lab" onclick={()=>dupLayer(activeLayer)}><i class="fa-solid fa-copy"></i></button><button class="lab" onclick={()=>rmLayer(activeLayer)}><i class="fa-solid fa-trash"></i></button></div>
-  {:else if id==='weather'}
-    <div class="rr"><span>Aktueller Ort</span><span class="mono">{weatherCities[activeCity]?.name || '—'}</span></div>
-    {#if weather}
-      <div class="rr"><span>Temperatur</span><span class="mono">{weather.temperature_2m}°C</span></div>
-      <div class="rr"><span>Feuchtigkeit</span><span class="mono">{weather.relative_humidity_2m}%</span></div>
-      <div class="rr"><span>Wind</span><span class="mono">{weather.wind_speed_10m} km/h</span></div>
-    {/if}
-    <div class="loc-search">
-      <input type="text" class="ti" placeholder="Ort suchen..." value={locationSearch} oninput={onLocationInput}>
-      {#if locationResults.length > 0}
-        <div class="loc-results">
-          {#each locationResults as loc}
-            <button class="loc-item" onclick={() => selectLocation(loc)}>
-              <span class="loc-name">{loc.name}</span>
-              <span class="loc-detail">{loc.admin || ''}{loc.country ? ', '+loc.country : ''}</span>
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </div>
-  {:else if id==='widgets'}
-    {#each ['zeit','cpu','ram','disk','net','sys','wetter','layout'] as cat}
-      {@const items = widgetList.filter(w => w.cat === cat)}
-      {#if items.length > 0}
-        {@const catName = {zeit:'Zeit',cpu:'CPU',ram:'RAM',disk:'Festplatten',net:'Netzwerk',sys:'System',wetter:'Wetter',layout:'Layout'}[cat] || cat}
-        <div class="wc-cat">{catName}</div>
-        <div class="wc-grid">
-          {#each items as w}
-            <button class="wc-btn" onclick={() => placeWidget(w)} title="{w.label} ({w.w}×{w.h})">
-              <span class="wc-name">{w.label}</span>
-              <span class="wc-size">{w.w}×{w.h}</span>
-            </button>
-          {/each}
-        </div>
-      {/if}
-    {/each}
   {/if}
 {/snippet}
 
@@ -1644,6 +1653,17 @@
   .datei-info { display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
   .datei-section { font: 600 9px var(--font); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 8px 0 2px; }
   .datei-desc { font: 400 var(--fs-xs) var(--font); color: var(--text-muted); line-height: 1.4; margin-bottom: 4px; }
+  .btn-row { display: flex; gap: 3px; }
+  .send-btn.half { flex: 1; }
+  .profile-row { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
+  .profile-load { flex: 1; padding: 5px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); font: 500 var(--fs-xs) var(--font); cursor: pointer; text-align: left; }
+  .profile-load:hover { border-color: var(--accent); color: var(--accent); }
+  .profile-date { font: 400 9px var(--mono); color: var(--text-muted); flex-shrink: 0; }
+  .profile-del { width: 24px; height: 24px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: none; color: var(--text-muted); cursor: pointer; font-size: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .profile-del:hover { border-color: var(--red); color: var(--red); }
+  .profile-save-row { display: flex; gap: 3px; margin-top: 4px; }
+  .profile-save-btn { width: 30px; height: 30px; border-radius: var(--radius-sm); border: 1px solid var(--accent); background: var(--accent-dim); color: var(--accent); cursor: pointer; font-size: var(--fs-xs); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .profile-save-btn:hover { background: var(--accent); color: #fff; }
   .send-btn.del { border-color: var(--red); color: var(--red); background: rgba(255,60,60,0.06); }
   .send-btn.del:hover { background: var(--red); color: #fff; }
   .ab.del:hover { background: var(--red); color: #fff; }

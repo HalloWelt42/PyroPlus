@@ -581,6 +581,35 @@ async def _ws_push_loop():
         await asyncio.sleep(WS_STATS_INTERVAL)
 
 
+# ─── Frontend Backup auf Host-Festplatte ──────────────────
+@app.post("/api/backup/save", tags=["Backup"],
+          summary="Frontend-State auf Host-Disk speichern")
+def backup_save(req: dict):
+    import json
+    path = DATA_DIR / "frontend_backup.json"
+    path.write_text(json.dumps(req, indent=2, ensure_ascii=False))
+    return {"ok": True, "path": str(path), "size": path.stat().st_size}
+
+@app.get("/api/backup/load", tags=["Backup"],
+         summary="Frontend-State von Host-Disk laden")
+def backup_load():
+    import json
+    path = DATA_DIR / "frontend_backup.json"
+    if not path.exists():
+        return {"error": "Kein Backup vorhanden"}
+    return json.loads(path.read_text())
+
+@app.get("/api/backup/info", tags=["Backup"],
+         summary="Backup-Info (Datum, Größe)")
+def backup_info():
+    path = DATA_DIR / "frontend_backup.json"
+    if not path.exists():
+        return {"exists": False}
+    import os
+    st = path.stat()
+    return {"exists": True, "size": st.st_size, "modified": st.st_mtime}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host=HOST, port=PORT, log_level="info")

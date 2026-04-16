@@ -55,9 +55,20 @@ function _renderInto(px, widget, stats, weather, history) {
   const sy = opts.scaleY ?? sx;
   const hasEx = opts.invert || opts.border || (opts.align && opts.align !== 'left');
 
-  // Wert holen
-  const val = src?.getValue ? String(src.getValue(stats, weather, opts)) : (opts.text ?? '');
+  // Wert holen + formatieren
+  let val = src?.getValue ? String(src.getValue(stats, weather, opts)) : (opts.text ?? '');
   const rawPct = src?.getRaw ? src.getRaw(stats, weather, opts) : parseFloat(val) || 0;
+
+  // Dezimalstellen
+  if (opts.decimals !== undefined && opts.decimals >= 0) {
+    const num = parseFloat(val);
+    if (!isNaN(num)) val = num.toFixed(opts.decimals);
+  }
+  // Tausendertrenner
+  if (opts.tsep) {
+    const num = parseFloat(val);
+    if (!isNaN(num)) val = Math.round(num).toLocaleString('de-DE');
+  }
   const fullText = (opts.prefix ?? '') + val + (opts.suffix ?? '');
 
   // Text-Rendering Hilfsfunktion
@@ -132,7 +143,7 @@ function _renderInto(px, widget, stats, weather, history) {
     case 'gauge':
     case 'gauge_gross':
     case 'gauge_xl': {
-      E.drawGauge(px, rawPct, x, y, opts.radius || 12);
+      E.drawGauge(px, rawPct, x, y, opts.radius || 12, { prefix: opts.prefix, suffix: opts.suffix ?? '%', valText: val });
       break;
     }
 

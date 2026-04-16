@@ -96,6 +96,12 @@ export const api = {
     temp: (temp) => post('/simulate/temp', { temp }),
     stop: () => post('/simulate/temp', { temp: null }),
   },
+
+  backup: {
+    save: (data) => post('/backup/save', data),
+    load: () => get('/backup/load'),
+    info: () => get('/backup/info'),
+  },
 };
 
 export function createWebSocket(onMessage) {
