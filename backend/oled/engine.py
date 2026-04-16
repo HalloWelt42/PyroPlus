@@ -354,26 +354,37 @@ class OLEDEngine:
 
     def _render_loop(self):
         last_rotate = time.time()
+        last_stats = time.time()
+        cached_stats = {}
+        render_interval = 0.2  # 5 fps
+        stats_interval = 1.0   # Stats nur 1x/s holen
+
         while self._running:
             try:
                 if self._rotation_reset:
                     last_rotate = time.time()
                     self._rotation_reset = False
 
-                stats = get_system_stats()
-                update_history(stats)
+                now = time.time()
 
-                # Wetter updaten
-                if self.weather.needs_update():
-                    self.weather.fetch()
+                # Stats + History nur 1x/s aktualisieren
+                if now - last_stats >= stats_interval:
+                    cached_stats = get_system_stats()
+                    update_history(cached_stats)
+                    last_stats = now
 
-                self.render(stats)
+                    # Wetter alle 5 min
+                    if self.weather.needs_update():
+                        self.weather.fetch()
+
+                # Rendering 5x/s mit gecachten Stats
+                self.render(cached_stats)
 
                 # Rotation
                 if self.mode == "auto" and len(self.screens) > 1:
-                    if time.time() - last_rotate >= self.rotation_interval:
+                    if now - last_rotate >= self.rotation_interval:
                         self.current_screen = (self.current_screen + 1) % len(self.screens)
-                        last_rotate = time.time()
+                        last_rotate = now
             except Exception as e:
                 logger.error(f"OLED Render-Loop: {e}")
-            time.sleep(1)
+            time.sleep(render_interval)
