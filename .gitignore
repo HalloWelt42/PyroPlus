@@ -49,3 +49,4 @@ hardware-proxy/data/
 
 # Docker
 docker-compose.override.yml
+data/

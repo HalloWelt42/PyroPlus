@@ -4,9 +4,9 @@
   let copyFeedback = $state(null);
 
   const cryptos = [
-    { id: 'btc', label: 'BITCOIN', symbol: 'BTC', icon: 'fa-brands fa-bitcoin', color: '#f7931a', address: 'bc1qnd599khdkv3v3npmj9ufxzf6h4fzanny2acwqr' },
-    { id: 'doge', label: 'DOGECOIN', symbol: 'DOGE', icon: 'fa-solid fa-dog', color: '#c3a634', address: 'DL7tuiYCqm3xQjMDXChdxeQxqUGMACn1ZV' },
-    { id: 'eth', label: 'ETHEREUM', symbol: 'ETH', icon: 'fa-brands fa-ethereum', color: '#627eea', address: '0x8A28fc47bFFFA03C8f685fa0836E2dBe1CA14F27' },
+    { id: 'btc', label: 'BITCOIN', symbol: 'BTC', icon: 'fa-brands fa-bitcoin', color: '#f7931a', address: 'bc1qnd599khdkv3v3npmj9ufxzf6h4fzanny2acwqr', qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=bitcoin:bc1qnd599khdkv3v3npmj9ufxzf6h4fzanny2acwqr' },
+    { id: 'doge', label: 'DOGECOIN', symbol: 'DOGE', icon: 'fa-solid fa-dog', color: '#c3a634', address: 'DL7tuiYCqm3xQjMDXChdxeQxqUGMACn1ZV', qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=dogecoin:DL7tuiYCqm3xQjMDXChdxeQxqUGMACn1ZV' },
+    { id: 'eth', label: 'ETHEREUM', symbol: 'ETH', icon: 'fa-brands fa-ethereum', color: '#627eea', address: '0x8A28fc47bFFFA03C8f685fa0836E2dBe1CA14F27', qrUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ethereum:0x8A28fc47bFFFA03C8f685fa0836E2dBe1CA14F27' },
   ];
 
   function close() { activeCrypto = null; visible = false; }
@@ -44,6 +44,7 @@
       {#each cryptos as c}
         {#if activeCrypto === c.id}
           <div class="detail">
+            <img class="qr-img" src={c.qrUrl} alt="{c.symbol} QR Code" width="120" height="120" />
             <span class="detail-label">{c.label}</span>
             <code class="detail-addr">{c.address}</code>
             <button class="copy" onclick={()=>copyAddress(c.address)}>
@@ -82,6 +83,7 @@
   .coin.active { border-color: var(--accent); }
   .coin-icon { font-size: 20px; }
   .coin-name { font: 700 10px var(--mono); color: var(--text-secondary); }
+  .qr-img { border-radius: 6px; background: #fff; padding: 6px; }
   .detail { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; width: 100%; }
   .detail-label { font: 700 9px var(--font); letter-spacing: 1px; color: var(--text-muted); }
   .detail-addr { font: 400 10px var(--mono); color: var(--text-primary); word-break: break-all; text-align: center; padding: 6px; background: var(--bg-elevated); border-radius: 4px; }

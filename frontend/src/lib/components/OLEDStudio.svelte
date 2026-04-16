@@ -932,7 +932,7 @@
   }
 
   /* ═══ PANEL D&D ═══ */
-  let lpanels=$state(['preview','props','layers']), rpanels=$state(['tools','display']);
+  let lpanels=$state(['preview','props','layers']), rpanels=$state(['tools','display','datei']);
   let pdragId=$state(null), pdropSide=$state(null);
   function pDragStart(e,id){pdragId=id;e.dataTransfer.setData('application/x-oled-panel',id);e.dataTransfer.effectAllowed='move';}
   function pDragEnd(){pdragId=null;pdropSide=null;}
@@ -990,7 +990,7 @@
   }
 
   /* Panel-Metadaten */
-  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, weather:{icon:'cloud-sun',label:'Wetter-Ort',c:true} };
+  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, datei:{icon:'folder-open',label:'Datei',c:true} };
 
   /* Vorlagen entfernt — Profile ersetzen Vorlagen */
   function panelIcon(id) { return _pd[id]?.icon || 'circle'; }
@@ -1065,6 +1065,21 @@
     s.toast(`Profil "${p.name}" geladen`, 'ok');
   }
 
+  function resetAll() {
+    if (!confirm('Alle Daten zurücksetzen? Screens, Widgets, Profile und Städte werden gelöscht.')) return;
+    localStorage.removeItem('pp-oled-state');
+    localStorage.removeItem('pp-widget-presets');
+    localStorage.removeItem('pp-oled-profiles');
+    localStorage.removeItem('pp-weather-cities');
+    screens = [{ id: 0, name: 'Screen 1', widgets: [], layers: [{ id: 0, name: 'Hintergrund', pixels: Array.from(new Uint8Array(W*H)), visible: true }], thumbnail: '' }];
+    placedWidgets = []; widgetPresets = []; profiles = [];
+    weatherCities = [{ name: 'Zeitz', lat: 51.05, lon: 12.13 }];
+    activeScreen = 0; _screenId = 1; selectedWidget = -1;
+    layers = [{ id: 0, name: 'Hintergrund', pixels: new Uint8Array(W*H), visible: true }];
+    renderWidgets();
+    s.toast('Alles zurückgesetzt', 'ok');
+  }
+
   function deleteProfile(name) {
     profiles = profiles.filter(p => p.name !== name);
     localStorage.setItem('pp-oled-profiles', JSON.stringify(profiles));
@@ -1104,10 +1119,6 @@
     <div class="pv-box"><div class="pv-bezel"><canvas bind:this={previewEl} width={W} height={H} class="pv-canvas"></canvas></div></div>
     <button class="send-btn" onclick={sendToOled}><i class="fa-solid fa-paper-plane"></i> An OLED senden ({screens.length})</button>
     <button class="send-btn sec" onclick={loadFromOled}><i class="fa-solid fa-download"></i> Vom Backend laden</button>
-    <div class="btn-row">
-      <button class="send-btn half" onclick={exportScreens}><i class="fa-solid fa-file-export"></i> Export</button>
-      <button class="send-btn half" onclick={importScreens}><i class="fa-solid fa-file-import"></i> Import</button>
-    </div>
   {:else if id==='props'}
     {#if selectedWidget >= 0 && placedWidgets[selectedWidget]}
       {@const sw = placedWidgets[selectedWidget]}
@@ -1178,6 +1189,21 @@
       <div class="rr"><span>Widgets</span><span class="mono">{placedWidgets.length}</span></div>
       <div class="rr" style="color:var(--text-muted);font-size:var(--fs-xs)">Klicke ein Widget auf dem Canvas zum Bearbeiten</div>
     {/if}
+  {:else if id==='datei'}
+    <div class="datei-info">
+      <div class="rr"><span>Screens</span><span class="mono">{screens.length}</span></div>
+      <div class="rr"><span>Widgets</span><span class="mono">{widgetPresets.length}</span></div>
+      <div class="rr"><span>Profile</span><span class="mono">{profiles.length}</span></div>
+      <div class="rr"><span>Wetter-Städte</span><span class="mono">{weatherCities.length}</span></div>
+    </div>
+    <div class="datei-section">Exportieren</div>
+    <div class="datei-desc">Speichert alles als JSON-Datei: Screens, Widgets, Profile, Städte, Rotation</div>
+    <button class="send-btn" onclick={exportScreens}><i class="fa-solid fa-file-export"></i> Alles exportieren</button>
+    <div class="datei-section">Importieren</div>
+    <div class="datei-desc">Lädt eine zuvor exportierte JSON-Datei. Ersetzt alle aktuellen Daten.</div>
+    <button class="send-btn" onclick={importScreens}><i class="fa-solid fa-file-import"></i> Datei importieren</button>
+    <div class="datei-section">Zurücksetzen</div>
+    <button class="send-btn del" onclick={resetAll}><i class="fa-solid fa-trash-can"></i> Alles zurücksetzen</button>
   {:else if id==='layers'}
     <div class="ll">{#each [...layers].reverse() as layer, ri}{@const idx=layers.length-1-ri}<div class="li" class:active={layer.id===activeLayer} class:drag-over={ldOver===idx} draggable="true" onclick={()=>activeLayer=layer.id} ondragstart={(e)=>ldStart(e,idx)} ondragover={(e)=>ldDragOver(e,idx)} ondrop={(e)=>ldDrop(e,idx)} ondragend={ldEnd}><span class="lh"><i class="fa-solid fa-grip-vertical"></i></span><button class="lv" onclick={(e)=>{e.stopPropagation();toggleVis(layer.id);render();}}><i class="fa-solid {layer.visible?'fa-eye':'fa-eye-slash'}"></i></button><span class="ln" contenteditable="false" ondblclick={(e)=>{e.target.contentEditable='true';e.target.focus();}} onblur={(e)=>{e.target.contentEditable='false';layers=layers.map(l=>l.id===layer.id?{...l,name:e.target.textContent}:l);}} onkeydown={(e)=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}}}>{layer.name}</span></div>{/each}</div>
     <div class="la"><button class="lab" onclick={()=>addLayer()}><i class="fa-solid fa-plus"></i></button><button class="lab" onclick={()=>dupLayer(activeLayer)}><i class="fa-solid fa-copy"></i></button><button class="lab" onclick={()=>rmLayer(activeLayer)}><i class="fa-solid fa-trash"></i></button></div>
@@ -1602,6 +1628,13 @@
   .rot-btn { padding: 2px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 9px var(--mono); cursor: pointer; }
   .rot-btn:hover { border-color: var(--accent); color: var(--accent); }
   .rot-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  /* Datei-Panel */
+  .datei-info { display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+  .datei-section { font: 600 9px var(--font); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 8px 0 2px; }
+  .datei-desc { font: 400 var(--fs-xs) var(--font); color: var(--text-muted); line-height: 1.4; margin-bottom: 4px; }
+  .send-btn.del { border-color: var(--red); color: var(--red); background: rgba(255,60,60,0.06); }
+  .send-btn.del:hover { background: var(--red); color: #fff; }
   .ab.del:hover { background: var(--red); color: #fff; }
 
   /* Properties */

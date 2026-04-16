@@ -20,13 +20,26 @@ let clockTimer;
 let viewKey = $state(0);
 let sidebarOpen = $state(true);
 
-onMount(() => { s.init(); clockTimer = setInterval(() => now = new Date(), 1000); });
-onDestroy(() => { s.destroy(); clearInterval(clockTimer); });
+onMount(() => {
+  s.init();
+  clockTimer = setInterval(() => now = new Date(), 1000);
+  // Deeplink: #/fan, #/leds, #/oled
+  const hash = location.hash.replace('#/', '');
+  if (['fan', 'leds', 'oled'].includes(hash)) { s.currentView = hash; viewKey++; }
+  window.addEventListener('hashchange', _onHash);
+});
+onDestroy(() => { s.destroy(); clearInterval(clockTimer); window.removeEventListener('hashchange', _onHash); });
+
+function _onHash() {
+  const hash = location.hash.replace('#/', '');
+  if (['fan', 'leds', 'oled'].includes(hash) && s.currentView !== hash) { s.currentView = hash; viewKey++; }
+}
 
 function selectView(id) {
   if (s.currentView === id) return;
   s.currentView = id;
   viewKey++;
+  location.hash = '#/' + id;
 }
 
 function tempToColor(t) {
@@ -135,6 +148,7 @@ const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
       <div class="sb-status"><span class="status-dot" class:on={s.connected}></span>{#if sidebarOpen}{s.connected ? 'Verbunden' : 'Getrennt'}{/if}</div>
       {#if sidebarOpen}
         <div class="sb-meta">Version {s.version || '?'} · Hardware {s.hwProxy?.version || '?'}</div>
+        <a class="sb-git" href="https://github.com/HalloWelt42/PyroPlus" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i> GitHub</a>
         <div class="sb-clock">{now.toLocaleTimeString('de-DE')}</div>
       {/if}
     </div>
@@ -314,6 +328,9 @@ const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
   .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
   .status-dot.on { background: var(--green); box-shadow: 0 0 8px rgba(0,232,138,0.4); }
   .sb-meta { font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); margin-top: 4px; }
+  .sb-git { font: 500 var(--fs-xs) var(--font); color: var(--text-muted); text-decoration: none; display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+  .sb-git:hover { color: var(--accent); }
+  .sb-git i { font-size: var(--fs-sm); }
   .sb-clock { font: 600 var(--fs-sm) var(--mono); color: var(--text-label); margin-top: 3px; }
 
   /* ═══ HAUPTBEREICH ═══ */
