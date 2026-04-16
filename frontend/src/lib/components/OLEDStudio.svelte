@@ -408,9 +408,44 @@
     s.toast(`${w.name} hinzugefuegt`, 'ok');
   }
 
-  function addConfiguredWidget() {
+  /* ═══ WIDGET-VORLAGEN (gespeicherte Widgets zum spaeter Einbauen) ═══ */
+  let widgetPresets = $state(JSON.parse(localStorage.getItem('pp-widget-presets') || '[]'));
+
+  function saveAsWidgetPreset() {
     if (!configSource) return;
-    placeNewWidget(configSource.id, configDisplay);
+    const preset = {
+      id: Date.now() + Math.random(),
+      source: configSource.id,
+      display: configDisplay,
+      name: cfgName || configSource.label,
+      opts: { ...cfgOpts },
+      boxW: cfgBoxW,
+      boxH: cfgBoxH,
+    };
+    widgetPresets = [...widgetPresets, preset];
+    localStorage.setItem('pp-widget-presets', JSON.stringify(widgetPresets));
+    s.toast(`Widget "${preset.name}" gespeichert`, 'ok');
+  }
+
+  function deleteWidgetPreset(id) {
+    widgetPresets = widgetPresets.filter(p => p.id !== id);
+    localStorage.setItem('pp-widget-presets', JSON.stringify(widgetPresets));
+  }
+
+  function placePresetOnScreen(preset) {
+    const w = {
+      id: Date.now() + Math.random(),
+      source: preset.source,
+      display: preset.display,
+      name: preset.name,
+      x: 4, y: 4,
+      opts: { ...preset.opts, _boxW: preset.boxW, _boxH: preset.boxH },
+    };
+    placedWidgets = [...placedWidgets, w];
+    selectedWidget = placedWidgets.length - 1;
+    tool = 'move';
+    renderWidgets();
+    s.toast(`"${preset.name}" platziert`, 'ok');
   }
 
   /* Alle Widgets in Layer 0 rendern — neues Format (source+display+opts) */
@@ -1147,7 +1182,7 @@
                   <!-- Name -->
                   <div class="pr"><span>Name</span><input type="text" class="ti" bind:value={cfgName}></div>
 
-                  <button class="add-btn" onclick={addConfiguredWidget}><i class="fa-solid fa-plus"></i> Zum Screen hinzufuegen</button>
+                  <button class="add-btn" onclick={saveAsWidgetPreset}><i class="fa-solid fa-puzzle-piece"></i> Als Widget speichern</button>
                 </div>
               {/if}
             </div>
