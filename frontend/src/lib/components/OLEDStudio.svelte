@@ -326,6 +326,27 @@
     renderWidgets();
     s.toast(`${w.name} eingefuegt`, 'ok');
   }
+  let configPreviewEl = $state(null);
+
+  function renderConfigPreview() {
+    if (!configPreviewEl || !configSource || !configDisplay) return;
+    const ctx = configPreviewEl.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, 128, 64);
+    // Temporaeres Widget rendern
+    const tmpWidget = createWidget(configSource.id, configDisplay, 4, 4);
+    const buf = new Uint8Array(W * H);
+    renderWidgetNew(buf, tmpWidget, s.stats, weather, s.stats?.history || _hist);
+    ctx.fillStyle = '#fff';
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++)
+        if (buf[y * W + x]) ctx.fillRect(x, y, 1, 1);
+  }
+
+  // Vorschau bei Quell-Wechsel und periodisch aktualisieren
+  $effect(() => { if (configSource && configDisplay) setTimeout(renderConfigPreview, 50); });
+
   function addConfiguredWidget() {
     if (!configSource) return;
     placeNewWidget(configSource.id, configDisplay);
@@ -373,6 +394,7 @@
       if (_hist.cpu.length > HIST_LEN) _hist.cpu.shift();
       if (_hist.temp.length > HIST_LEN) _hist.temp.shift();
       if (_hist.ram.length > HIST_LEN) _hist.ram.shift();
+      renderConfigPreview();
     }, 1000);
   }
   function stopWidgetTimer() { clearInterval(_renderTimer); clearInterval(_statsTimer); }
@@ -1031,8 +1053,12 @@
                   <div class="conf-title">{configSource.label} — Darstellung</div>
                   <div class="mode-grid">
                     {#each getModesForType(configSource.type) as mode}
-                      <button class="mode-btn" class:active={configDisplay===mode.id} onclick={()=>configDisplay=mode.id}>{mode.label}</button>
+                      <button class="mode-btn" class:active={configDisplay===mode.id} onclick={()=>{configDisplay=mode.id;renderConfigPreview();}}>{mode.label}</button>
                     {/each}
+                  </div>
+                  <!-- Live-Vorschau -->
+                  <div class="conf-preview">
+                    <canvas bind:this={configPreviewEl} width="128" height="64" class="conf-canvas"></canvas>
                   </div>
                   <button class="add-btn" onclick={addConfiguredWidget}><i class="fa-solid fa-plus"></i> Zum Canvas</button>
                 </div>
@@ -1143,6 +1169,12 @@
   .mode-btn { padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 var(--fs-xs) var(--font); cursor: pointer; }
   .mode-btn:hover { border-color: var(--accent); color: var(--accent); }
   .mode-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .conf-preview { display: flex; justify-content: center; padding: 8px 0; }
+  .conf-canvas {
+    width: 256px; height: 128px;
+    image-rendering: pixelated; image-rendering: crisp-edges;
+    border: 1px solid #333; border-radius: 3px; background: #000;
+  }
   .add-btn { width: 100%; padding: 7px; border-radius: var(--radius-sm); border: 1px solid var(--accent); background: var(--accent-dim); color: var(--accent); font: 600 var(--fs-sm) var(--font); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
   .add-btn:hover { background: var(--accent); color: #fff; }
   .canvas-scroll canvas { image-rendering: pixelated; touch-action: none; cursor: crosshair; box-shadow: 0 0 0 1px var(--border), 0 4px 20px rgba(0,0,0,0.4); flex-shrink: 0; }
