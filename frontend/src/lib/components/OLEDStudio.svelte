@@ -701,7 +701,7 @@
   }
 
   /* ═══ PANEL D&D ═══ */
-  let lpanels=$state(['preview','props','layers','widgets','templates']), rpanels=$state(['tools','display','color','weather','clock']);
+  let lpanels=$state(['preview','props','layers','widgets']), rpanels=$state(['tools','display','weather']);
   let pdragId=$state(null), pdropSide=$state(null);
   function pDragStart(e,id){pdragId=id;e.dataTransfer.setData('application/x-oled-panel',id);e.dataTransfer.effectAllowed='move';}
   function pDragEnd(){pdragId=null;pdropSide=null;}
@@ -759,127 +759,9 @@
   }
 
   /* Panel-Metadaten */
-  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, color:{icon:'palette',label:'Farbe',c:false}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, widgets:{icon:'puzzle-piece',label:'Widgets',c:true}, weather:{icon:'cloud-sun',label:'Wetter-Ort',c:true}, templates:{icon:'bookmark',label:'Vorlagen',c:true}, clock:{icon:'clock',label:'Uhr-Einst.',c:true} };
+  const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, widgets:{icon:'puzzle-piece',label:'Widgets',c:true}, weather:{icon:'cloud-sun',label:'Wetter-Ort',c:true} };
 
-  /* Vordefinierte Vorlagen */
-  const templates = [
-    { name: 'Uhr + System', widgets: [
-      {type:'clock',x:0,y:0,props:{scale:2}},
-      {type:'weekday',x:0,y:18,props:{scale:1}},
-      {type:'date',x:16,y:18,props:{scale:1}},
-      {type:'cpu_temp',x:0,y:30,props:{scale:1,prefix:'CPU '}},
-      {type:'ram_pct',x:0,y:40,props:{scale:1,prefix:'RAM '}},
-      {type:'net_ip',x:0,y:50,props:{scale:1,prefix:''}},
-    ]},
-    { name: 'Wetter', widgets: [
-      {type:'w_icon',x:2,y:2,props:{}},
-      {type:'w_temp',x:14,y:0,props:{scale:2}},
-      {type:'w_cond',x:2,y:20,props:{scale:1}},
-      {type:'w_hum',x:2,y:30,props:{scale:1}},
-      {type:'w_wind',x:2,y:40,props:{scale:1}},
-      {type:'w_loc',x:2,y:54,props:{scale:1,text:''}},
-      {type:'clock_s',x:76,y:2,props:{scale:1}},
-    ]},
-    { name: 'Große Uhr', widgets: [
-      {type:'clock_l',x:4,y:4,props:{scale:3}},
-      {type:'weekday',x:4,y:32,props:{scale:1}},
-      {type:'date',x:20,y:32,props:{scale:1}},
-      {type:'cpu_temp',x:4,y:50,props:{scale:1,prefix:''}},
-      {type:'ram_pct',x:40,y:50,props:{scale:1,prefix:''}},
-    ]},
-    { name: 'System-Monitor', widgets: [
-      {type:'cpu_temp',x:0,y:0,props:{scale:1,prefix:'CPU '}},
-      {type:'cpu_bar',x:0,y:10,props:{width:60,height:6}},
-      {type:'ram_pct',x:0,y:20,props:{scale:1,prefix:'RAM '}},
-      {type:'ram_bar',x:0,y:30,props:{width:60,height:6}},
-      {type:'disk_pct',x:0,y:40,props:{scale:1,prefix:'DSK ',diskIdx:0}},
-      {type:'disk_bar',x:0,y:50,props:{width:60,height:6,diskIdx:0}},
-      {type:'uptime',x:66,y:0,props:{scale:1,prefix:''}},
-      {type:'net_ip',x:66,y:10,props:{scale:1,prefix:''}},
-      {type:'net_rx',x:66,y:24,props:{scale:1,prefix:'Rx '}},
-      {type:'net_tx',x:66,y:34,props:{scale:1,prefix:'Tx '}},
-    ]},
-    { name: 'Weihnachten', widgets: [
-      {type:'tree_spr',x:2,y:2,props:{scale:2}},
-      {type:'snowman',x:20,y:4,props:{scale:2}},
-      {type:'snowflake',x:50,y:2,props:{scale:1}},
-      {type:'snowflake',x:70,y:6,props:{scale:1}},
-      {type:'snowflake',x:90,y:0,props:{scale:1}},
-      {type:'snowflake',x:110,y:4,props:{scale:1}},
-      {type:'gift_spr',x:40,y:14,props:{scale:1}},
-      {type:'bell_spr',x:100,y:14,props:{scale:1}},
-      {type:'label',x:2,y:34,props:{scale:2,text:'Frohe'}},
-      {type:'label',x:2,y:50,props:{scale:2,text:'Weihnachten'}},
-    ]},
-    { name: 'Party', widgets: [
-      {type:'music_spr',x:4,y:4,props:{scale:2}},
-      {type:'star',x:30,y:2,props:{scale:1}},
-      {type:'star',x:50,y:6,props:{scale:1}},
-      {type:'star',x:70,y:0,props:{scale:1}},
-      {type:'star',x:90,y:8,props:{scale:1}},
-      {type:'heart',x:110,y:2,props:{scale:1}},
-      {type:'label',x:24,y:20,props:{scale:3,text:'PARTY'}},
-      {type:'clock_s',x:40,y:52,props:{scale:1}},
-    ]},
-    { name: 'Haustier', widgets: [
-      {type:'cat_spr',x:10,y:10,props:{scale:3}},
-      {type:'heart',x:50,y:4,props:{scale:1}},
-      {type:'heart',x:60,y:8,props:{scale:1}},
-      {type:'heart',x:70,y:4,props:{scale:1}},
-      {type:'label',x:50,y:20,props:{scale:2,text:'Miau!'}},
-      {type:'clock',x:0,y:50,props:{scale:1}},
-    ]},
-    { name: 'Minimal', widgets: [
-      {type:'clock_l',x:16,y:8,props:{scale:3}},
-      {type:'date',x:40,y:40,props:{scale:1}},
-    ]},
-    { name: 'Disk-Monitor', widgets: [
-      {type:'disk_name',x:0,y:0,props:{scale:1,prefix:'',diskIdx:0}},
-      {type:'disk_bar',x:0,y:10,props:{width:60,height:6,diskIdx:0}},
-      {type:'disk_pct',x:64,y:0,props:{scale:1,prefix:'',diskIdx:0}},
-      {type:'disk_name',x:0,y:20,props:{scale:1,prefix:'',diskIdx:1}},
-      {type:'disk_bar',x:0,y:30,props:{width:60,height:6,diskIdx:1}},
-      {type:'disk_pct',x:64,y:20,props:{scale:1,prefix:'',diskIdx:1}},
-      {type:'disk_name',x:0,y:40,props:{scale:1,prefix:'',diskIdx:2}},
-      {type:'disk_bar',x:0,y:50,props:{width:60,height:6,diskIdx:2}},
-      {type:'disk_pct',x:64,y:40,props:{scale:1,prefix:'',diskIdx:2}},
-    ]},
-    { name: 'Netzwerk', widgets: [
-      {type:'net_ip',x:0,y:0,props:{scale:2,prefix:''}},
-      {type:'net_if',x:0,y:18,props:{scale:1,prefix:''}},
-      {type:'net_rx',x:0,y:30,props:{scale:1,prefix:'DL '}},
-      {type:'net_tx',x:0,y:40,props:{scale:1,prefix:'UL '}},
-      {type:'uptime',x:0,y:54,props:{scale:1,prefix:'Up '}},
-    ]},
-    { name: 'Dashboard', widgets: [
-      {type:'section',x:0,y:0,props:{width:62,text:'CPU'}},
-      {type:'gauge_cpu',x:2,y:10,props:{radius:12}},
-      {type:'cpu_temp',x:30,y:14,props:{scale:1,prefix:''}},
-      {type:'section',x:66,y:0,props:{width:62,text:'RAM'}},
-      {type:'gauge_ram',x:68,y:10,props:{radius:12}},
-      {type:'ram_pct',x:96,y:14,props:{scale:1,prefix:''}},
-      {type:'section',x:0,y:36,props:{width:128,text:'VERLAUF'}},
-      {type:'spark_cpu',x:0,y:44,props:{width:62,height:18}},
-      {type:'spark_ram',x:66,y:44,props:{width:62,height:18}},
-    ]},
-    { name: 'Gauges', widgets: [
-      {type:'gauge_cpu',x:2,y:2,props:{radius:16}},
-      {type:'label',x:2,y:36,props:{scale:1,text:'CPU'}},
-      {type:'gauge_ram',x:42,y:2,props:{radius:16}},
-      {type:'label',x:42,y:36,props:{scale:1,text:'RAM'}},
-      {type:'gauge_disk',x:82,y:2,props:{radius:16,diskIdx:0}},
-      {type:'label',x:82,y:36,props:{scale:1,text:'Disk'}},
-      {type:'clock_s',x:36,y:54,props:{scale:1}},
-    ]},
-  ];
-
-  function loadTemplate(t) {
-    placedWidgets = t.widgets.map(w => ({ id: Date.now()+Math.random(), ...w }));
-    selectedWidget = -1;
-    tool = 'move';
-    renderWidgets();
-    s.toast(`Vorlage "${t.name}" geladen`, 'ok');
-  }
+  /* Vorlagen entfernt — Profile ersetzen Vorlagen */
   function panelIcon(id) { return _pd[id]?.icon || 'circle'; }
   function panelLabel(id) { return _pd[id]?.label || id; }
   function panelCollapsible(id) { return _pd[id]?.c ?? true; }
@@ -963,40 +845,52 @@
   let profileSaveName = $state('');
 
   /* ═══ WIDGET-VORSCHAU-LEISTE ═══ */
-  const PREV_W = 48, PREV_H = 24;
   let previewCanvases = $state({}); // id -> canvas element
   const catOrder = ['zeit','cpu','ram','disk','net','sys','wetter','deko'];
-  const catMeta = {zeit:['fa-clock','Zeit'],cpu:['fa-microchip','CPU'],ram:['fa-memory','RAM'],disk:['fa-hard-drive','Disk'],net:['fa-network-wired','Netz'],sys:['fa-server','Sys'],wetter:['fa-cloud-sun','Wetter'],deko:['fa-pen','Deko']};
+  const catLabels = {zeit:'Zeit',cpu:'CPU',ram:'RAM',disk:'Disk',net:'Netz',sys:'System',wetter:'Wetter',deko:'Deko'};
+
+  function getWidgetSize(wId) {
+    const wt = widgetTypes[wId];
+    if (!wt) return { w: 30, h: 7 };
+    if (wt.isShape) {
+      return { w: Math.min(wt.props.width || wt.props.radius*2 || wt.w, 80), h: Math.min(wt.props.height || wt.props.radius*2 || wt.h, 30) };
+    }
+    const sx = wt.props.scaleX ?? wt.props.scale ?? 1;
+    const sy = wt.props.scaleY ?? wt.props.scale ?? 1;
+    // Textbreite schätzen anhand getText
+    const text = wt.getText ? wt.getText(wt.props) : 'TEXT';
+    return { w: Math.max(text.length * 6 * sx, 12), h: 7 * sy };
+  }
 
   function renderWidgetPreview(canvas, wId) {
     if (!canvas) return;
     const wt = widgetTypes[wId];
     if (!wt) return;
+    const sz = getWidgetSize(wId);
+    const pad = 2;
+    const cw = sz.w + pad * 2, ch = sz.h + pad * 2;
+    canvas.width = cw;
+    canvas.height = ch;
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, PREV_W, PREV_H);
-    // Mini-Buffer rendern
+    ctx.fillRect(0, 0, cw, ch);
+    // In echten Pixel-Buffer rendern
     const buf = new Uint8Array(W * H);
     const fakeProps = { ...wt.props, invert: false, border: false, align: 'left' };
     if (wt.isShape) {
-      wt.draw(buf, 2, 2, fakeProps);
+      wt.draw(buf, pad, pad, fakeProps);
     } else {
       const text = wt.getText(fakeProps);
       const sx = fakeProps.scaleX ?? fakeProps.scale ?? 1;
       const sy = fakeProps.scaleY ?? fakeProps.scale ?? 1;
-      E.drawText(buf, text, 2, 2, sx, sy);
+      E.drawText(buf, text, pad, pad, sx, sy);
     }
-    // Buffer skaliert auf Preview-Canvas zeichnen
+    // 1:1 Pixel zeichnen — echte Auflösung
     ctx.fillStyle = '#fff';
-    const scaleX = PREV_W / W, scaleY = PREV_H / H;
-    // Direkt die relevanten Pixel zeichnen (nur oberer linker Bereich)
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        if (buf[y * W + x]) {
-          ctx.fillRect(Math.floor(x * scaleX), Math.floor(y * scaleY),
-                       Math.max(1, Math.ceil(scaleX)), Math.max(1, Math.ceil(scaleY)));
-        }
+    for (let y = 0; y < ch && y < H; y++) {
+      for (let x = 0; x < cw && x < W; x++) {
+        if (buf[y * W + x]) ctx.fillRect(x, y, 1, 1);
       }
     }
   }
@@ -1066,8 +960,6 @@
         <option value="16" selected={snapGrid===16}>16px</option>
       </select>
     </div>
-  {:else if id==='color'}
-    <div class="cp"><div class="cs white" class:active={tool!=='eraser'} onclick={()=>{if(tool==='eraser')tool='pencil';}} title="Weiß"></div><div class="cs black" class:active={tool==='eraser'} onclick={()=>tool='eraser'} title="Schwarz"></div></div>
   {:else if id==='preview'}
     <div class="pv-box"><div class="pv-bezel"><canvas bind:this={previewEl} width={W} height={H} class="pv-canvas"></canvas></div></div>
     <button class="send-btn" onclick={sendToOled}><i class="fa-solid fa-paper-plane"></i> An OLED senden ({screens.length})</button>
@@ -1157,18 +1049,6 @@
         </div>
       {/if}
     </div>
-  {:else if id==='templates'}
-    {#each templates as t}
-      <button class="wc-btn" onclick={() => loadTemplate(t)}><i class="fa-solid fa-download"></i> <span class="wc-name">{t.name}</span><span class="wc-size">{t.widgets.length} Widgets</span></button>
-    {/each}
-  {:else if id==='clock'}
-    {@const cs = s.oled?.clock_settings || {}}
-    <div class="pr"><span>Blinken</span><button class="tog" class:on={cs.blink!==false} onclick={()=>s.setClockSettings({blink:!(cs.blink!==false)})}></button></div>
-    <div class="pr"><span>Sekunden</span><button class="tog" class:on={cs.seconds} onclick={()=>s.setClockSettings({seconds:!cs.seconds})}></button></div>
-    <div class="pr"><span>Zehntel</span><button class="tog" class:on={cs.tenths} onclick={()=>s.setClockSettings({tenths:!cs.tenths})}></button></div>
-    <div class="pr"><span>Datum</span><button class="tog" class:on={cs.date!==false} onclick={()=>s.setClockSettings({date:!(cs.date!==false)})}></button></div>
-    <div class="pr"><span>Wochentag</span><button class="tog" class:on={cs.weekday!==false} onclick={()=>s.setClockSettings({weekday:!(cs.weekday!==false)})}></button></div>
-    <div class="pr"><span>24h</span><button class="tog" class:on={cs.format_24h!==false} onclick={()=>s.setClockSettings({format_24h:!(cs.format_24h!==false)})}></button></div>
   {:else if id==='widgets'}
     {#each ['zeit','cpu','ram','disk','net','sys','wetter','deko'] as cat}
       {@const items = widgetList.filter(w => w.cat === cat)}
@@ -1221,10 +1101,10 @@
           {@const items = widgetList.filter(w => w.cat === cat)}
           {#if items.length > 0}
             <div class="ws-group">
-              <span class="ws-cat" title={catMeta[cat]?.[1]||cat}><i class="fa-solid {catMeta[cat]?.[0]||'fa-circle'}"></i></span>
+              <span class="ws-cat">{catLabels[cat]||cat}</span>
               {#each items as w}
-                <div class="ws-item" draggable="true" ondragstart={(e)=>onPreviewDragStart(e,w.id)} onclick={()=>placeWidget(w)} title="{w.label} ({w.w}×{w.h}) — Klick oder Drag">
-                  <canvas bind:this={previewCanvases[w.id]} width={PREV_W} height={PREV_H} class="ws-canvas"></canvas>
+                <div class="ws-item" draggable="true" ondragstart={(e)=>onPreviewDragStart(e,w.id)} onclick={()=>placeWidget(w)} title="{w.label} — Klick oder Drag">
+                  <canvas bind:this={previewCanvases[w.id]} width={getWidgetSize(w.id).w+4} height={getWidgetSize(w.id).h+4} class="ws-canvas"></canvas>
                   <span class="ws-label">{w.label}</span>
                 </div>
               {/each}
@@ -1300,41 +1180,40 @@
   /* Widget-Vorschau-Leiste */
   .widget-strip {
     display: flex; gap: 2px; overflow-x: auto; overflow-y: hidden;
-    padding: 6px 8px; border-bottom: 1px solid var(--border);
-    background: var(--bg-base); flex-shrink: 0; min-height: 62px;
-    scrollbar-width: thin;
+    padding: 4px 8px; border-bottom: 1px solid var(--border);
+    background: var(--bg-base); flex-shrink: 0;
+    scrollbar-width: thin; align-items: flex-end;
   }
   .ws-group {
-    display: flex; align-items: center; gap: 3px;
-    padding-right: 6px; border-right: 1px solid var(--border);
+    display: flex; align-items: flex-end; gap: 3px;
+    padding-right: 8px; margin-right: 4px; border-right: 1px solid var(--border);
     flex-shrink: 0;
   }
-  .ws-group:last-child { border-right: none; padding-right: 0; }
+  .ws-group:last-child { border-right: none; padding-right: 0; margin-right: 0; }
   .ws-cat {
     writing-mode: vertical-lr; text-orientation: mixed;
-    font-size: 10px; color: var(--accent); padding: 0 2px;
-    flex-shrink: 0; display: flex; align-items: center;
+    font: 600 9px var(--font); color: var(--accent); padding: 0 1px;
+    flex-shrink: 0; letter-spacing: 0.04em; text-transform: uppercase;
   }
   .ws-item {
-    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
     cursor: grab; flex-shrink: 0; padding: 2px;
     border-radius: var(--radius-sm); border: 1px solid transparent;
     transition: border-color 120ms;
   }
-  .ws-item:hover { border-color: var(--accent); }
+  .ws-item:hover { border-color: var(--accent); background: rgba(0,180,255,0.04); }
   .ws-item:active { cursor: grabbing; }
   .ws-canvas {
-    width: 48px; height: 24px;
-    image-rendering: pixelated;
-    border-radius: 2px;
-    border: 1px solid rgba(255,255,255,0.08);
+    image-rendering: pixelated; image-rendering: crisp-edges;
+    border-radius: 1px;
+    border: 1px solid rgba(255,255,255,0.1);
     background: #000;
     pointer-events: none;
   }
   .ws-label {
-    font: 500 9px var(--font); color: var(--text-muted);
-    max-width: 52px; overflow: hidden; text-overflow: ellipsis;
-    white-space: nowrap; text-align: center;
+    font: 500 8px var(--font); color: var(--text-muted);
+    max-width: 70px; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; text-align: center; line-height: 1;
   }
 
   /* Tool Grid */
@@ -1356,12 +1235,6 @@
   .tog.on { background: var(--green); }
   .tog::after { content:''; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:#fff; transition:transform 150ms; }
   .tog.on::after { transform: translateX(16px); }
-
-  /* Colors */
-  .cp { display: flex; gap: 8px; }
-  .cs { width: 32px; height: 32px; border-radius: var(--radius-sm); border: 2px solid var(--border); cursor: pointer; }
-  .cs.white { background: #fff; } .cs.black { background: #000; }
-  .cs.active { border-color: var(--accent); box-shadow: 0 0 8px rgba(0,180,255,0.3); }
 
   /* Preview */
   .pv-box { display: flex; justify-content: center; }
