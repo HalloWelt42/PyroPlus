@@ -113,18 +113,85 @@
 
   /* ═══ WETTER (Open-Meteo API + Ortssuche) ═══ */
   let weather = $state(null);
+  let weatherDaily = $state([]);
+  let weatherHourly = $state([]);
   let weatherLocation = $state(JSON.parse(localStorage.getItem('pp-weather-loc') || 'null') || { name: 'Zeitz', lat: 51.05, lon: 12.13 });
   let locationSearch = $state('');
   let locationResults = $state([]);
   let showLocationSearch = $state(!weatherLocation.name);
+  let _weatherFetchTime = 0;
+
+  function _wmoDE(code) {
+    if (code==null) return '--';
+    if (code===0) return 'Klar';
+    if (code<=3) return 'Bewölkt';
+    if (code<=48) return 'Nebel';
+    if (code<=55) return 'Nieseln';
+    if (code<=57) return 'Gefrierender Niesel';
+    if (code<=65) return 'Regen';
+    if (code<=67) return 'Gefrierender Regen';
+    if (code<=75) return 'Schneefall';
+    if (code<=77) return 'Schneegriesel';
+    if (code<=82) return 'Regenschauer';
+    if (code<=86) return 'Schneeschauer';
+    if (code<=95) return 'Gewitter';
+    return 'Gewitter mit Hagel';
+  }
 
   async function fetchWeather() {
     if (!weatherLocation) return;
+    if (Date.now() - _weatherFetchTime < 600000) return; // 10 Min Cache
+    _weatherFetchTime = Date.now();
     try {
-      const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${weatherLocation.lat}&longitude=${weatherLocation.lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,surface_pressure&timezone=auto`);
+      const params = [
+        'current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,cloud_cover,surface_pressure,pressure_msl,precipitation,is_day',
+        'hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,weather_code,wind_speed_10m,uv_index,cloud_cover',
+        'daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,precipitation_probability_max,sunrise,sunset,daylight_duration,uv_index_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant',
+        'forecast_days=7',
+        'timezone=auto',
+      ].join('&');
+      const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${weatherLocation.lat}&longitude=${weatherLocation.lon}&${params}`);
       const d = await r.json();
-      weather = d.current;
-    } catch {}
+      const c = d.current || {};
+      weather = {
+        ...c,
+        location: weatherLocation.name,
+        condition_text: _wmoDE(c.weather_code),
+        sunrise: '', sunset: '',
+      };
+      // Daily
+      const dd = d.daily || {};
+      const days = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+      weatherDaily = (dd.time || []).map((t, i) => {
+        const dt = new Date(t + 'T12:00');
+        return {
+          date: t, tag: days[dt.getDay()],
+          max: dd.temperature_2m_max?.[i], min: dd.temperature_2m_min?.[i],
+          code: dd.weather_code?.[i], zustand: _wmoDE(dd.weather_code?.[i]),
+          regen: dd.precipitation_sum?.[i], regenProb: dd.precipitation_probability_max?.[i],
+          sunrise: (dd.sunrise?.[i]||'').slice(-5), sunset: (dd.sunset?.[i]||'').slice(-5),
+          tageslicht: Math.round((dd.daylight_duration?.[i]||0)/3600*10)/10,
+          uvMax: dd.uv_index_max?.[i], windMax: dd.wind_speed_10m_max?.[i],
+          boeMax: dd.wind_gusts_10m_max?.[i], windDir: dd.wind_direction_10m_dominant?.[i],
+          gefMax: dd.apparent_temperature_max?.[i], gefMin: dd.apparent_temperature_min?.[i],
+        };
+      });
+      if (weatherDaily.length > 0) {
+        weather.sunrise = weatherDaily[0].sunrise;
+        weather.sunset = weatherDaily[0].sunset;
+      }
+      // Hourly (naechste 24h)
+      const hh = d.hourly || {};
+      const nowH = new Date().getHours();
+      weatherHourly = (hh.time || []).slice(nowH, nowH + 24).map((t, i) => ({
+        time: t, stunde: (t||'').slice(-5,-3)+'h',
+        temp: hh.temperature_2m?.[nowH+i], feuchte: hh.relative_humidity_2m?.[nowH+i],
+        gefuehlt: hh.apparent_temperature?.[nowH+i], regenProb: hh.precipitation_probability?.[nowH+i],
+        code: hh.weather_code?.[nowH+i], zustand: _wmoDE(hh.weather_code?.[nowH+i]),
+        wind: hh.wind_speed_10m?.[nowH+i], uv: hh.uv_index?.[nowH+i],
+        wolken: hh.cloud_cover?.[nowH+i],
+      }));
+    } catch(e) { console.error('Wetter-Fetch:', e); }
   }
 
   async function searchLocation(q) {
@@ -1000,7 +1067,7 @@
   let showProfileSave = $state(false);
   let profileSaveName = $state('');
 
-  onMount(()=>{loadState();pushH();renderWidgets();startWidgetTimer();fetchWeather();setInterval(fetchWeather,300000);});
+  onMount(()=>{loadState();pushH();renderWidgets();startWidgetTimer();fetchWeather();setInterval(fetchWeather,600000);});
   onDestroy(()=>{stopWidgetTimer();saveState();});
   $effect(()=>{zoom;showGrid;render();autoSave();});
 </script>
@@ -1070,6 +1137,18 @@
       <div class="rr" style="margin-top:6px;color:var(--text-muted);font-size:var(--fs-xs)"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent)"></i> Darstellung</div>
       <div class="pr"><span>Invertiert</span><button class="tog" class:on={wp(sw).invert} onclick={()=>updateWidgetProp(selectedWidget,'invert',!wp(sw).invert)}></button></div>
       <div class="pr"><span>Rahmen</span><button class="tog" class:on={wp(sw).border} onclick={()=>updateWidgetProp(selectedWidget,'border',!wp(sw).border)}></button></div>
+      <!-- Streckung X/Y nachtraeglich -->
+      <div class="pr"><span>Streck X</span><input type="range" min="1" max="6" value={wp(sw).scaleX??wp(sw).scale??1} oninput={(e)=>updateWidgetProp(selectedWidget,'scaleX',+e.target.value)}><span class="pv">{wp(sw).scaleX??wp(sw).scale??1}x</span></div>
+      <div class="pr"><span>Streck Y</span><input type="range" min="1" max="6" value={wp(sw).scaleY??wp(sw).scaleX??wp(sw).scale??1} oninput={(e)=>updateWidgetProp(selectedWidget,'scaleY',+e.target.value)}><span class="pv">{wp(sw).scaleY??wp(sw).scaleX??wp(sw).scale??1}x</span></div>
+      <!-- Rotation 90° -->
+      <div class="pr"><span>Rotation</span>
+        <div class="rot-btns">
+          <button class="rot-btn" class:active={!wp(sw).rotate||wp(sw).rotate===0} onclick={()=>updateWidgetProp(selectedWidget,'rotate',0)}>0°</button>
+          <button class="rot-btn" class:active={wp(sw).rotate===90} onclick={()=>updateWidgetProp(selectedWidget,'rotate',90)}>90°</button>
+          <button class="rot-btn" class:active={wp(sw).rotate===180} onclick={()=>updateWidgetProp(selectedWidget,'rotate',180)}>180°</button>
+          <button class="rot-btn" class:active={wp(sw).rotate===270} onclick={()=>updateWidgetProp(selectedWidget,'rotate',270)}>270°</button>
+        </div>
+      </div>
       {#if !wt?.isShape}
         <div class="pr"><span>Ausr.</span>
           <div class="align-btns">
@@ -1468,6 +1547,10 @@
   /* Prop Actions */
   .prop-actions { display: flex; gap: 4px; margin-top: 6px; }
   .ab.del { border-color: var(--red); color: var(--red); }
+  .rot-btns { display: flex; gap: 2px; }
+  .rot-btn { padding: 2px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 9px var(--mono); cursor: pointer; }
+  .rot-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .rot-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
   .ab.del:hover { background: var(--red); color: #fff; }
 
   /* Properties */

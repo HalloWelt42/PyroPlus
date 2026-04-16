@@ -19,7 +19,37 @@ const W = E.W, H = E.H;
 export function renderWidget(px, widget, stats, weather, history) {
   const { source, display, x, y, opts = {} } = widget;
   const src = getSource(source);
-  if (!src && display !== 'linie_h' && display !== 'linie_v' && display !== 'rahmen' && display !== 'block' && display !== 'section') return;
+  if (!src && !['linie_h','linie_v','rahmen_shape','block','section'].includes(display)) return;
+
+  const rot = opts.rotate || 0;
+  if (rot > 0) {
+    // In Temp-Buffer zeichnen, dann rotiert kopieren
+    const tmp = new Uint8Array(W * H);
+    _renderInto(tmp, { ...widget, opts: { ...opts, rotate: 0 } }, stats, weather, history);
+    const sz = getWidgetSize(widget);
+    _copyRotated(tmp, px, x, y, sz.w, sz.h, rot);
+    return;
+  }
+  _renderInto(px, widget, stats, weather, history);
+}
+
+function _copyRotated(src, dst, ox, oy, w, h, rot) {
+  for (let iy = 0; iy < h && iy + oy < H; iy++) {
+    for (let ix = 0; ix < w && ix + ox < W; ix++) {
+      if (!src[(oy + iy) * W + (ox + ix)]) continue;
+      let dx, dy;
+      if (rot === 90)       { dx = ox + h - 1 - iy; dy = oy + ix; }
+      else if (rot === 180) { dx = ox + w - 1 - ix;  dy = oy + h - 1 - iy; }
+      else if (rot === 270) { dx = ox + iy;           dy = oy + w - 1 - ix; }
+      else                  { dx = ox + ix;           dy = oy + iy; }
+      if (dx >= 0 && dx < W && dy >= 0 && dy < H) dst[dy * W + dx] = 1;
+    }
+  }
+}
+
+function _renderInto(px, widget, stats, weather, history) {
+  const { source, display, x, y, opts = {} } = widget;
+  const src = getSource(source);
 
   const sx = opts.scaleX ?? 1;
   const sy = opts.scaleY ?? sx;

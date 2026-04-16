@@ -33,7 +33,7 @@ class WeatherProvider:
         self._fetch_time: float = 0
 
     def needs_update(self) -> bool:
-        return time.time() - self._fetch_time > 300
+        return time.time() - self._fetch_time > 600  # 10 Min Cache
 
     def fetch(self):
         """Wetterdaten von Open-Meteo holen."""
