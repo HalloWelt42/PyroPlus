@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from oled.renderer import (
     W, H, draw_text, draw_text_ex, draw_bar, draw_hline, draw_vline,
     draw_rect, draw_sprite, draw_icon, draw_marquee,
-    draw_sparkline, draw_gauge, draw_section_header,
+    draw_sparkline, draw_gauge, draw_section_header, draw_fan_icon,
 )
 
 TZ = ZoneInfo("Europe/Berlin")
@@ -273,3 +273,18 @@ def render_widget(buf: bytearray, widget: dict, stats: dict,
 
     elif display == "section":
         draw_section_header(buf, opts.get("text", "Label"), x, y, opts.get("width", 60))
+
+    # Lüftersymbol (animiert)
+    elif display in ("fan_icon", "fan_icon_gross", "fan_icon_xl", "fan_icon_rpm"):
+        sz = opts.get("size", 16 if "gross" in display else 24 if "xl" in display else 8)
+        rpm = 0
+        try:
+            rpm = float(val)
+        except (ValueError, TypeError):
+            pass
+        speed = min(1.0, rpm / 3000)
+        frame = int(time.time() * max(1, speed * 12)) % 4 if speed > 0.01 else 0
+        draw_fan_icon(buf, x, y, sz, frame)
+        if display == "fan_icon_rpm":
+            label = f"{round(rpm)}{opts.get('suffix', '')}"
+            draw_text(buf, label, x + sz + 2, y + sz // 2 - 3, sx, sy)

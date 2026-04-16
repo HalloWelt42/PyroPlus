@@ -191,6 +191,31 @@ function _renderInto(px, widget, stats, weather, history) {
       E.drawSectionHeader(px, opts.text || 'Label', x, y, opts.width || 60);
       break;
     }
+
+    // ─── Animiertes Lüftersymbol ───
+    case 'fan_icon':
+    case 'fan_icon_gross':
+    case 'fan_icon_xl': {
+      const sz = opts.size || (display === 'fan_icon_xl' ? 24 : display === 'fan_icon_gross' ? 16 : 8);
+      const rpm = parseFloat(val) || 0;
+      // Drehgeschwindigkeit proportional zur Drehzahl (0=still, 4000=schnell)
+      const speed = Math.min(1, rpm / 3000);
+      const frame = speed > 0.01 ? Math.floor(Date.now() / Math.max(80, 500 - speed * 420)) % 4 : 0;
+      E.drawFanIcon(px, x, y, sz, frame);
+      break;
+    }
+
+    case 'fan_icon_rpm': {
+      const sz = opts.size || 16;
+      const rpm = parseFloat(val) || 0;
+      const speed = Math.min(1, rpm / 3000);
+      const frame = speed > 0.01 ? Math.floor(Date.now() / Math.max(80, 500 - speed * 420)) % 4 : 0;
+      E.drawFanIcon(px, x, y, sz, frame);
+      // RPM-Text rechts neben dem Symbol
+      const label = `${Math.round(rpm)}${opts.suffix || ''}`;
+      E.drawText(px, label, x + sz + 2, y + Math.floor(sz / 2) - 3, sx, sy);
+      break;
+    }
   }
 }
 
@@ -221,6 +246,10 @@ export function getWidgetSize(widget) {
     case 'rahmen':
     case 'block':        return { w: opts.width || 40, h: opts.height || 20 };
     case 'section':      return { w: opts.width || 60, h: 7 };
+    case 'fan_icon':     return { w: opts.size || 8, h: opts.size || 8 };
+    case 'fan_icon_gross': return { w: opts.size || 16, h: opts.size || 16 };
+    case 'fan_icon_xl':  return { w: opts.size || 24, h: opts.size || 24 };
+    case 'fan_icon_rpm': return { w: (opts.size || 16) + 40, h: opts.size || 16 };
     default:             return { w: 30, h: 7 };
   }
 }

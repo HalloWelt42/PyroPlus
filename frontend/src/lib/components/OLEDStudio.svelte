@@ -1312,22 +1312,35 @@
                     <div class="pr"><span>Y</span><input type="range" min="1" max="6" value={cfgOpts.scaleY??cfgOpts.scaleX} oninput={(e)=>cfgOpts.scaleY=+e.target.value}><span class="pv">{cfgOpts.scaleY??cfgOpts.scaleX}x</span></div>
                   {/if}
                   {#if cfgOpts.prefix !== undefined}
-                    <div class="pr"><span>Praefix</span><input type="text" class="ti" bind:value={cfgOpts.prefix}></div>
-                  {/if}
-                  {#if cfgOpts.suffix !== undefined}
-                    <div class="pr"><span>Suffix</span><input type="text" class="ti" bind:value={cfgOpts.suffix}></div>
+                    <div class="conf-label">Formatierung</div>
+                    <div class="pr"><span>Präfix</span><input type="text" class="ti" bind:value={cfgOpts.prefix} placeholder="z.B. CPU "></div>
+                    <div class="pr"><span>Suffix</span><input type="text" class="ti" bind:value={cfgOpts.suffix} placeholder="z.B. °C"></div>
+                    <div class="pr"><span>Dezimal</span>
+                      <select class="ti" style="flex:1;padding:3px 6px" onchange={(e)=>{cfgOpts.decimals=+e.target.value;cfgOpts={...cfgOpts};}}>
+                        <option value="-1" selected={cfgOpts.decimals==null||cfgOpts.decimals===-1}>Auto</option>
+                        <option value="0" selected={cfgOpts.decimals===0}>0</option>
+                        <option value="1" selected={cfgOpts.decimals===1}>1</option>
+                        <option value="2" selected={cfgOpts.decimals===2}>2</option>
+                      </select>
+                    </div>
+                    <div class="pr"><span>1.000er</span><button class="tog sm" class:on={cfgOpts.tsep} onclick={()=>{cfgOpts.tsep=!cfgOpts.tsep;cfgOpts={...cfgOpts};}}></button></div>
                   {/if}
                   {#if cfgOpts.text !== undefined}
-                    <div class="pr"><span>Text</span><input type="text" class="ti" bind:value={cfgOpts.text}></div>
+                    <div class="conf-label">Text</div>
+                    <div class="pr"><span>Inhalt</span><input type="text" class="ti" bind:value={cfgOpts.text}></div>
                   {/if}
                   {#if cfgOpts.width !== undefined}
-                    <div class="pr"><span>Breite</span><input type="range" min="4" max="126" bind:value={cfgOpts.width}><span class="pv">{cfgOpts.width}</span></div>
+                    <div class="conf-label">Größe</div>
+                    <div class="pr"><span>Breite</span><input type="range" min="4" max="126" bind:value={cfgOpts.width}><span class="pv">{cfgOpts.width}px</span></div>
                   {/if}
                   {#if cfgOpts.height !== undefined}
-                    <div class="pr"><span>Hoehe</span><input type="range" min="2" max="62" bind:value={cfgOpts.height}><span class="pv">{cfgOpts.height}</span></div>
+                    <div class="pr"><span>Höhe</span><input type="range" min="2" max="62" bind:value={cfgOpts.height}><span class="pv">{cfgOpts.height}px</span></div>
                   {/if}
                   {#if cfgOpts.radius !== undefined}
-                    <div class="pr"><span>Radius</span><input type="range" min="6" max="30" bind:value={cfgOpts.radius}><span class="pv">{cfgOpts.radius}</span></div>
+                    <div class="pr"><span>Radius</span><input type="range" min="6" max="30" bind:value={cfgOpts.radius}><span class="pv">{cfgOpts.radius}px</span></div>
+                  {/if}
+                  {#if cfgOpts.size !== undefined}
+                    <div class="pr"><span>Größe</span><input type="range" min="8" max="32" bind:value={cfgOpts.size}><span class="pv">{cfgOpts.size}px</span></div>
                   {/if}
 
                   <!-- Simulation -->

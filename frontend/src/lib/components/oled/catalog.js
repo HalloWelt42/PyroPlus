@@ -114,6 +114,12 @@ export const DATA_SOURCES = [
   { id: 'fan.rpm_pct',    tab: 'fan', label: 'Drehzahl %',       unit: '%',   type: 'percent',
     getValue: (s) => _pct(Math.min(100, (s?.fan?.rpm ?? 0) / 4000 * 100)),
     getRaw: (s) => Math.min(100, (s?.fan?.rpm ?? 0) / 4000 * 100) },
+  { id: 'fan.pwm_level',  tab: 'fan', label: 'PWM Stufe',        unit: '',    type: 'number',
+    getValue: (s) => s?.fan?.pwm_level ?? 0 },
+  { id: 'fan.symbol',     tab: 'fan', label: 'Lüftersymbol',     unit: '',    type: 'animated',
+    getValue: (s) => s?.fan?.rpm ?? 0 },
+  { id: 'fan.symbol_rpm', tab: 'fan', label: 'Symbol + RPM',     unit: '',    type: 'animated',
+    getValue: (s) => s?.fan?.rpm ?? 0 },
 
   // ═══ ZEITEN ═══
   { id: 'zeit.uhr',       tab: 'zeit', label: 'Uhrzeit HH:MM',   unit: '',  type: 'time',
@@ -253,6 +259,11 @@ export const DISPLAY_MODES = [
   { id: 'text_gross',       label: 'Text Mittel',         forTypes: TEXT_LIKE },
   { id: 'text_xl',          label: 'Text Groß',          forTypes: TEXT_LIKE },
   { id: 'laufschrift',      label: 'Laufschrift',         forTypes: ['string'] },
+  // ─── Animiert ───
+  { id: 'fan_icon',         label: 'Lüfter Klein (8px)',   forTypes: ['animated'] },
+  { id: 'fan_icon_gross',   label: 'Lüfter Groß (16px)',  forTypes: ['animated'] },
+  { id: 'fan_icon_xl',      label: 'Lüfter XL (24px)',    forTypes: ['animated'] },
+  { id: 'fan_icon_rpm',     label: 'Lüfter + RPM',        forTypes: ['animated'] },
   // ─── Layout ───
   { id: 'linie_h',          label: 'Linie horizontal',    forTypes: ['shape'] },
   { id: 'linie_v',          label: 'Linie vertikal',      forTypes: ['shape'] },
@@ -370,6 +381,10 @@ export function defaultOpts(display) {
     case 'text_xl':          return { scaleX: 3, scaleY: 3, text: '' };
     case 'laufschrift':      return { scaleX: 1, scaleY: 1, text: 'Hallo Welt!' };
     // Layout
+    case 'fan_icon':         return { size: 8 };
+    case 'fan_icon_gross':   return { size: 16 };
+    case 'fan_icon_xl':      return { size: 24 };
+    case 'fan_icon_rpm':     return { size: 16, scaleX: 1, scaleY: 1, suffix: ' RPM' };
     case 'linie_h':          return { width: 60 };
     case 'linie_v':          return { height: 20 };
     case 'rahmen_shape':     return { width: 40, height: 20 };
