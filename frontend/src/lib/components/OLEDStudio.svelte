@@ -112,14 +112,19 @@
   ];
 
   /* ═══ WETTER (Open-Meteo API + Ortssuche) ═══ */
+  /* ═══ MULTI-STADT WETTER ═══ */
+  let weatherCities = $state(JSON.parse(localStorage.getItem('pp-weather-cities') || 'null') || [
+    { name: 'Zeitz', lat: 51.05, lon: 12.13 },
+  ]);
+  let activeCity = $state(0);
+  let weatherCache = $state({}); // { "lat,lon": { data, daily, hourly, fetchTime } }
   let weather = $state(null);
   let weatherDaily = $state([]);
   let weatherHourly = $state([]);
-  let weatherLocation = $state(JSON.parse(localStorage.getItem('pp-weather-loc') || 'null') || { name: 'Zeitz', lat: 51.05, lon: 12.13 });
   let locationSearch = $state('');
   let locationResults = $state([]);
-  let showLocationSearch = $state(!weatherLocation.name);
-  let _weatherFetchTime = 0;
+
+  function _saveCities() { localStorage.setItem('pp-weather-cities', JSON.stringify(weatherCities)); }
 
   function _wmoDE(code) {
     if (code==null) return '--';
@@ -138,61 +143,57 @@
     return 'Gewitter mit Hagel';
   }
 
-  async function fetchWeather() {
-    if (!weatherLocation) return;
-    if (Date.now() - _weatherFetchTime < 600000) return; // 10 Min Cache
-    _weatherFetchTime = Date.now();
+  const _weatherParams = [
+    'current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,cloud_cover,surface_pressure,pressure_msl,precipitation,is_day',
+    'hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,weather_code,wind_speed_10m,uv_index,cloud_cover',
+    'daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,precipitation_probability_max,sunrise,sunset,daylight_duration,uv_index_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant',
+    'forecast_days=7', 'timezone=auto',
+  ].join('&');
+
+  async function _fetchCityWeather(city, force = false) {
+    const key = `${city.lat},${city.lon}`;
+    const cached = weatherCache[key];
+    if (!force && cached && Date.now() - cached.fetchTime < 600000) return cached; // 10 Min Cache
     try {
-      const params = [
-        'current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,cloud_cover,surface_pressure,pressure_msl,precipitation,is_day',
-        'hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,weather_code,wind_speed_10m,uv_index,cloud_cover',
-        'daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,precipitation_probability_max,sunrise,sunset,daylight_duration,uv_index_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant',
-        'forecast_days=7',
-        'timezone=auto',
-      ].join('&');
-      const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${weatherLocation.lat}&longitude=${weatherLocation.lon}&${params}`);
+      const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&${_weatherParams}`);
       const d = await r.json();
       const c = d.current || {};
-      weather = {
-        ...c,
-        location: weatherLocation.name,
-        condition_text: _wmoDE(c.weather_code),
-        sunrise: '', sunset: '',
-      };
-      // Daily
-      const dd = d.daily || {};
       const days = ['So','Mo','Di','Mi','Do','Fr','Sa'];
-      weatherDaily = (dd.time || []).map((t, i) => {
-        const dt = new Date(t + 'T12:00');
-        return {
-          date: t, tag: days[dt.getDay()],
-          max: dd.temperature_2m_max?.[i], min: dd.temperature_2m_min?.[i],
-          code: dd.weather_code?.[i], zustand: _wmoDE(dd.weather_code?.[i]),
-          regen: dd.precipitation_sum?.[i], regenProb: dd.precipitation_probability_max?.[i],
-          sunrise: (dd.sunrise?.[i]||'').slice(-5), sunset: (dd.sunset?.[i]||'').slice(-5),
-          tageslicht: Math.round((dd.daylight_duration?.[i]||0)/3600*10)/10,
-          uvMax: dd.uv_index_max?.[i], windMax: dd.wind_speed_10m_max?.[i],
-          boeMax: dd.wind_gusts_10m_max?.[i], windDir: dd.wind_direction_10m_dominant?.[i],
-          gefMax: dd.apparent_temperature_max?.[i], gefMin: dd.apparent_temperature_min?.[i],
-        };
-      });
-      if (weatherDaily.length > 0) {
-        weather.sunrise = weatherDaily[0].sunrise;
-        weather.sunset = weatherDaily[0].sunset;
-      }
-      // Hourly (naechste 24h)
+      const dd = d.daily || {};
       const hh = d.hourly || {};
       const nowH = new Date().getHours();
-      weatherHourly = (hh.time || []).slice(nowH, nowH + 24).map((t, i) => ({
-        time: t, stunde: (t||'').slice(-5,-3)+'h',
-        temp: hh.temperature_2m?.[nowH+i], feuchte: hh.relative_humidity_2m?.[nowH+i],
-        gefuehlt: hh.apparent_temperature?.[nowH+i], regenProb: hh.precipitation_probability?.[nowH+i],
-        code: hh.weather_code?.[nowH+i], zustand: _wmoDE(hh.weather_code?.[nowH+i]),
-        wind: hh.wind_speed_10m?.[nowH+i], uv: hh.uv_index?.[nowH+i],
-        wolken: hh.cloud_cover?.[nowH+i],
-      }));
-    } catch(e) { console.error('Wetter-Fetch:', e); }
+      const result = {
+        data: { ...c, location: city.name, condition_text: _wmoDE(c.weather_code), sunrise: '', sunset: '' },
+        daily: (dd.time || []).map((t, i) => {
+          const dt = new Date(t + 'T12:00');
+          return { date: t, tag: days[dt.getDay()], max: dd.temperature_2m_max?.[i], min: dd.temperature_2m_min?.[i], code: dd.weather_code?.[i], zustand: _wmoDE(dd.weather_code?.[i]), regen: dd.precipitation_sum?.[i], regenProb: dd.precipitation_probability_max?.[i], sunrise: (dd.sunrise?.[i]||'').slice(-5), sunset: (dd.sunset?.[i]||'').slice(-5), tageslicht: Math.round((dd.daylight_duration?.[i]||0)/3600*10)/10, uvMax: dd.uv_index_max?.[i], windMax: dd.wind_speed_10m_max?.[i], boeMax: dd.wind_gusts_10m_max?.[i], windDir: dd.wind_direction_10m_dominant?.[i], gefMax: dd.apparent_temperature_max?.[i], gefMin: dd.apparent_temperature_min?.[i] };
+        }),
+        hourly: (hh.time || []).slice(nowH, nowH + 24).map((t, i) => ({ time: t, stunde: (t||'').slice(-5,-3)+'h', temp: hh.temperature_2m?.[nowH+i], feuchte: hh.relative_humidity_2m?.[nowH+i], gefuehlt: hh.apparent_temperature?.[nowH+i], regenProb: hh.precipitation_probability?.[nowH+i], code: hh.weather_code?.[nowH+i], zustand: _wmoDE(hh.weather_code?.[nowH+i]), wind: hh.wind_speed_10m?.[nowH+i], uv: hh.uv_index?.[nowH+i], wolken: hh.cloud_cover?.[nowH+i] })),
+        fetchTime: Date.now(),
+      };
+      if (result.daily.length > 0) { result.data.sunrise = result.daily[0].sunrise; result.data.sunset = result.daily[0].sunset; }
+      weatherCache = { ...weatherCache, [key]: result };
+      return result;
+    } catch(e) { console.error('Wetter-Fetch:', city.name, e); return null; }
   }
+
+  async function fetchAllWeather(force = false) {
+    for (const city of weatherCities) await _fetchCityWeather(city, force);
+    _applyActiveCity();
+  }
+
+  function _applyActiveCity() {
+    const city = weatherCities[activeCity] || weatherCities[0];
+    if (!city) return;
+    const key = `${city.lat},${city.lon}`;
+    const cached = weatherCache[key];
+    if (cached) { weather = cached.data; weatherDaily = cached.daily; weatherHourly = cached.hourly; }
+  }
+
+  function switchCity(idx) { activeCity = idx; _applyActiveCity(); }
+  function removeCity(idx) { if (weatherCities.length <= 1) return; weatherCities.splice(idx, 1); weatherCities = [...weatherCities]; if (activeCity >= weatherCities.length) activeCity = 0; _saveCities(); _applyActiveCity(); }
+  async function forceRefreshCity(idx) { const city = weatherCities[idx]; if (city) { await _fetchCityWeather(city, true); if (idx === activeCity) _applyActiveCity(); s.toast(`${city.name} aktualisiert`, 'ok'); } }
+  async function forceRefreshAll() { await fetchAllWeather(true); s.toast(`Alle ${weatherCities.length} Städte aktualisiert`, 'ok'); }
 
   async function searchLocation(q) {
     if (q.length < 2) { locationResults = []; return; }
@@ -204,13 +205,14 @@
   }
 
   function selectLocation(loc) {
-    weatherLocation = { name: loc.name, lat: loc.lat, lon: loc.lon };
-    localStorage.setItem('pp-weather-loc', JSON.stringify(weatherLocation));
-    locationSearch = '';
-    locationResults = [];
-    showLocationSearch = false;
-    fetchWeather();
-    s.toast(`Wetter-Ort: ${loc.name}`, 'ok');
+    if (weatherCities.length >= 10) { s.toast('Maximal 10 Städte', 'info'); return; }
+    const city = { name: loc.name, lat: loc.lat, lon: loc.lon };
+    weatherCities = [...weatherCities, city];
+    _saveCities();
+    locationSearch = ''; locationResults = [];
+    activeCity = weatherCities.length - 1;
+    _fetchCityWeather(city).then(() => _applyActiveCity());
+    s.toast(`${loc.name} hinzugefügt (${weatherCities.length}/10)`, 'ok');
   }
 
   let _searchTimer = 0;
@@ -893,7 +895,7 @@
 
   async function exportScreens() {
     saveCurrentScreen();
-    const data = JSON.stringify({ screens, version: '1.0' }, null, 2);
+    const data = JSON.stringify({ screens, weatherCities, widgetPresets, profiles, rotation, rotationInterval, version: '2.0' }, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -915,8 +917,14 @@
             layers: sc.layers || [{ id: 0, name: 'Hintergrund', pixels: Array.from(new Uint8Array(W*H)), visible: true }],
           }));
           _screenId = screens.length;
+          if (data.weatherCities?.length > 0) { weatherCities = data.weatherCities; _saveCities(); activeCity = 0; }
+          if (data.widgetPresets?.length > 0) { widgetPresets = data.widgetPresets; localStorage.setItem('pp-widget-presets', JSON.stringify(widgetPresets)); }
+          if (data.profiles?.length > 0) { profiles = data.profiles; localStorage.setItem('pp-oled-profiles', JSON.stringify(profiles)); }
+          if (data.rotation !== undefined) rotation = data.rotation;
+          if (data.rotationInterval) rotationInterval = data.rotationInterval;
           switchScreen(screens[0].id);
-          s.toast(`${screens.length} Screen(s) importiert`, 'ok');
+          fetchAllWeather();
+          s.toast(`Importiert: ${screens.length} Screens, ${data.weatherCities?.length||0} Städte, ${data.widgetPresets?.length||0} Widgets`, 'ok');
         }
       } catch (err) { s.toast('Import-Fehler: ' + err.message, 'err'); }
     };
@@ -1067,7 +1075,7 @@
   let showProfileSave = $state(false);
   let profileSaveName = $state('');
 
-  onMount(()=>{loadState();pushH();renderWidgets();startWidgetTimer();fetchWeather();setInterval(fetchWeather,600000);});
+  onMount(()=>{loadState();pushH();renderWidgets();startWidgetTimer();fetchAllWeather();setInterval(()=>fetchAllWeather(),600000);});
   onDestroy(()=>{stopWidgetTimer();saveState();});
   $effect(()=>{zoom;showGrid;render();autoSave();});
 </script>
@@ -1275,12 +1283,34 @@
                 {/if}
               {/each}
               {#if activeTab === 'wetter'}
+                <!-- Städte-Leiste -->
+                <div class="city-bar">
+                  {#each weatherCities as city, i}
+                    <button class="city-chip" class:active={activeCity===i} onclick={()=>switchCity(i)}>
+                      {city.name}
+                      {#if weatherCities.length > 1}<span class="city-del" onclick={(e)=>{e.stopPropagation();removeCity(i);}}>&times;</span>{/if}
+                    </button>
+                  {/each}
+                  <span class="city-count">{weatherCities.length}/10</span>
+                </div>
+                <!-- Aktionen -->
+                <div class="city-actions">
+                  <button class="act-btn" onclick={()=>forceRefreshCity(activeCity)} title="Aktive Stadt neu laden"><i class="fa-solid fa-rotate"></i> Aktualisieren</button>
+                  <button class="act-btn" onclick={forceRefreshAll} title="Alle Städte neu laden"><i class="fa-solid fa-rotate"></i> Alle</button>
+                </div>
+                <!-- Stadt hinzufügen -->
                 <div class="we-loc">
-                  <input type="text" class="ti" placeholder="Ort suchen..." value={locationSearch} oninput={onLocationInput}>
+                  <input type="text" class="ti" placeholder="Stadt hinzufügen..." value={locationSearch} oninput={onLocationInput}>
                   {#if locationResults.length > 0}
                     <div class="loc-results">{#each locationResults as loc}<button class="loc-item" onclick={()=>selectLocation(loc)}>{loc.name}{loc.country ? ', '+loc.country : ''}</button>{/each}</div>
                   {/if}
                 </div>
+                <!-- Cache-Info -->
+                {@const cKey = weatherCities[activeCity] ? `${weatherCities[activeCity].lat},${weatherCities[activeCity].lon}` : ''}
+                {@const cInfo = weatherCache[cKey]}
+                {#if cInfo}
+                  <div class="rr" style="font-size:9px"><span>Cache</span><span class="mono">{Math.round((Date.now()-cInfo.fetchTime)/1000)}s alt</span></div>
+                {/if}
               {/if}
               {#if configSource}
                 <div class="conf-box">
@@ -1495,6 +1525,14 @@
   .dk { font: 500 var(--fs-sm) var(--font); color: var(--text-secondary); }
   .dv { font: 600 var(--fs-sm) var(--mono); color: var(--text-primary); }
   .data-header { font: 600 9px var(--font); color: var(--accent); padding: 6px 10px 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .city-bar { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 4px; }
+  .city-chip { padding: 3px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font: 500 var(--fs-xs) var(--font); cursor: pointer; display: flex; align-items: center; gap: 3px; }
+  .city-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .city-chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .city-del { font-size: 10px; cursor: pointer; }
+  .city-del:hover { color: var(--red); }
+  .city-count { font: 500 9px var(--mono); color: var(--text-muted); align-self: center; }
+  .city-actions { display: flex; gap: 3px; margin-bottom: 4px; }
   .we-loc { margin-top: 4px; }
   .conf-box { padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-surface); margin-top: 6px; }
   .conf-title { font: 600 var(--fs-sm) var(--font); color: var(--text-primary); margin-bottom: 6px; }
