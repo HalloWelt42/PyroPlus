@@ -154,6 +154,67 @@ export function drawText(pixels, str, sx, sy, scaleX = 1, scaleY) {
   }
 }
 
+/* ═══ Erweitertes Text-Rendering (Invert, Border, Align) ═══ */
+export function drawTextEx(pixels, str, sx, sy, scaleX = 1, scaleY, opts = {}) {
+  if (scaleY === undefined) scaleY = scaleX;
+  const { invert = false, border = false, align = 'left', boxW = 0 } = opts;
+  const textW = Math.max(1, str.length * 6 * scaleX - scaleX);
+  const textH = 7 * scaleY;
+  const pad = (invert || border) ? 1 : 0;
+  const totalW = (boxW > 0 ? boxW : textW) + pad * 2;
+  const totalH = textH + pad * 2;
+
+  // Ausrichtung
+  let tx = sx + pad;
+  if (boxW > 0 && align === 'center') tx = sx + pad + Math.floor((boxW - textW) / 2);
+  else if (boxW > 0 && align === 'right') tx = sx + pad + boxW - textW;
+
+  if (invert) {
+    // Weißer Block
+    for (let dy = 0; dy < totalH; dy++)
+      for (let dx = 0; dx < totalW; dx++) {
+        const px = sx + dx, py = sy + dy;
+        if (px >= 0 && px < W && py >= 0 && py < H) pixels[py * W + px] = 1;
+      }
+    // Text schwarz (0) auf weißem Hintergrund
+    drawTextVal(pixels, str, tx, sy + pad, scaleX, scaleY, 0);
+  } else {
+    drawText(pixels, str, tx, sy + pad, scaleX, scaleY);
+  }
+
+  // Rahmen (nur ohne Invert, weil Invert bereits einen Block hat)
+  if (border && !invert) {
+    for (let dx = 0; dx < totalW; dx++) {
+      const px = sx + dx;
+      if (px >= 0 && px < W) { if (sy >= 0 && sy < H) pixels[sy * W + px] = 1; if (sy+totalH-1 >= 0 && sy+totalH-1 < H) pixels[(sy+totalH-1) * W + px] = 1; }
+    }
+    for (let dy = 0; dy < totalH; dy++) {
+      const py = sy + dy;
+      if (py >= 0 && py < H) { if (sx >= 0 && sx < W) pixels[py * W + sx] = 1; if (sx+totalW-1 >= 0 && sx+totalW-1 < W) pixels[py * W + sx+totalW-1] = 1; }
+    }
+  }
+}
+
+function drawTextVal(pixels, str, sx, sy, scaleX, scaleY, val) {
+  let cx = sx;
+  for (const ch of str) {
+    const g = FONT[ch] || FONT[ch.toUpperCase()];
+    if (!g) { cx += 4 * scaleX; continue; }
+    g.split(',').forEach((row, ry) => {
+      for (let rx = 0; rx < row.length; rx++) {
+        if (row[rx] === '1') {
+          for (let dy = 0; dy < scaleY; dy++)
+            for (let dx = 0; dx < scaleX; dx++) {
+              const px = cx + rx * scaleX + dx, py = sy + ry * scaleY + dy;
+              if (px >= 0 && px < W && py >= 0 && py < H) pixels[py * W + px] = val;
+            }
+        }
+      }
+    });
+    cx += 6 * scaleX;
+  }
+}
+
 /* ═══ Wetter-Icons (8×8 Pixel) ═══ */
 const WEATHER_ICONS = {
   sun: [

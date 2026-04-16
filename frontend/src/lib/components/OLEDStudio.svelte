@@ -266,13 +266,17 @@
   let placedWidgets = $state([]);
   let selectedWidget = $state(-1);
 
+  let snapGrid = $state(0); // 0=aus, 4/8/16=Rasterweite
+
+  function snapPos(v) { return snapGrid > 0 ? Math.round(v / snapGrid) * snapGrid : v; }
+
   function placeWidget(w) {
     const wt = widgetTypes[w.id];
     placedWidgets = [...placedWidgets, {
       id: Date.now(),
       type: w.id,
       x: 4, y: 4,
-      props: { ...wt.props },
+      props: { ...wt.props, invert: false, border: false, align: 'left' },
     }];
     selectedWidget = placedWidgets.length - 1;
     tool = 'move';
@@ -309,11 +313,26 @@
       if (!wt) continue;
       if (wt.isShape) {
         wt.draw(px, w.x, w.y, w.props);
+        // Rahmen für Shapes
+        if (w.props.border) {
+          const bw = w.props.width || wt.w, bh = w.props.height || wt.h;
+          E.drawRect(w.x-1,w.y-1,w.x+bw,w.y+bh,(px2,py)=>{if(px2>=0&&px2<W&&py>=0&&py<H)px[py*W+px2]=1;},false);
+        }
       } else {
         const text = wt.getText(w.props);
         const sx = w.props.scaleX ?? w.props.scale ?? 1;
         const sy = w.props.scaleY ?? w.props.scale ?? 1;
-        E.drawText(px, text, w.x, w.y, sx, sy);
+        const hasEx = w.props.invert || w.props.border || (w.props.align && w.props.align !== 'left');
+        if (hasEx) {
+          E.drawTextEx(px, text, w.x, w.y, sx, sy, {
+            invert: !!w.props.invert,
+            border: !!w.props.border,
+            align: w.props.align || 'left',
+            boxW: w.props.boxW || 0,
+          });
+        } else {
+          E.drawText(px, text, w.x, w.y, sx, sy);
+        }
       }
     }
     layers = [...layers];
@@ -439,12 +458,19 @@
           type: w.type,
           x: w.x,
           y: w.y,
-          font: (w.props?.scaleX || w.props?.scale || 1) >= 3 ? 'xl' : (w.props?.scaleX || w.props?.scale || 1) >= 2 ? 'lg' : 'sm',
+          scaleX: w.props?.scaleX ?? w.props?.scale ?? 1,
+          scaleY: w.props?.scaleY ?? w.props?.scale ?? 1,
           prefix: w.props?.prefix,
           text: w.props?.text,
           w: w.props?.width,
           h: w.props?.height,
+          scale: w.props?.scale,
           diskIdx: w.props?.diskIdx,
+          invert: w.props?.invert || false,
+          border: w.props?.border || false,
+          align: w.props?.align || 'left',
+          boxW: w.props?.boxW || 0,
+          tsep: w.props?.tsep || false,
         })),
       }));
 
@@ -480,28 +506,91 @@
 
   async function loadFromOled() {
     try {
-      // Preview-Bild vom Backend holen
-      if (s.oled?.preview) {
-        // Base64 PNG zu Pixel-Array
-        const img = new Image();
-        img.src = 'data:image/png;base64,' + s.oled.preview;
-        await new Promise(r => { img.onload = r; });
-        const c = document.createElement('canvas'); c.width = W; c.height = H;
-        const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, W, H);
-        const data = ctx.getImageData(0, 0, W, H);
-        const px = layers[0]?.pixels;
-        if (px) {
-          for (let i = 0; i < W * H; i++) px[i] = (data.data[i*4] > 128 || data.data[i*4+1] > 128 || data.data[i*4+2] > 128) ? 1 : 0;
-          layers = [...layers];
-          renderWidgets();
-          s.toast('Von OLED geladen', 'ok');
-        }
-      } else {
-        s.toast('Kein OLED-Preview verfügbar', 'info');
+      // Widget-Konfigurationen vom Backend holen (nicht nur PNG!)
+      const backendScreens = s.oled?.screens;
+      if (!backendScreens || backendScreens.length === 0) {
+        s.toast('Keine Screens im Backend', 'info');
+        return;
       }
+
+      // Backend-Screens in Editor-Format konvertieren
+      const newScreens = backendScreens.map((bs, i) => {
+        const widgets = (bs.widgets || []).map(bw => ({
+          id: Date.now() + Math.random(),
+          type: bw.type,
+          x: bw.x || 0,
+          y: bw.y || 0,
+          props: {
+            ...(widgetTypes[bw.type]?.props || {}),
+            scaleX: bw.scaleX ?? bw.scale ?? (widgetTypes[bw.type]?.props?.scale ?? 1),
+            scaleY: bw.scaleY ?? bw.scale ?? (widgetTypes[bw.type]?.props?.scale ?? 1),
+            prefix: bw.prefix ?? widgetTypes[bw.type]?.props?.prefix,
+            text: bw.text ?? widgetTypes[bw.type]?.props?.text,
+            width: bw.w ?? widgetTypes[bw.type]?.props?.width,
+            height: bw.h ?? widgetTypes[bw.type]?.props?.height,
+            diskIdx: bw.diskIdx ?? widgetTypes[bw.type]?.props?.diskIdx,
+            invert: bw.invert || false,
+            border: bw.border || false,
+            align: bw.align || 'left',
+            boxW: bw.boxW || 0,
+            tsep: bw.tsep || false,
+          },
+        }));
+        return {
+          id: i,
+          name: bs.name || `Screen ${i + 1}`,
+          widgets,
+          layers: [{ id: 0, name: 'Hintergrund', pixels: Array.from(new Uint8Array(W*H)), visible: true }],
+          thumbnail: '',
+        };
+      });
+
+      screens = newScreens;
+      _screenId = screens.length;
+      activeScreen = screens[0]?.id ?? 0;
+      const sc = screens[0];
+      placedWidgets = sc.widgets ? JSON.parse(JSON.stringify(sc.widgets)) : [];
+      layers = sc.layers.map(l => ({ ...l, pixels: new Uint8Array(l.pixels) }));
+      activeLayer = 0;
+      _nid = 1;
+      selectedWidget = -1;
+      renderWidgets();
+      s.toast(`${newScreens.length} Screen(s) vom Backend geladen`, 'ok');
     } catch (e) {
       s.toast('Fehler: ' + (e.message||e), 'err');
     }
+  }
+
+  async function exportScreens() {
+    saveCurrentScreen();
+    const data = JSON.stringify({ screens, version: '1.0' }, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `pyroplus-oled-${new Date().toISOString().slice(0,10)}.json`;
+    a.click(); URL.revokeObjectURL(url);
+    s.toast('Screens exportiert', 'ok');
+  }
+
+  async function importScreens() {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.json';
+    input.onchange = async (e) => {
+      try {
+        const text = await e.target.files[0].text();
+        const data = JSON.parse(text);
+        if (data.screens?.length > 0) {
+          screens = data.screens.map((sc, i) => ({
+            ...sc, id: i,
+            layers: sc.layers || [{ id: 0, name: 'Hintergrund', pixels: Array.from(new Uint8Array(W*H)), visible: true }],
+          }));
+          _screenId = screens.length;
+          switchScreen(screens[0].id);
+          s.toast(`${screens.length} Screen(s) importiert`, 'ok');
+        }
+      } catch (err) { s.toast('Import-Fehler: ' + err.message, 'err'); }
+    };
+    input.click();
   }
 
   /* ═══ PANEL D&D ═══ */
@@ -513,7 +602,33 @@
   function sDragLeave(e){if(!e.currentTarget.contains(e.relatedTarget))pdropSide=null;}
   function sDrop(e,side){e.preventDefault();const id=e.dataTransfer.getData('application/x-oled-panel');if(!id)return;lpanels=lpanels.filter(p=>p!==id);rpanels=rpanels.filter(p=>p!==id);if(side==='left')lpanels=[...lpanels,id];else rpanels=[...rpanels,id];pdragId=null;pdropSide=null;}
 
-  function onKey(e){if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;if(e.ctrlKey&&e.key==='z'){undo();e.preventDefault();}if(e.ctrlKey&&e.key==='y'){redo();e.preventDefault();}if((e.key==='Delete'||e.key==='Backspace')&&selectedWidget>=0){removeWidget(selectedWidget);e.preventDefault();return;}if(e.key==='g'){showGrid=!showGrid;render();}if(e.key==='+')zoom=Math.min(16,zoom+1);if(e.key==='-')zoom=Math.max(2,zoom-1);const t=drawTools.find(t=>t.key===e.key.toUpperCase());if(t&&!e.ctrlKey)tool=t.id;}
+  function onKey(e){
+    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+    if(e.ctrlKey&&e.key==='z'){undo();e.preventDefault();}
+    if(e.ctrlKey&&e.key==='y'){redo();e.preventDefault();}
+    if(e.ctrlKey&&e.key==='d'&&selectedWidget>=0){
+      // Duplizieren
+      const src=placedWidgets[selectedWidget];
+      placedWidgets=[...placedWidgets,{...JSON.parse(JSON.stringify(src)),id:Date.now(),x:src.x+4,y:src.y+4}];
+      selectedWidget=placedWidgets.length-1;renderWidgets();e.preventDefault();return;
+    }
+    if((e.key==='Delete'||e.key==='Backspace')&&selectedWidget>=0){removeWidget(selectedWidget);e.preventDefault();return;}
+    // Arrow-Key Nudge (1px, Shift=8px)
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)&&selectedWidget>=0){
+      const step=e.shiftKey?(snapGrid||8):1;
+      const w=placedWidgets[selectedWidget];
+      if(e.key==='ArrowLeft')w.x=Math.max(0,w.x-step);
+      if(e.key==='ArrowRight')w.x=Math.min(W-1,w.x+step);
+      if(e.key==='ArrowUp')w.y=Math.max(0,w.y-step);
+      if(e.key==='ArrowDown')w.y=Math.min(H-1,w.y+step);
+      if(snapGrid>0){w.x=snapPos(w.x);w.y=snapPos(w.y);}
+      placedWidgets=[...placedWidgets];renderWidgets();e.preventDefault();return;
+    }
+    if(e.key==='g'){showGrid=!showGrid;render();}
+    if(e.key==='+')zoom=Math.min(16,zoom+1);
+    if(e.key==='-')zoom=Math.max(2,zoom-1);
+    const t=drawTools.find(t=>t.key===e.key.toUpperCase());if(t&&!e.ctrlKey)tool=t.id;
+  }
 
   /* Panel-Metadaten */
   const _pd = { tools:{icon:'pen',label:'Werkzeuge',c:false}, display:{icon:'eye',label:'Anzeige',c:true}, color:{icon:'palette',label:'Farbe',c:false}, preview:{icon:'display',label:'Vorschau',c:false}, props:{icon:'sliders',label:'Eigenschaften',c:true}, layers:{icon:'layer-group',label:'Ebenen',c:false}, widgets:{icon:'puzzle-piece',label:'Widgets',c:true}, weather:{icon:'cloud-sun',label:'Wetter-Ort',c:true}, templates:{icon:'bookmark',label:'Vorlagen',c:true} };
@@ -678,12 +793,24 @@
   {:else if id==='display'}
     <div class="pr"><span>Zoom</span><input type="range" min="2" max="16" value={zoom} oninput={(e)=>zoom=+e.target.value}><span class="pv">{zoom}×</span></div>
     <div class="pr"><span>Raster</span><button class="tog" class:on={showGrid} onclick={()=>{showGrid=!showGrid;}}></button></div>
+    <div class="pr"><span>Snap</span>
+      <select class="ti" style="flex:1;padding:3px 6px" onchange={(e)=>snapGrid=+e.target.value}>
+        <option value="0" selected={snapGrid===0}>Aus</option>
+        <option value="4" selected={snapGrid===4}>4px</option>
+        <option value="8" selected={snapGrid===8}>8px</option>
+        <option value="16" selected={snapGrid===16}>16px</option>
+      </select>
+    </div>
   {:else if id==='color'}
     <div class="cp"><div class="cs white" class:active={tool!=='eraser'} onclick={()=>{if(tool==='eraser')tool='pencil';}} title="Weiß"></div><div class="cs black" class:active={tool==='eraser'} onclick={()=>tool='eraser'} title="Schwarz"></div></div>
   {:else if id==='preview'}
     <div class="pv-box"><div class="pv-bezel"><canvas bind:this={previewEl} width={W} height={H} class="pv-canvas"></canvas></div></div>
     <button class="send-btn" onclick={sendToOled}><i class="fa-solid fa-paper-plane"></i> An OLED senden ({screens.length})</button>
-    <button class="send-btn" style="margin-top:4px;border-color:var(--green);color:var(--green)" onclick={loadFromOled}><i class="fa-solid fa-download"></i> Von OLED laden</button>
+    <button class="send-btn sec" onclick={loadFromOled}><i class="fa-solid fa-download"></i> Vom Backend laden</button>
+    <div class="btn-row">
+      <button class="send-btn half" onclick={exportScreens}><i class="fa-solid fa-file-export"></i> Export</button>
+      <button class="send-btn half" onclick={importScreens}><i class="fa-solid fa-file-import"></i> Import</button>
+    </div>
   {:else if id==='props'}
     {#if selectedWidget >= 0 && placedWidgets[selectedWidget]}
       {@const sw = placedWidgets[selectedWidget]}
@@ -714,7 +841,26 @@
       {#if sw.props.height !== undefined}
         <div class="pr"><span>Höhe</span><input type="range" min="2" max="64" value={sw.props.height} oninput={(e)=>updateWidgetProp(selectedWidget,'height',+e.target.value)}><span class="pv">{sw.props.height}</span></div>
       {/if}
-      <button class="ab" style="width:100%;aspect-ratio:auto;height:28px;margin-top:6px" onclick={()=>removeWidget(selectedWidget)}><i class="fa-solid fa-trash-can"></i> Widget entfernen</button>
+      <!-- Erweiterte Darstellung -->
+      <div class="rr" style="margin-top:6px;color:var(--text-muted);font-size:var(--fs-xs)"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent)"></i> Darstellung</div>
+      <div class="pr"><span>Invertiert</span><button class="tog" class:on={sw.props.invert} onclick={()=>updateWidgetProp(selectedWidget,'invert',!sw.props.invert)}></button></div>
+      <div class="pr"><span>Rahmen</span><button class="tog" class:on={sw.props.border} onclick={()=>updateWidgetProp(selectedWidget,'border',!sw.props.border)}></button></div>
+      {#if !wt?.isShape}
+        <div class="pr"><span>Ausr.</span>
+          <div class="align-btns">
+            <button class="align-btn" class:active={!sw.props.align||sw.props.align==='left'} onclick={()=>updateWidgetProp(selectedWidget,'align','left')} title="Links"><i class="fa-solid fa-align-left"></i></button>
+            <button class="align-btn" class:active={sw.props.align==='center'} onclick={()=>updateWidgetProp(selectedWidget,'align','center')} title="Mitte"><i class="fa-solid fa-align-center"></i></button>
+            <button class="align-btn" class:active={sw.props.align==='right'} onclick={()=>updateWidgetProp(selectedWidget,'align','right')} title="Rechts"><i class="fa-solid fa-align-right"></i></button>
+          </div>
+        </div>
+        {#if sw.props.align && sw.props.align !== 'left'}
+          <div class="pr"><span>Box-B.</span><input type="range" min="0" max="128" value={sw.props.boxW||0} oninput={(e)=>updateWidgetProp(selectedWidget,'boxW',+e.target.value)}><span class="pv">{sw.props.boxW||0}</span></div>
+        {/if}
+      {/if}
+      <div class="prop-actions">
+        <button class="ab" style="flex:1;height:28px" onclick={()=>{const src=placedWidgets[selectedWidget];placedWidgets=[...placedWidgets,{...JSON.parse(JSON.stringify(src)),id:Date.now(),x:src.x+4,y:src.y+4}];selectedWidget=placedWidgets.length-1;renderWidgets();}} title="Duplizieren"><i class="fa-solid fa-copy"></i></button>
+        <button class="ab del" style="flex:1;height:28px" onclick={()=>removeWidget(selectedWidget)} title="Entfernen"><i class="fa-solid fa-trash-can"></i></button>
+      </div>
     {:else}
       <div class="rr"><span>Cursor</span><span class="mono">{cursorX>=0?`${cursorX}, ${cursorY}`:'—'}</span></div>
       <div class="rr"><span>Widgets</span><span class="mono">{placedWidgets.length}</span></div>
@@ -788,7 +934,10 @@
               <div class="sg-thumb">
                 {#if sc.thumbnail}<img src={sc.thumbnail} alt={sc.name} />{:else}<div class="sg-empty"></div>{/if}
               </div>
-              <span class="sg-name">{sc.name}</span>
+              <span class="sg-name" contenteditable="false"
+                ondblclick={(e)=>{e.stopPropagation();e.target.contentEditable='true';e.target.focus();}}
+                onblur={(e)=>{e.target.contentEditable='false';const idx=screens.findIndex(s2=>s2.id===sc.id);if(idx>=0){screens[idx].name=e.target.textContent;screens=[...screens];}}}
+                onkeydown={(e)=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}}}>{sc.name}</span>
               {#if screens.length > 1}
                 <button class="sg-del" onclick={(e)=>{e.stopPropagation();removeScreen(sc.id);}}><i class="fa-solid fa-xmark"></i></button>
               {/if}
@@ -861,6 +1010,21 @@
   .pv-canvas { display: block; width: 128px; height: 64px; image-rendering: pixelated; }
   .send-btn { width: 100%; padding: 8px; border-radius: var(--radius-sm); border: 1px solid var(--accent); background: var(--accent-dim); color: var(--accent); font: 500 var(--fs-sm) var(--font); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
   .send-btn:hover { background: var(--accent); color: #fff; }
+  .send-btn.sec { margin-top: 4px; border-color: var(--green); color: var(--green); background: rgba(0,232,138,0.06); }
+  .send-btn.sec:hover { background: var(--green); color: #000; }
+  .send-btn.half { flex: 1; }
+  .btn-row { display: flex; gap: 4px; margin-top: 4px; }
+
+  /* Alignment Buttons */
+  .align-btns { display: flex; gap: 2px; }
+  .align-btn { width: 28px; height: 24px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+  .align-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .align-btn.active { background: rgba(0,180,255,0.1); border-color: var(--accent); color: var(--accent); }
+
+  /* Prop Actions */
+  .prop-actions { display: flex; gap: 4px; margin-top: 6px; }
+  .ab.del { border-color: var(--red); color: var(--red); }
+  .ab.del:hover { background: var(--red); color: #fff; }
 
   /* Properties */
   .rr { display: flex; justify-content: space-between; font: 500 var(--fs-sm) var(--font); color: var(--text-muted); padding: 3px 0; }

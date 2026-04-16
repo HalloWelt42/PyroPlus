@@ -213,19 +213,21 @@ const tempColor = $derived(tempToColor(s.stats?.cpu?.temp || 0));
   .sidebar-collapsed .sb-led-glow { display: none; }
   .sidebar-collapsed .sb-led { width: 10px; height: 10px; border-radius: 2px; }
 
-  /* OLED-Display 1:1 */
+  /* OLED-Display pixelexakt 128×64 */
   .sb-oled { display: flex; justify-content: center; margin: 14px 0 36px; }
   .sb-oled-screen {
     width: 132px; height: 68px;
+    padding: 2px;
     border: 2px solid #333;
     border-radius: 2px;
     background: #000;
-    display: flex; align-items: center; justify-content: center;
     overflow: hidden;
+    flex-shrink: 0;
   }
   .sb-oled-img {
     width: 128px; height: 64px;
     image-rendering: pixelated;
+    image-rendering: crisp-edges;
     display: block;
   }
   .sb-oled-off { width: 128px; height: 64px; }
