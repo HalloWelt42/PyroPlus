@@ -48,6 +48,14 @@ class FanController:
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
         self._load_settings()
+        # Echten GPIO-Status abfragen und synchronisieren
+        try:
+            gpio_state = hw_client.case_fan_get()
+            self.case_on = gpio_state.get("on", False)
+            if self.case_on:
+                logger.info(f"Gehäuselüfter war AN — synchronisiert (Schwelle Aus: {self.threshold_off}°C)")
+        except Exception:
+            pass
         logger.info(f"Lüfter verfügbar: {self.available}")
 
     # ═══════════════════════════════════════════════════════
