@@ -8,7 +8,8 @@
   import { entpacken, packen, setzePixel, linie, rechteck, ellipse, fuellen, verschieben, kopie, pixelAusPng, type Bitmap } from './bitmap';
   import type { Widget } from '$lib/api/types';
 
-  let { onkontext }: { onkontext?: (id: string) => void } = $props();
+  /* onauswahl: der Nutzer hat auf dem Display ein Widget gewählt (Klick oder Rechtsklick) */
+  let { onauswahl }: { onauswahl?: () => void } = $props();
 
   let schirm = $state<HTMLDivElement | null>(null);
   let feld = $state<HTMLDivElement | null>(null);
@@ -68,6 +69,7 @@
       return;
     }
     oled.waehleWidget(box.id, e.shiftKey);
+    onauswahl?.();
     if (e.shiftKey) return;
     const ursprung = new Map<string, { x: number; y: number }>();
     for (const w of oled.gewaehlte) ursprung.set(w.id, { x: w.x, y: w.y });
@@ -119,7 +121,7 @@
     if (!oled.auswahl.includes(box.id)) oled.waehleWidget(box.id);
     const f = feld.getBoundingClientRect();
     menue = { x: e.clientX - f.left, y: e.clientY - f.top };
-    onkontext?.(box.id);
+    onauswahl?.();
   }
 
   /* Zeichenlogik: Koordinaten relativ zum Widget */
@@ -210,7 +212,7 @@
     {/if}
     <div class="rechts">
       {#if oled.probe}
-        <span class="badge badge-info"><i class="fa-solid fa-eye"></i>Vorschau mit neuem Widget</span>
+        <button class="btn btn-klein" title="Vorschau des neuen Widgets entfernen, ohne es einzufügen (Esc)" onclick={() => oled.vorschauVerwerfen()}><i class="fa-solid fa-xmark"></i>Vorschau verwerfen</button>
       {:else}
         <span class="badge" class:badge-ok={oled.speicherzustand === 'gespeichert'} class:badge-warn={oled.speicherzustand === 'wartet' || oled.speicherzustand === 'laeuft'} class:badge-err={oled.speicherzustand === 'fehler'}>
           <i class="fa-solid {oled.speicherzustand === 'gespeichert' ? 'fa-circle-check' : oled.speicherzustand === 'fehler' ? 'fa-triangle-exclamation' : 'fa-pen'}"></i>{zustandText}

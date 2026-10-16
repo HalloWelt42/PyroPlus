@@ -114,6 +114,13 @@
   }
 
   onDestroy(() => { oled.setzeProbe(null); oled.simulate = {}; });
+  /* Vorschau anderswo verworfen (Knopf am Display, Esc, Entf): Wahl zurücksetzen */
+  let verworfenGesehen = oled.verworfen;
+  $effect(() => {
+    if (oled.verworfen === verworfenGesehen) return;
+    verworfenGesehen = oled.verworfen;
+    quelleId = null; modusId = null; probewert = null; klein = null;
+  });
 </script>
 
 {#if wechselFuer}
@@ -180,6 +187,9 @@
     {/if}
     <div class="zeile"><span class="label">Name</span><input class="feld" bind:value={name} title="Eigener Name des Widgets" oninput={probeAktualisieren}></div>
   </div>
-  <button class="btn btn-primary btn-breit" title="Widget an der markierten Stelle einfügen" onclick={einfuegen}><i class="fa-solid fa-plus"></i>Einfügen</button>
+  <div class="btn-reihe">
+    <button class="btn" title="Vorschau verwerfen, nichts einfügen (Esc)" onclick={() => oled.vorschauVerwerfen()}><i class="fa-solid fa-xmark"></i>Verwerfen</button>
+    <button class="btn btn-primary" title="Widget an der markierten Stelle einfügen" onclick={einfuegen}><i class="fa-solid fa-plus"></i>Einfügen</button>
+  </div>
 {/if}
 

@@ -468,6 +468,15 @@ class OledStore {
     this.rendernBald(40);
   }
 
+  /* Vorschau des neuen Widgets verwerfen; verworfen zählt hoch, damit der Reiter Hinzufügen seine Wahl zurücksetzt */
+  verworfen = $state(0);
+  vorschauVerwerfen(): void {
+    if (!this.probe) return;
+    this.simulate = {};
+    this.setzeProbe(null);
+    this.verworfen += 1;
+  }
+
   probeEinfuegen(): void {
     if (!this.probe) return;
     const w = tief(this.probe);

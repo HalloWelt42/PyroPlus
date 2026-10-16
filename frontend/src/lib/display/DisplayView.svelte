@@ -41,7 +41,8 @@
     if (strg && e.key.toLowerCase() === 'a') { e.preventDefault(); oled.alleWaehlen(); return; }
     if (strg && e.key.toLowerCase() === 'd' && ids.length) { e.preventDefault(); oled.duplizierenWidgets(ids); return; }
     if ((e.key === 'Delete' || e.key === 'Backspace') && ids.length && !oled.zeichnen) { e.preventDefault(); oled.entfernen(ids); return; }
-    if (e.key === 'Escape') { oled.waehleWidget(null); oled.setzeProbe(null); return; }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && !ids.length && oled.probe) { e.preventDefault(); oled.vorschauVerwerfen(); return; }
+    if (e.key === 'Escape') { if (oled.zeichnen) { oled.zeichnen = false; return; } if (ids.length) { oled.waehleWidget(null); return; } oled.vorschauVerwerfen(); return; }
     if (ids.length && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
       e.preventDefault();
       const schritt = e.shiftKey ? 8 : 1;
@@ -63,7 +64,7 @@
   <DisplayKopf />
   <div class="editor">
     <BildschirmListe />
-    <Canvas onkontext={(id) => rechteSpalte?.zeigeEigenschaften()} />
+    <Canvas onauswahl={() => rechteSpalte?.zeigeEigenschaften()} />
     <RechteSpalte bind:this={rechteSpalte} />
   </div>
 </div>

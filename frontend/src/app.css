@@ -371,4 +371,4 @@ img { display: block; }
 @container (max-width: 460px) { .hilfe-text dl { grid-template-columns: minmax(0, 1fr); } .hilfe-text dd { margin-bottom: 6px; } }
 /* Schmale Vorschauspalte: der Hinweis im Fuß weicht, die Werte bleiben */
 .spalte-canvas { container-type: inline-size; }
-@container (max-width: 560px) { .canvas-fuss .hinweis { display: none; } }
+@container (max-width: 560px) { .canvas-fuss .hinweis { display: none; } .canvas-fuss { flex-wrap: wrap; row-gap: 4px; column-gap: 14px; } }

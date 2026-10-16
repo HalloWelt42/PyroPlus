@@ -37,6 +37,7 @@ const ANSICHTEN_RECHNER = [
   { name: "display-eigenschaften", route: "#/display", schritte: `waehleErstesWidget(); await schlafen(900);` },
   { name: "display-mehrfach", route: "#/display", schritte: `waehleAlleWidgets(); await schlafen(900);` },
   { name: "display-hinzufuegen", route: "#/display", schritte: `klick(".reiter button", "Hinzufügen"); await schlafen(600); klick(".quelle"); await schlafen(500); klick(".chip", "Symbol + Wert"); await schlafen(1500);` },
+  { name: "display-vorschau-schmal", route: "#/display", schritte: `klick(".reiter button", "Hinzufügen"); await schlafen(600); klick(".quelle"); await schlafen(1200);` },
   { name: "display-hinzufuegen-unten", route: "#/display", schritte: `klick(".reiter button", "Hinzufügen"); await schlafen(600); klick(".quelle"); await schlafen(500); klick(".chip", "Balken + Wert"); await schlafen(1200); rollen(".spalte-rechts .spalte-inhalt", 99999); await schlafen(400);` },
   { name: "display-bausteine", route: "#/display", schritte: `klick(".reiter button", "Bausteine"); await schlafen(2500);` },
   { name: "display-bausteine-unten", route: "#/display", schritte: `klick(".reiter button", "Bausteine"); await schlafen(2500); rollen(".spalte-rechts .spalte-inhalt", 99999); await schlafen(600);` },

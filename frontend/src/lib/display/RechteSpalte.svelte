@@ -10,17 +10,9 @@
   let wechselFuer = $state<Widget | null>(null);
   let inhalt = $state<HTMLDivElement | null>(null);
 
-  export function zeigeEigenschaften(): void { reiter = 'eigenschaften'; wechselFuer = null; }
-
-  /* Ändert sich die Auswahl auf ein Widget, springt die Spalte zu den Eigenschaften;
-     eine laufende Probe oder ein Quellenwechsel bleiben beim Hinzufügen. */
-  let letzteAuswahl = '';
-  $effect(() => {
-    const jetzt = oled.auswahl.join(',');
-    if (jetzt === letzteAuswahl) return;
-    letzteAuswahl = jetzt;
-    if (jetzt && !oled.probe && !wechselFuer) { reiter = 'eigenschaften'; if (inhalt) inhalt.scrollTop = 0; }
-  });
+  /* Aufruf bei Auswahl auf dem Display: dann sind die Eigenschaften gefragt. Einfügen aus Bausteinen
+     oder Hinzufügen wählt zwar das neue Widget, der Reiter bleibt aber, damit die Liste stehen bleibt. */
+  export function zeigeEigenschaften(): void { wechsle('eigenschaften'); }
 
   function wechsle(r: Reiter): void {
     reiter = r;
