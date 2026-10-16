@@ -160,6 +160,7 @@ class OledStore {
   /* Bildschirmwahl */
 
   waehle(id: string | null): void {
+    this.offenenEntwurfSichern();
     const screen = this.screens.find((s) => s.id === id) ?? null;
     this.entwurf = screen ? tief(screen) : null;
     this.auswahl = [];
@@ -291,11 +292,6 @@ class OledStore {
 
   widgetEinfuegen(widget: Widget, waehlen = true): void {
     const neu: Widget = { ...tief(widget), id: neueId() };
-    if (neu.x === 0 && neu.y === 0 && this.probeBox) {
-      const stelle = freieStelle(this.boxen, this.probeBox.w, this.probeBox.h);
-      neu.x = stelle.x;
-      neu.y = stelle.y;
-    }
     this.aendere((s) => { s.widgets.push(neu); });
     if (waehlen) this.auswahl = [neu.id];
     this.zeichnen = neu.display === 'bitmap';
@@ -469,7 +465,6 @@ class OledStore {
   probeEinfuegen(): void {
     if (!this.probe) return;
     const w = tief(this.probe);
-    if (this.probeBox) { w.x = this.probeBox.x - (this.probeBox.x - w.x); }
     this.widgetEinfuegen(w);
     this.probe = null;
     this.probeBox = null;
@@ -487,21 +482,26 @@ class OledStore {
     if (!this.entwurf) return;
     if (this.renderLaeuft) { this.renderErneut = true; return; }
     this.renderLaeuft = true;
+    const entwurfVorher = this.entwurf;
+    const probeVorher = this.probe;
+    const veraltet = () => this.entwurf !== entwurfVorher || this.probe !== probeVorher;
     try {
       let screen = this.entwurf;
       if (this.probe) {
         const probe = tief(this.probe);
         if (this.probeBox === null) {
-          const mass = await api.oled.render({ screen: { ...tief(this.entwurf), widgets: [{ ...probe, x: 0, y: 0 }] }, simulate: this.simulate });
-          const box = mass.boxes[0];
-          const stelle = freieStelle(this.boxen, box.w || 1, box.h || 1);
-          probe.x = stelle.x;
-          probe.y = stelle.y;
-          this.probe = { ...this.probe, x: stelle.x, y: stelle.y };
+          const mass = await api.oled.renderWidget({ ...probe, x: 0, y: 0 }, this.simulate);
+          if (veraltet()) { this.renderErneut = true; return; }
+          const stelle = mass.width > 0 ? freieStelle(this.boxen, mass.width, mass.height) : { x: 0, y: 0 };
+          probe.x = Math.max(0, stelle.x - mass.box.x);
+          probe.y = Math.max(0, stelle.y - mass.box.y);
+          this.probe = { ...this.probe, x: probe.x, y: probe.y };
         }
         screen = { ...tief(this.entwurf), widgets: [...this.entwurf.widgets, probe] };
       }
+      const probeGerendert = this.probe;
       const antwort = await api.oled.render({ screen, simulate: this.simulate });
+      if (this.entwurf?.id !== entwurfVorher.id || this.probe !== probeGerendert) { this.renderErneut = true; return; }
       this.bild = antwort.imageBase64;
       if (this.probe) {
         this.boxen = antwort.boxes.slice(0, -1);
@@ -555,17 +555,29 @@ class OledStore {
   }
 
   async speichern(): Promise<void> {
-    if (!this.entwurf) return;
-    const entwurf = tief(this.entwurf);
-    this.speicherzustand = 'laeuft';
+    if (this.entwurf) await this.entwurfSpeichern(tief(this.entwurf));
+  }
+
+  /* Vor einem Bildschirmwechsel: noch nicht gespeicherte Änderungen sofort sichern,
+     sonst würde der verzögerte Speichervorgang schon den neuen Bildschirm sehen. */
+  private offenenEntwurfSichern(): void {
+    if (this.speicherTimer) { clearTimeout(this.speicherTimer); this.speicherTimer = null; }
+    if (this.entwurf && this.speicherzustand !== 'gespeichert') void this.entwurfSpeichern(tief(this.entwurf));
+  }
+
+  /* Speichert genau den übergebenen Stand; der Speicherzustand gilt nur, solange dieser Bildschirm bearbeitet wird. */
+  private async entwurfSpeichern(entwurf: Screen): Promise<void> {
+    const istAktiv = () => this.entwurf?.id === entwurf.id;
+    if (istAktiv()) this.speicherzustand = 'laeuft';
     try {
       const gespeichert = await api.oled.updateScreen(entwurf.id, entwurf);
       this.screens = this.screens.map((s) => (s.id === gespeichert.id ? gespeichert : s));
       this.bekannteVersion += 1;
+      if (!istAktiv()) { void this.aktualisiereVorschaubilder(); return; }
       this.speicherzustand = JSON.stringify(entwurf) === JSON.stringify(this.entwurf) ? 'gespeichert' : 'wartet';
       if (this.speicherzustand === 'wartet') this.speichernBald();
     } catch (e) {
-      this.speicherzustand = 'fehler';
+      if (istAktiv()) this.speicherzustand = 'fehler';
       ui.fehler(e, 'Speichern');
     }
   }
@@ -587,18 +599,24 @@ class OledStore {
 
   async bausteinEinfuegen(vorlageId: string): Promise<void> {
     try {
-      const w = await api.oled.templateWidget(vorlageId);
-      this.setzeProbe({ ...w, x: 0, y: 0 });
-      await this.rendern();
-      this.probeEinfuegen();
+      await this.anFreierStelleEinfuegen(await api.oled.templateWidget(vorlageId));
     } catch (e) { ui.fehler(e, 'Baustein'); }
   }
 
   async eigenenBausteinEinfuegen(preset: WidgetPreset): Promise<void> {
-    const w: Widget = { id: neueId(), source: preset.source, display: preset.display, x: 0, y: 0, name: preset.name, opts: tief(preset.opts) };
-    this.setzeProbe(w);
-    await this.rendern();
-    this.probeEinfuegen();
+    try {
+      await this.anFreierStelleEinfuegen({ id: neueId(), source: preset.source, display: preset.display, x: 0, y: 0, name: preset.name, opts: tief(preset.opts) });
+    } catch (e) { ui.fehler(e, 'Baustein'); }
+  }
+
+  /* Misst das Widget beim Backend und setzt es an die erste freie Stelle des Bildschirms,
+     der beim Einfügen bearbeitet wird. Unabhängig von Probe und Render-Schleife. */
+  private async anFreierStelleEinfuegen(widget: Widget): Promise<void> {
+    const mass = await api.oled.renderWidget({ ...widget, x: 0, y: 0 }, {});
+    if (!this.entwurf || this.entwurf.kind !== 'widgets') return;
+    const stelle = mass.width > 0 ? freieStelle(this.boxen, mass.width, mass.height) : { x: 0, y: 0 };
+    this.widgetEinfuegen({ ...widget, x: Math.max(0, stelle.x - mass.box.x), y: Math.max(0, stelle.y - mass.box.y) });
+    ui.toast(`"${widget.name}" eingefügt`);
   }
 
   async alsBausteinSichern(widget: Widget, name: string): Promise<void> {

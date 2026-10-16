@@ -16,15 +16,25 @@ export class ApiFehler extends Error {
 }
 
 let token = '';
+let tokenAnfrage: Promise<string> | null = null;
 
-async function holeToken(): Promise<string> {
-  const antwort = await fetch('/api/token');
-  const daten = (await antwort.json()) as { token?: string };
-  token = daten.token ?? '';
-  return token;
+/* Holt den Token genau einmal, auch wenn viele Anfragen gleichzeitig starten. */
+function holeToken(): Promise<string> {
+  tokenAnfrage ??= (async () => {
+    try {
+      const antwort = await fetch('/api/token');
+      const daten = (await antwort.json()) as { token?: string };
+      token = daten.token ?? '';
+      return token;
+    } finally {
+      tokenAnfrage = null;
+    }
+  })();
+  return tokenAnfrage;
 }
 
 async function anfrage<T>(methode: string, pfad: string, body?: unknown, wiederholt = false): Promise<T> {
+  if (!token) await holeToken();
   const antwort = await fetch(`/api${pfad}`, {
     method: methode,
     headers: { 'Content-Type': 'application/json', 'X-API-Token': token },
