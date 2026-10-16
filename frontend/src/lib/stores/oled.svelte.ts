@@ -20,8 +20,14 @@ function tief<T>(wert: T): T {
   return JSON.parse(JSON.stringify(wert)) as T;
 }
 
+/* UUID Version 4 als 32 Hexzeichen wie im Backend. getRandomValues statt randomUUID,
+   weil randomUUID nur in sicheren Umgebungen (https, localhost) existiert und die
+   Oberfläche im Heimnetz über http läuft. */
 function neueId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
 }
 
 export function leereOpts(): WidgetOpts {
