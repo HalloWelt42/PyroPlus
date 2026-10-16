@@ -1,22 +1,24 @@
 """
-PyroPlus v3.0.0 — Hardware-Proxy Client
-© HalloWelt42 - Nur für private Nutzung
+PyroPlus: Client zum Hardware-Proxy.
 
-Config-basierte Kommunikation mit dem HW-Proxy.
-LEDs: Sendet nur Konfigurationsänderungen (kein HTTP pro Frame).
-OLED: Sendet gerenderte Bilder (1x/s — akzeptabel).
-Fan:  Sendet bei Änderungen.
+Alle Hardware-Zugriffe laufen über diese Funktionen. Ist HW_PROXY_URL auf
+"none" gesetzt (Tests, Entwicklung ohne Pi), antwortet jede Funktion sofort mit
+ihrem Rückfallwert, ohne Netzwerkzugriff.
+
+LEDs:  nur Konfigurationsänderungen (keine HTTP-Anfrage je Bild).
+OLED:  fertig gerenderte Bilder.
+Lüfter: Sollwerte bei Änderung, Status auf Anfrage.
 """
 
 import logging
-from typing import Optional
+from typing import Any, Optional
+
 import httpx
 
-from config import HW_PROXY_URL
+from config import HW_PROXY_DISABLED, HW_PROXY_URL
 
 logger = logging.getLogger("hw_client")
 
-# ─── Shared Client (Connection Pooling) ─────────────────────
 _client: Optional[httpx.Client] = None
 
 
@@ -30,209 +32,137 @@ def _get_client() -> httpx.Client:
     return _client
 
 
-def close():
+def close() -> None:
     global _client
     if _client:
         _client.close()
         _client = None
 
 
-def health() -> dict:
+def _call(method: str, path: str, json: Any = None, quiet: bool = False) -> Optional[dict]:
+    """Eine Anfrage an den Proxy; None bei Abschaltung oder Fehler."""
+    if HW_PROXY_DISABLED:
+        return None
     try:
-        r = _get_client().get("/health")
-        return r.json()
-    except Exception as e:
-        logger.error(f"HW-Proxy nicht erreichbar: {e}")
+        antwort = _get_client().request(method, path, json=json)
+        return antwort.json()
+    except Exception as fehler:
+        if not quiet:
+            logger.error(f"Hardware-Proxy {method} {path}: {fehler}")
+        return None
+
+
+def available() -> bool:
+    return not HW_PROXY_DISABLED
+
+
+# Allgemein
+
+def health() -> dict:
+    daten = _call("GET", "/health")
+    if daten is None:
         return {"status": "offline", "fan": False, "oled": False, "leds": False}
+    return daten
 
-
-# ─── Temperatur ─────────────────────────────────────────────
 
 def get_temp() -> float:
+    daten = _call("GET", "/temp", quiet=True)
+    if daten is not None:
+        return float(daten.get("temp", 0.0))
     try:
-        r = _get_client().get("/temp")
-        return r.json().get("temp", 0.0)
+        with open("/sys/class/thermal/thermal_zone0/temp") as f:
+            return round(int(f.read().strip()) / 1000.0, 1)
     except Exception:
-        try:
-            with open("/sys/class/thermal/thermal_zone0/temp") as f:
-                return round(int(f.read().strip()) / 1000.0, 1)
-        except Exception:
-            return 0.0
-
-
-# ─── Fan ────────────────────────────────────────────────────
-
-def fan_set_pwm(duty: float) -> dict:
-    """PWM setzen (0-100%). Gibt dict mit duty, pwm, rpm zurück."""
-    try:
-        r = _get_client().post("/fan/pwm", json={"duty": round(duty, 1)})
-        return r.json()
-    except Exception as e:
-        logger.error(f"Lüfter PWM: {e}")
-        return {"ok": False}
-
-
-def fan_get_status() -> dict:
-    """Aktuellen Lüfter-Status lesen (PWM, RPM, GPIO)."""
-    try:
-        r = _get_client().get("/fan/pwm")
-        return r.json()
-    except Exception:
-        return {"available": False}
-
-
-def case_fan_set(on: bool) -> dict:
-    """Gehäuselüfter An/Aus über GPIO."""
-    try:
-        r = _get_client().post("/fan/case", json={"on": on})
-        return r.json()
-    except Exception as e:
-        logger.error(f"Gehäuselüfter: {e}")
-        return {"ok": False}
-
-
-def case_fan_get() -> dict:
-    """Gehäuselüfter Status."""
-    try:
-        r = _get_client().get("/fan/case")
-        return r.json()
-    except Exception:
-        return {"available": False, "on": False}
+        return 0.0
 
 
 def get_host_ip() -> str:
-    try:
-        r = _get_client().get("/host-ip")
-        return r.json().get("ip", "N/A")
-    except:
-        return "N/A"
+    daten = _call("GET", "/host-ip", quiet=True)
+    return str(daten.get("ip", "N/A")) if daten else "N/A"
+
+
+# Lüfter
+
+def fan_set_pwm(duty: float) -> dict:
+    daten = _call("POST", "/fan/pwm", json={"duty": round(duty, 1)})
+    return daten if daten is not None else {"ok": False}
+
+
+def fan_get_status() -> dict:
+    daten = _call("GET", "/fan/pwm", quiet=True)
+    return daten if daten is not None else {"available": False}
+
 
 def fan_available() -> bool:
-    try:
-        return fan_get_status().get("available", False)
-    except Exception:
-        return False
+    return bool(fan_get_status().get("available", False))
 
 
-# ─── OLED ───────────────────────────────────────────────────
+def case_fan_set(on: bool) -> dict:
+    daten = _call("POST", "/fan/case", json={"on": on})
+    return daten if daten is not None else {"ok": False}
+
+
+def case_fan_get() -> dict:
+    daten = _call("GET", "/fan/case", quiet=True)
+    return daten if daten is not None else {"available": False, "on": False}
+
+
+# OLED
 
 def oled_display(image_base64: str) -> bool:
-    try:
-        r = _get_client().post("/oled/display", json={"image_base64": image_base64})
-        return r.json().get("ok", False)
-    except Exception as e:
-        logger.error(f"OLED Display: {e}")
-        return False
+    daten = _call("POST", "/oled/display", json={"image_base64": image_base64}, quiet=True)
+    return bool(daten and daten.get("ok", False))
 
 
 def oled_brightness(value: int) -> bool:
-    try:
-        r = _get_client().post("/oled/brightness", json={"value": value})
-        return r.json().get("ok", False)
-    except Exception as e:
-        logger.error(f"OLED Brightness: {e}")
-        return False
+    daten = _call("POST", "/oled/brightness", json={"value": value})
+    return bool(daten and daten.get("ok", False))
 
 
 def oled_clear() -> bool:
-    try:
-        r = _get_client().post("/oled/clear")
-        return r.json().get("ok", False)
-    except Exception:
-        return False
+    daten = _call("POST", "/oled/clear", quiet=True)
+    return bool(daten and daten.get("ok", False))
 
 
 def oled_available() -> bool:
-    try:
-        r = _get_client().get("/oled/status")
-        return r.json().get("available", False)
-    except Exception:
-        return False
+    daten = _call("GET", "/oled/status", quiet=True)
+    return bool(daten and daten.get("available", False))
 
 
-# ═════════════════════════════════════════════════════════════
-#  LEDs — NEUE CONFIG-BASIERTE API
-# ═════════════════════════════════════════════════════════════
+# LEDs (konfigurationsbasiert)
 
-def leds_config(**kwargs) -> bool:
-    """LED-Konfiguration an Proxy senden (nur bei Änderungen!).
-
-    Beispiel: leds_config(effect="rainbow", speed=100)
-    Erlaubte Keys: effect, color, color2, brightness, speed,
-                   individual_mode, individual_colors
-    """
-    try:
-        r = _get_client().post("/leds/config", json=kwargs)
-        return r.json().get("ok", False)
-    except Exception as e:
-        logger.error(f"LED Config: {e}")
-        return False
+def leds_config(**kwargs: Any) -> bool:
+    """Konfigurationsänderung senden. Erlaubte Schlüssel: effect, color, color2,
+    brightness, speed, individual_mode, individual_colors."""
+    daten = _call("POST", "/leds/config", json=kwargs)
+    return bool(daten and daten.get("ok", False))
 
 
 def leds_push_system_data(cpu_temp: float, cpu_load: float) -> bool:
-    """System-Daten für reaktive Effekte pushen (alle 2-5s)."""
-    try:
-        r = _get_client().post("/leds/system-data", json={
-            "cpu_temp": cpu_temp, "cpu_load": cpu_load
-        })
-        return r.json().get("ok", False)
-    except Exception:
-        return False
+    daten = _call("POST", "/leds/system-data",
+                  json={"cpu_temp": cpu_temp, "cpu_load": cpu_load}, quiet=True)
+    return bool(daten and daten.get("ok", False))
 
 
 def leds_get_state() -> dict:
-    """Aktuellen LED-State vom Proxy holen (für WebSocket/Frontend)."""
-    try:
-        r = _get_client().get("/leds/state")
-        return r.json()
-    except Exception as e:
-        logger.error(f"LED State: {e}")
-        return {"available": False, "led_states": []}
+    daten = _call("GET", "/leds/state")
+    return daten if daten is not None else {"available": False, "led_states": []}
 
 
 def leds_get_states_only() -> list[dict]:
-    """Nur LED-Farben holen (leichtgewichtig)."""
-    try:
-        r = _get_client().get("/leds/states-only")
-        return r.json().get("led_states", [])
-    except Exception:
-        return []
+    daten = _call("GET", "/leds/states-only", quiet=True)
+    return list(daten.get("led_states", [])) if daten else []
 
 
 def leds_available() -> bool:
-    try:
-        r = _get_client().get("/leds/status")
-        return r.json().get("available", False)
-    except Exception:
-        return False
+    daten = _call("GET", "/leds/status", quiet=True)
+    return bool(daten and daten.get("available", False))
 
 
 def leds_effects() -> dict:
-    """Effekt-Katalog vom Proxy."""
-    try:
-        r = _get_client().get("/leds/effects")
-        return r.json()
-    except Exception:
-        return {"effects": {}, "by_category": {}}
-
-
-# ─── Legacy (für Abwärtskompatibilität) ─────────────────────
-
-def leds_set(colors: list[dict]) -> bool:
-    """DEPRECATED: Direkte Farbsetzung. Nutze leds_config() stattdessen."""
-    logger.warning("leds_set() ist deprecated — nutze leds_config()")
-    try:
-        r = _get_client().post("/leds/set", json={"leds": colors})
-        return r.json().get("ok", False)
-    except Exception:
-        return False
-
-
-def leds_brightness(value: int) -> bool:
-    """DEPRECATED: Nutze leds_config(brightness=X) stattdessen."""
-    return leds_config(brightness=int(value / 255 * 1000))
+    daten = _call("GET", "/leds/effects", quiet=True)
+    return daten if daten is not None else {"effects": {}, "by_category": {}}
 
 
 def leds_off() -> bool:
-    """LEDs ausschalten."""
     return leds_config(effect="off")

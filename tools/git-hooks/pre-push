@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Vor dem Push: Versionskonsistenz, Backend-Tests, Frontend-Build (falls eingerichtet).
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+tools/version.sh check
+
+if [ -x backend/.venv/bin/python ]; then
+  echo "Backend-Tests ..."
+  (cd backend && .venv/bin/python -m pytest -q)
+else
+  echo "Hinweis: backend/.venv fehlt, Backend-Tests übersprungen" >&2
+fi
+
+if [ -d frontend/node_modules ]; then
+  echo "Frontend-Build ..."
+  (cd frontend && npm run build --silent >/dev/null)
+else
+  echo "Hinweis: frontend/node_modules fehlt, Frontend-Build übersprungen" >&2
+fi
+echo "Push freigegeben: $(tools/version.sh show)"

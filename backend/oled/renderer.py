@@ -1,7 +1,6 @@
 """
-PyroPlus — OLED Pixel-Buffer Renderer (128x64, 1-Bit)
-Reine Pixel-Operationen auf bytearray. Kein PIL fuer Text/Formen.
-Identisch zum Frontend engine.js — pixelgenaues Rendering.
+PyroPlus: Pixel-Primitive auf dem 1-Bit-Puffer (128x64).
+Reine Pixel-Operationen auf bytearray; PIL nur für die PNG-Ausgabe.
 """
 
 from oled.font import FONT, CHAR_SPACING, get_glyph
@@ -228,8 +227,8 @@ def draw_sparkline(buf: bytearray, values: list, x: int, y: int, w: int, h: int)
         draw_line(buf, x0, y0, x1, y1)
 
 
-def draw_gauge(buf: bytearray, pct: float, x: int, y: int, r: int):
-    """Halbkreis-Fortschrittsanzeige mit Prozentwert."""
+def draw_gauge(buf: bytearray, pct: float, x: int, y: int, r: int, label: str | None = None):
+    """Halbkreis-Fortschrittsanzeige; label leer = Prozentwert."""
     import math
     cx, cy = x + r, y + r
     clamped = max(0, min(100, pct))
@@ -250,7 +249,7 @@ def draw_gauge(buf: bytearray, pct: float, x: int, y: int, r: int):
             set_pixel(buf, px, py, 1)
         a += 1.0
     # Wert zentriert
-    text = f"{round(clamped)}%"
+    text = label if label else f"{round(clamped)}%"
     tw = len(text) * 6
     draw_text(buf, text, cx - tw // 2, cy - 3, 1)
 

@@ -1,240 +1,282 @@
 """
-PyroPlus — OLED Wetter-Modul
-Daten von Open-Meteo API holen + Wetter-Screens rendern.
+PyroPlus: Wetterdaten für mehrere Orte.
+
+Ein Anbieter (Protocol) liefert einen Bericht je Ort. Der Dienst hält die Orte,
+den Zwischenspeicher und entscheidet, wann nachgeladen wird. Standardanbieter
+ist Open-Meteo (ohne Schlüssel). Ein anderer Anbieter wird nur hier getauscht.
 """
 
+from __future__ import annotations
+
 import logging
+import threading
 import time
 from datetime import datetime
-from zoneinfo import ZoneInfo
+from typing import Optional, Protocol
 
-from oled.renderer import (
-    W, H, create_buffer, draw_text, draw_hline,
-    draw_bar, draw_icon, set_pixel,
-)
-from oled.icons import ICONS_8x8, condition_to_icon
+import httpx
+from pydantic import BaseModel, Field
+
+from oled.models import GeocodeHit, WeatherLocation, WeatherLocationState, WeatherSettings
 
 logger = logging.getLogger("oled.weather")
-TZ = ZoneInfo("Europe/Berlin")
 
 
-class WeatherProvider:
-    """Holt und cached Wetterdaten von Open-Meteo."""
+class WeatherCurrent(BaseModel):
+    temperature: Optional[float] = None
+    apparent_temperature: Optional[float] = None
+    humidity: Optional[float] = None
+    wind_speed: Optional[float] = None
+    wind_direction: Optional[float] = None
+    wind_gusts: Optional[float] = None
+    cloud_cover: Optional[float] = None
+    pressure: Optional[float] = None
+    pressure_msl: Optional[float] = None
+    precipitation: Optional[float] = None
+    weather_code: Optional[int] = None
+    condition_text: str = "--"
+    is_day: bool = True
+    sunrise: str = ""
+    sunset: str = ""
 
-    def __init__(self):
-        self.data: dict | None = None
-        self.hourly: list[dict] = []
-        self.daily: list[dict] = []
-        self.alerts: list[dict] = []
-        self.location: str = ""
-        self.lat: float = 51.05
-        self.lon: float = 12.13
-        self._fetch_time: float = 0
 
-    def needs_update(self) -> bool:
-        return time.time() - self._fetch_time > 600  # 10 Min Cache
+class WeatherHour(BaseModel):
+    time: str = ""
+    temperature: Optional[float] = None
+    weather_code: Optional[int] = None
+    condition_text: str = ""
+    precipitation_probability: Optional[float] = None
 
-    def fetch(self):
-        """Wetterdaten von Open-Meteo holen."""
-        self._fetch_time = time.time()
+
+class WeatherDay(BaseModel):
+    date: str = ""
+    temperature_max: Optional[float] = None
+    temperature_min: Optional[float] = None
+    weather_code: Optional[int] = None
+    condition_text: str = ""
+    sunrise: str = ""
+    sunset: str = ""
+    precipitation_probability: Optional[float] = None
+
+
+class WeatherReport(BaseModel):
+    location_id: str
+    location_name: str
+    current: WeatherCurrent = Field(default_factory=WeatherCurrent)
+    hourly: list[WeatherHour] = Field(default_factory=list)
+    daily: list[WeatherDay] = Field(default_factory=list)
+    fetched_at: float = 0.0
+
+
+def wmo_text(code: Optional[int]) -> str:
+    """WMO-Wettercode als kurzer deutscher Text (passend zur 5x7-Schrift)."""
+    if code is None:
+        return "--"
+    if code == 0:
+        return "Klar"
+    if code <= 3:
+        return "Bewölkt"
+    if code <= 49:
+        return "Nebel"
+    if code <= 59:
+        return "Niesel"
+    if code <= 69:
+        return "Regen"
+    if code <= 79:
+        return "Schnee"
+    if code <= 84:
+        return "Schauer"
+    return "Gewitter"
+
+
+class WeatherProvider(Protocol):
+    def fetch(self, location: WeatherLocation) -> WeatherReport: ...
+    def geocode(self, query: str) -> list[GeocodeHit]: ...
+
+
+class OpenMeteoProvider:
+    """Open-Meteo: Vorhersage und Ortssuche, ohne Schlüssel."""
+
+    FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+    GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
+
+    def __init__(self, timeout: float = 15.0) -> None:
+        self.timeout = timeout
+
+    def fetch(self, location: WeatherLocation) -> WeatherReport:
+        params = {
+            "latitude": location.lat,
+            "longitude": location.lon,
+            "current": ",".join([
+                "temperature_2m", "relative_humidity_2m", "apparent_temperature",
+                "wind_speed_10m", "wind_direction_10m", "wind_gusts_10m", "weather_code",
+                "cloud_cover", "surface_pressure", "pressure_msl", "precipitation", "is_day",
+            ]),
+            "hourly": "temperature_2m,weather_code,precipitation_probability",
+            "daily": "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max",
+            "forecast_days": 7,
+            "timezone": "auto",
+        }
+        antwort = httpx.get(self.FORECAST_URL, params=params, timeout=self.timeout)
+        antwort.raise_for_status()
+        daten = antwort.json()
+        return self._parse(location, daten)
+
+    def _parse(self, location: WeatherLocation, daten: dict) -> WeatherReport:
+        c = daten.get("current", {}) or {}
+        current = WeatherCurrent(
+            temperature=c.get("temperature_2m"),
+            apparent_temperature=c.get("apparent_temperature"),
+            humidity=c.get("relative_humidity_2m"),
+            wind_speed=c.get("wind_speed_10m"),
+            wind_direction=c.get("wind_direction_10m"),
+            wind_gusts=c.get("wind_gusts_10m"),
+            cloud_cover=c.get("cloud_cover"),
+            pressure=c.get("surface_pressure"),
+            pressure_msl=c.get("pressure_msl"),
+            precipitation=c.get("precipitation"),
+            weather_code=c.get("weather_code"),
+            condition_text=wmo_text(c.get("weather_code")),
+            is_day=bool(c.get("is_day", 1)),
+        )
+
+        hourly: list[WeatherHour] = []
+        h = daten.get("hourly", {}) or {}
+        zeiten = h.get("time", []) or []
+        jetzt_stunde = datetime.now().hour
+        for i, t in enumerate(zeiten):
+            try:
+                stunde = int(str(t)[-5:-3])
+            except ValueError:
+                stunde = i
+            if stunde < jetzt_stunde and not hourly:
+                continue
+            hourly.append(WeatherHour(
+                time=str(t),
+                temperature=_at(h.get("temperature_2m"), i),
+                weather_code=_at(h.get("weather_code"), i),
+                condition_text=wmo_text(_at(h.get("weather_code"), i)),
+                precipitation_probability=_at(h.get("precipitation_probability"), i),
+            ))
+            if len(hourly) >= 24:
+                break
+
+        daily: list[WeatherDay] = []
+        d = daten.get("daily", {}) or {}
+        for i, datum in enumerate(d.get("time", []) or []):
+            sr = str(_at(d.get("sunrise"), i) or "")
+            ss = str(_at(d.get("sunset"), i) or "")
+            daily.append(WeatherDay(
+                date=str(datum),
+                temperature_max=_at(d.get("temperature_2m_max"), i),
+                temperature_min=_at(d.get("temperature_2m_min"), i),
+                weather_code=_at(d.get("weather_code"), i),
+                condition_text=wmo_text(_at(d.get("weather_code"), i)),
+                sunrise=sr[-5:] if len(sr) >= 5 else sr,
+                sunset=ss[-5:] if len(ss) >= 5 else ss,
+                precipitation_probability=_at(d.get("precipitation_probability_max"), i),
+            ))
+        if daily:
+            current.sunrise = daily[0].sunrise
+            current.sunset = daily[0].sunset
+
+        return WeatherReport(location_id=location.id, location_name=location.name,
+                             current=current, hourly=hourly, daily=daily, fetched_at=time.time())
+
+    def geocode(self, query: str) -> list[GeocodeHit]:
+        antwort = httpx.get(self.GEOCODE_URL, params={"name": query, "count": 8, "language": "de"},
+                            timeout=self.timeout)
+        antwort.raise_for_status()
+        treffer: list[GeocodeHit] = []
+        for r in antwort.json().get("results", []) or []:
+            treffer.append(GeocodeHit(name=str(r.get("name", "")), country=str(r.get("country", "")),
+                                      admin=str(r.get("admin1", "")),
+                                      lat=float(r.get("latitude", 0.0)), lon=float(r.get("longitude", 0.0))))
+        return treffer
+
+
+def _at(liste: Optional[list], index: int):
+    if liste is None or index >= len(liste):
+        return None
+    return liste[index]
+
+
+class WeatherService:
+    """Orte, Zwischenspeicher und Nachladen. Thread-sicher."""
+
+    def __init__(self, provider: WeatherProvider, settings: WeatherSettings,
+                 refresh_seconds: int = 600) -> None:
+        self.provider = provider
+        self.settings = settings
+        self.refresh_seconds = refresh_seconds
+        self._reports: dict[str, WeatherReport] = {}
+        self._failed_at: dict[str, float] = {}
+        self._lock = threading.Lock()
+
+    # Orte
+
+    def report_for(self, location_id: Optional[str]) -> Optional[WeatherReport]:
+        """Bericht für einen Ort; leer = Vorgabeort."""
+        ort = self.settings.location_by_id(location_id) or self.settings.default_location()
+        if ort is None:
+            return None
+        with self._lock:
+            return self._reports.get(ort.id)
+
+    def states(self) -> list[WeatherLocationState]:
+        ergebnis: list[WeatherLocationState] = []
+        vorgabe = self.settings.default_location()
+        with self._lock:
+            for ort in self.settings.locations:
+                bericht = self._reports.get(ort.id)
+                zusammenfassung = ""
+                if bericht and bericht.current.temperature is not None:
+                    zusammenfassung = f"{bericht.current.temperature:.1f} °C, {bericht.current.condition_text}"
+                ergebnis.append(WeatherLocationState(
+                    location=ort,
+                    is_default=bool(vorgabe and vorgabe.id == ort.id),
+                    fetched_at=datetime.fromtimestamp(bericht.fetched_at) if bericht else None,
+                    ok=bericht is not None,
+                    summary=zusammenfassung,
+                ))
+        return ergebnis
+
+    def any_ok(self) -> bool:
+        with self._lock:
+            return bool(self._reports)
+
+    def forget(self, location_id: str) -> None:
+        with self._lock:
+            self._reports.pop(location_id, None)
+            self._failed_at.pop(location_id, None)
+
+    # Nachladen
+
+    def refresh_due(self, force: bool = False) -> None:
+        """Lädt alle Orte nach, deren Bericht älter als refresh_seconds ist."""
+        jetzt = time.time()
+        for ort in list(self.settings.locations):
+            with self._lock:
+                bericht = self._reports.get(ort.id)
+                fehlgeschlagen = self._failed_at.get(ort.id, 0.0)
+            frisch = bericht is not None and jetzt - bericht.fetched_at < self.refresh_seconds
+            kuerzlich_fehlgeschlagen = jetzt - fehlgeschlagen < 60
+            if force or (not frisch and not kuerzlich_fehlgeschlagen):
+                self.refresh_location(ort)
+
+    def refresh_location(self, ort: WeatherLocation) -> bool:
         try:
-            import httpx
-            r = httpx.get(
-                f"https://api.open-meteo.com/v1/forecast"
-                f"?latitude={self.lat}&longitude={self.lon}"
-                f"&current=temperature_2m,relative_humidity_2m,wind_speed_10m,"
-                f"weather_code,surface_pressure"
-                f"&hourly=temperature_2m,weather_code,precipitation_probability"
-                f"&daily=temperature_2m_max,temperature_2m_min,weather_code,"
-                f"sunrise,sunset,precipitation_probability_max"
-                f"&forecast_days=5&timezone=auto",
-                timeout=10,
-            )
-            if r.status_code != 200:
-                return
-            data = r.json()
-            current = data.get("current", {})
+            bericht = self.provider.fetch(ort)
+        except Exception as fehler:
+            logger.error(f"Wetter {ort.name}: {fehler}")
+            with self._lock:
+                self._failed_at[ort.id] = time.time()
+            return False
+        with self._lock:
+            self._reports[ort.id] = bericht
+            self._failed_at.pop(ort.id, None)
+        logger.info(f"Wetter {ort.name}: {bericht.current.temperature} °C, {bericht.current.condition_text}")
+        return True
 
-            self.data = {
-                "temperature": current.get("temperature_2m"),
-                "temp": current.get("temperature_2m"),
-                "humidity": current.get("relative_humidity_2m"),
-                "wind_speed": current.get("wind_speed_10m"),
-                "pressure": current.get("surface_pressure"),
-                "weather_code": current.get("weather_code"),
-                "condition_text": self._wmo_to_text(current.get("weather_code")),
-            }
-
-            # Hourly
-            hourly_raw = data.get("hourly", {})
-            times = hourly_raw.get("time", [])
-            temps = hourly_raw.get("temperature_2m", [])
-            codes = hourly_raw.get("weather_code", [])
-            probs = hourly_raw.get("precipitation_probability", [])
-            now_h = datetime.now(TZ).hour
-            self.hourly = []
-            for i in range(len(times)):
-                try:
-                    h = int(times[i][-5:-3]) if times[i] else i
-                except (ValueError, IndexError):
-                    h = i
-                if h >= now_h or len(self.hourly) > 0:
-                    self.hourly.append({
-                        "time": times[i] if i < len(times) else "",
-                        "temperature": temps[i] if i < len(temps) else 0,
-                        "weather_code": codes[i] if i < len(codes) else 0,
-                        "condition_text": self._wmo_to_text(codes[i] if i < len(codes) else 0),
-                        "precipitation_probability": probs[i] if i < len(probs) else 0,
-                    })
-                if len(self.hourly) >= 24:
-                    break
-
-            # Daily
-            daily_raw = data.get("daily", {})
-            dates = daily_raw.get("time", [])
-            maxs = daily_raw.get("temperature_2m_max", [])
-            mins = daily_raw.get("temperature_2m_min", [])
-            d_codes = daily_raw.get("weather_code", [])
-            sunrises = daily_raw.get("sunrise", [])
-            sunsets = daily_raw.get("sunset", [])
-            d_probs = daily_raw.get("precipitation_probability_max", [])
-            self.daily = []
-            for i in range(len(dates)):
-                sr = sunrises[i] if i < len(sunrises) else ""
-                ss = sunsets[i] if i < len(sunsets) else ""
-                self.daily.append({
-                    "date": dates[i],
-                    "temperature_max": maxs[i] if i < len(maxs) else 0,
-                    "temperature_min": mins[i] if i < len(mins) else 0,
-                    "weather_code": d_codes[i] if i < len(d_codes) else 0,
-                    "condition_text": self._wmo_to_text(d_codes[i] if i < len(d_codes) else 0),
-                    "sunrise": sr[-5:] if len(sr) >= 5 else sr,
-                    "sunset": ss[-5:] if len(ss) >= 5 else ss,
-                    "precipitation_probability": d_probs[i] if i < len(d_probs) else 0,
-                })
-
-            # Sunrise/Sunset in current data
-            if self.daily:
-                self.data["sunrise"] = self.daily[0].get("sunrise", "")
-                self.data["sunset"] = self.daily[0].get("sunset", "")
-
-            logger.info(f"Wetter aktualisiert: {self.data.get('temperature')}°C")
-        except Exception as e:
-            logger.error(f"Wetter-Fetch: {e}")
-
-    @staticmethod
-    def _wmo_to_text(code) -> str:
-        if code is None:
-            return "---"
-        if code == 0:
-            return "Klar"
-        if code <= 3:
-            return "Bewoelkt"
-        if code <= 49:
-            return "Nebel"
-        if code <= 59:
-            return "Niesel"
-        if code <= 69:
-            return "Regen"
-        if code <= 79:
-            return "Schnee"
-        if code <= 84:
-            return "Schauer"
-        return "Gewitter"
-
-
-# ═══ Wetter-Screen-Renderer ═══
-
-def render_weather_compact(buf: bytearray, weather: WeatherProvider):
-    """Kompakte Wetter-Anzeige."""
-    w = weather.data or {}
-    now = datetime.now(TZ)
-    loc = weather.location or "---"
-    draw_text(buf, loc[:14], 0, 0, 1)
-    draw_text(buf, now.strftime("%H:%M"), 96, 0, 1)
-
-    temp = w.get("temperature", "--")
-    cond = w.get("condition_text", "")
-    icon_name = condition_to_icon(cond)
-    icon_rows = ICONS_8x8.get(icon_name, [])
-
-    draw_text(buf, f"{temp}\u00b0C", 0, 12, 2)
-    if icon_rows:
-        draw_icon(buf, icon_rows, 68, 12)
-    draw_text(buf, cond[:10], 78, 14, 1)
-
-    hum = w.get("humidity", "--")
-    wind = w.get("wind_speed", "--")
-    prs = w.get("pressure", "--")
-    draw_text(buf, f"Feu.{hum}%", 0, 30, 1)
-    draw_text(buf, f"W.{wind}km/h", 0, 40, 1)
-    draw_text(buf, f"{prs}hPa", 66, 40, 1)
-
-    sr = w.get("sunrise", "")
-    ss = w.get("sunset", "")
-    sun_icon = ICONS_8x8.get("sun", [])
-    moon_icon = ICONS_8x8.get("moon", [])
-    if sun_icon:
-        draw_icon(buf, sun_icon, 0, 52)
-    draw_text(buf, str(sr)[:5], 10, 54, 1)
-    if moon_icon:
-        draw_icon(buf, moon_icon, 70, 52)
-    draw_text(buf, str(ss)[:5], 80, 54, 1)
-
-
-def render_weather_hourly(buf: bytearray, weather: WeatherProvider):
-    """6-Stunden Vorhersage."""
-    draw_text(buf, "Naechste 6h", 2, 0, 1)
-    hours = weather.hourly[:6]
-    if not hours:
-        draw_text(buf, "Keine Daten", 2, 28, 1)
-        return
-    for i, h in enumerate(hours):
-        x = 2 + i * 21
-        t_str = str(h.get("time", ""))[-5:-3] + "h" if h.get("time") else f"{i}h"
-        draw_text(buf, t_str[:3], x, 12, 1)
-        cond = h.get("condition_text", "")
-        icon_name = condition_to_icon(cond)
-        icon_rows = ICONS_8x8.get(icon_name, [])
-        if icon_rows:
-            draw_icon(buf, icon_rows, x + 2, 22)
-        temp = h.get("temperature", "?")
-        draw_text(buf, f"{temp}"[:4], x, 34, 1)
-        rain = h.get("precipitation_probability", "")
-        if rain:
-            draw_text(buf, f"{rain}%"[:4], x, 44, 1)
-
-
-def render_weather_daily(buf: bytearray, weather: WeatherProvider):
-    """5-Tage Vorhersage."""
-    draw_text(buf, "5-Tage", 2, 0, 1)
-    draw_text(buf, (weather.location or "")[:10], 60, 0, 1)
-    days = weather.daily[:5]
-    if not days:
-        draw_text(buf, "Keine Daten", 2, 28, 1)
-        return
-    days_de = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
-    for i, d in enumerate(days):
-        y = 12 + i * 10
-        wd = ""
-        try:
-            from datetime import datetime as dt2
-            date_str = d.get("date", "")
-            if date_str:
-                dd = dt2.fromisoformat(date_str.split("T")[0])
-                wd = days_de[dd.weekday()]
-        except Exception:
-            wd = f"T{i + 1}"
-        draw_text(buf, wd[:2], 2, y, 1)
-        cond = d.get("condition_text", "")
-        icon_name = condition_to_icon(cond)
-        icon_rows = ICONS_8x8.get(icon_name, [])
-        if icon_rows:
-            draw_icon(buf, icon_rows, 18, y)
-        hi = d.get("temperature_max", "")
-        lo = d.get("temperature_min", "")
-        draw_text(buf, f"{hi}"[:4], 30, y, 1)
-        draw_text(buf, f"{lo}"[:4], 54, y, 1)
-        rain = d.get("precipitation_probability", "")
-        if rain:
-            draw_text(buf, f"{rain}%"[:4], 78, y, 1)
+    def geocode(self, query: str) -> list[GeocodeHit]:
+        return self.provider.geocode(query)

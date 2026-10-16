@@ -1,13 +1,14 @@
 services:
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: pyroplus-backend
     ports:
       - "8071:8071"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./data:/app/data
       - /:/host:ro
       - /mnt:/mnt:ro
@@ -17,7 +18,9 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
     container_name: pyroplus-frontend
     ports:
       - "8070:80"
@@ -26,4 +29,3 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
-

@@ -16,7 +16,7 @@ from pathlib import Path
 
 logger = logging.getLogger("stats")
 
-DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
+from config import DATA_DIR
 HISTORY_LEN = 60
 _history = {
     "cpu": deque(maxlen=HISTORY_LEN),
@@ -263,11 +263,34 @@ def _detect_disks():
     return disks
 
 
+_hostname_cache = ""
+
+
+def get_hostname() -> str:
+    """Rechnername des Hosts (im Container über /host/etc/hostname)."""
+    global _hostname_cache
+    if _hostname_cache:
+        return _hostname_cache
+    for pfad in ("/host/etc/hostname", "/etc/hostname"):
+        try:
+            with open(pfad) as f:
+                name = f.read().strip()
+            if name:
+                _hostname_cache = name
+                return name
+        except Exception:
+            continue
+    import socket
+    _hostname_cache = socket.gethostname()
+    return _hostname_cache
+
+
 def get_network():
     """Host-Netzwerk-Stats — IP kommt vom HW-Proxy (läuft nativ)."""
     import hw_client
     result = {
         "ip": hw_client.get_host_ip(),
+        "hostname": get_hostname(),
         "interface": "",
         "rx_bytes_sec": 0,
         "tx_bytes_sec": 0,

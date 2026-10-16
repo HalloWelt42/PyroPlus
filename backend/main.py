@@ -1,67 +1,87 @@
 """
-PyroPlus v3.0.0 — FastAPI Backend
-© HalloWelt42 - Nur für private Nutzung
+PyroPlus: FastAPI-Backend.
 
 Swagger-UI: http://host:8071/docs
+
+Bereiche: System, Lüfter, LEDs, OLED (eigener Router unter oled/api.py),
+Schnellzugriff, Fremddaten, WebSocket. Alle Zustände gehören dem Backend.
 """
+
+from __future__ import annotations
 
 import asyncio
 import json
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Any, AsyncIterator, Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request, HTTPException, Depends
+from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 
 import hw_client
-from config import VERSION, APP_NAME, HOST, PORT, WS_STATS_INTERVAL, API_TOKEN, TOKEN_FILE
-from stats import collect_stats
-from fan.controller import FanController
-from oled.engine import OLEDEngine
+from config import (
+    API_TOKEN, APP_NAME, DATA_DIR, HOST, OLED_RENDER_INTERVAL, PORT, TOKEN_FILE, VERSION,
+    VERSION_VOLL, WEATHER_DEFAULT_LOCATION, WEATHER_REFRESH_SECONDS, WS_STATS_INTERVAL,
+)
 from effects.engine import LEDEngine
+from fan.controller import FanController
+from oled.api import legacy as oled_legacy_router
+from oled.api import router as oled_router
+from oled.engine import OledEngine
+from oled.store import OledStore
+from oled.weather import OpenMeteoProvider, WeatherService
+from stats import collect_stats
 
 logger = logging.getLogger("api")
 
 fan: Optional[FanController] = None
-oled: Optional[OLEDEngine] = None
+oled: Optional[OledEngine] = None
 leds: Optional[LEDEngine] = None
 ws_clients: set[WebSocket] = set()
 _custom_data: dict[str, dict] = {}
+_sim_temp: float | None = None
 
 
-# ─── Token Auth Middleware ──────────────────────────────────
+# Token-Prüfung
+
 OPEN_PATHS = {"/api/token", "/docs", "/openapi.json", "/redoc", "/health"}
 
+
 class TokenAuthMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
         path = request.url.path
-        # Offene Pfade brauchen kein Token
         if path in OPEN_PATHS or path.startswith("/ws"):
             return await call_next(request)
-        # Token prüfen
         token = request.headers.get("X-API-Token") or request.query_params.get("token")
         if token != API_TOKEN:
             return JSONResponse(status_code=401, content={"error": "Ungültiger API-Token"})
         return await call_next(request)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global fan, oled, leds
-    logger.info(f"=== {APP_NAME} v{VERSION} startet ===")
-    logger.info(f"API-Token: {API_TOKEN[:8]}... (gespeichert in {TOKEN_FILE})")
+def build_oled_engine() -> OledEngine:
+    store = OledStore(DATA_DIR, WEATHER_DEFAULT_LOCATION)
+    store.ensure_initialised()
+    weather = WeatherService(OpenMeteoProvider(), store.load_weather(), WEATHER_REFRESH_SECONDS)
+    return OledEngine(store, weather, collect_stats,
+                      fan_state_provider=lambda: fan.get_state() if fan else {},
+                      render_interval=OLED_RENDER_INTERVAL, app_version=VERSION)
 
-    hw_status = hw_client.health()
-    logger.info(f"Hardware-Proxy: {hw_status}")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    global fan, oled, leds
+    logger.info(f"=== {APP_NAME} {VERSION_VOLL} startet ===")
+    logger.info(f"API-Token: {API_TOKEN[:8]}... (gespeichert in {TOKEN_FILE})")
+    logger.info(f"Hardware-Proxy: {hw_client.health()}")
 
     fan = FanController()
     fan.start()
-    oled = OLEDEngine()
+    oled = build_oled_engine()
+    app.state.oled = oled
     oled.start()
     leds = LEDEngine()
     leds.start()
@@ -82,445 +102,333 @@ app = FastAPI(title=APP_NAME, version=VERSION, lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 app.add_middleware(TokenAuthMiddleware)
+app.include_router(oled_legacy_router)
+app.include_router(oled_router)
 
 
-# ─── Models ─────────────────────────────────────────────────
+# Modelle
+
 class ColorModel(BaseModel):
     r: int = Field(ge=0, le=255)
     g: int = Field(ge=0, le=255)
     b: int = Field(ge=0, le=255)
 
+
 class FanManualSpeed(BaseModel):
     speed: float = Field(ge=0.0, le=100.0)
 
+
 class FanFineSettings(BaseModel):
     hysteresis: Optional[float] = Field(None, ge=0.5, le=10.0)
-    ramp_up: Optional[float] = Field(None, ge=0.0, le=15.0)
-    ramp_down: Optional[float] = Field(None, ge=0.0, le=30.0)
-    min_speed: Optional[float] = Field(None, ge=0.0, le=40.0)
-    poll_interval: Optional[float] = Field(None, ge=0.5, le=10.0)
-    threshold_on: Optional[float] = Field(None, ge=35, le=75)
-    threshold_off: Optional[float] = Field(None, ge=30, le=70)
+    threshold_on: Optional[float] = Field(None, ge=35, le=80)
+    threshold_off: Optional[float] = Field(None, ge=30, le=75)
     case_profile: Optional[str] = None
+
 
 class CurvePoint(BaseModel):
     temp: float = Field(ge=20.0, le=85.0)
     speed: float = Field(ge=0.0, le=100.0)
 
+
 class FanCurveRequest(BaseModel):
     points: list[CurvePoint] = Field(min_length=2)
-
-class OLEDScreenData(BaseModel):
-    """Flexibles Screen-Format: type + screen-spezifische Felder."""
-    type: str
-    name: str = ""
-    # system screens
-    widgets: Optional[list[dict]] = None
-    # custom_text
-    lines: Optional[list[str]] = None
-    font_scale: Optional[int] = None
-    align: Optional[str] = None
-    # pixel_art
-    art_id: Optional[str] = None
-    # marquee
-    text: Optional[str] = None
-    speed: Optional[int] = None
-    y: Optional[int] = None
-
-class OLEDClockSettings(BaseModel):
-    blink: Optional[bool] = None
-    seconds: Optional[bool] = None
-    tenths: Optional[bool] = None
-    date: Optional[bool] = None
-    weekday: Optional[bool] = None
-    format_24h: Optional[bool] = None
-
-class PixelArtData(BaseModel):
-    id: str
-    name: str = ""
-    pixels: list[dict]
 
 
 class LEDIndividualColor(BaseModel):
     index: int = Field(ge=0, le=3)
     color: ColorModel
 
+
 class CustomDataEntry(BaseModel):
     label: str = Field(max_length=100, description="Anzeigename")
-    value: str = Field(max_length=1000, description="Wert (Text/Zahl)")
+    value: str = Field(max_length=1000, description="Wert (Text oder Zahl)")
     unit: str = Field("", max_length=20, description="Einheit (optional)")
-    icon: str = Field("📊", max_length=4, description="Emoji-Icon")
+    icon: str = Field("", max_length=8, description="Symbol (optional)")
     category: str = Field("custom", max_length=50, description="Kategorie")
-    url: str = Field("", max_length=500, description="Link (optional)")
+    url: str = Field("", max_length=500, description="Verweis (optional)")
 
 
-# ─── Token / System ────────────────────────────────────────
-@app.get("/api/token", tags=["System"],
-         summary="API-Token abrufen (kein Auth nötig)")
-def get_api_token():
-    """Gibt den API-Token zurück. Das Frontend ruft diesen beim Start ab."""
+class SimulateTemp(BaseModel):
+    temp: Optional[float] = Field(None, ge=0, le=120, description="Leer = Simulation beenden")
+
+
+class DiskConfigModel(BaseModel):
+    monitored_mounts: list[str]
+
+
+# System
+
+@app.get("/api/token", tags=["System"], summary="API-Token abrufen (ohne Anmeldung)")
+def get_api_token() -> dict[str, str]:
+    """Die Oberfläche holt den Token beim Start."""
     return {"token": API_TOKEN, "info": "Sende diesen Token als X-API-Token Header"}
 
+
 @app.get("/health", tags=["System"])
-def health_check():
-    return {"status": "ok", "version": VERSION}
+def health_check() -> dict[str, str]:
+    return {"status": "ok", "version": VERSION, "voll": VERSION_VOLL}
+
 
 @app.get("/api/info", tags=["System"])
-def get_info():
-    return {"app": APP_NAME, "version": VERSION}
+def get_info() -> dict[str, str]:
+    return {"app": APP_NAME, "version": VERSION, "voll": VERSION_VOLL}
+
 
 @app.get("/api/stats", tags=["System"])
-def get_stats():
+def get_stats() -> dict[str, Any]:
     return collect_stats()
 
-@app.get("/api/state", tags=["System"],
-         summary="Kompletter Systemstatus")
-def get_full_state():
-    # LED-States frisch vom HW-Proxy holen
+
+@app.get("/api/state", tags=["System"], summary="Kompletter Systemstatus")
+def get_full_state() -> dict[str, Any]:
     if leds:
         leds.refresh_led_states()
     return {
         "version": VERSION,
+        "voll": VERSION_VOLL,
         "hw_proxy": hw_client.health(),
         "fan": fan.get_state() if fan else {},
-        "oled": oled.get_state() if oled else {},
+        "oled": _oled_payload(),
         "leds": leds.get_state() if leds else {},
-        "stats": collect_stats(),
+        "stats": _stats_with_simulation(collect_stats()),
         "custom_data": _custom_data,
     }
 
 
-# ─── Fan ────────────────────────────────────────────────────
-@app.get("/api/fan", tags=["Lüfter"])
-def fan_get_state():
-    return fan.get_state()
+def _oled_payload() -> dict[str, Any]:
+    """OLED-Zustand für WebSocket und Gesamtstatus. Enthält noch die Bildschirme,
+    weil die alte Oberfläche sie erwartet; ab Stufe 2 nur der Live-Zustand."""
+    if oled is None:
+        return {}
+    return oled.get_state().model_dump(mode="json", by_alias=True)
 
-@app.post("/api/fan/mode/{mode}", tags=["Lüfter"],
-          summary="Lüfter-Modus: auto | manual | off")
-def fan_set_mode(mode: str):
+
+def _stats_with_simulation(stats: dict[str, Any]) -> dict[str, Any]:
+    if _sim_temp is not None and stats.get("cpu"):
+        return {**stats, "cpu": {**stats["cpu"], "temp": _sim_temp}}
+    return stats
+
+
+# Lüfter
+
+@app.get("/api/fan", tags=["Lüfter"])
+def fan_get_state() -> dict[str, Any]:
+    return fan.get_state() if fan else {}
+
+
+@app.post("/api/fan/mode/{mode}", tags=["Lüfter"], summary="Lüfter-Modus: auto | manual | off")
+def fan_set_mode(mode: str) -> dict[str, Any]:
     if mode not in ("auto", "manual", "off"):
         return {"error": "Ungültiger Modus. Erlaubt: auto, manual, off"}
     fan.set_mode(mode)
     return {"ok": True, "mode": mode}
 
-@app.post("/api/fan/profile/{name}", tags=["Lüfter"],
-          summary="Auto-Profil wählen: silent | balanced | performance | night")
-def fan_set_profile(name: str):
+
+@app.post("/api/fan/profile/{name}", tags=["Lüfter"], summary="Profil: silent | balanced | performance | custom")
+def fan_set_profile(name: str) -> dict[str, Any]:
     return fan.set_profile(name)
 
-@app.post("/api/fan/curve", tags=["Lüfter"],
-          summary="Benutzerdefinierte Temperaturkurve setzen")
-def fan_set_curve(req: FanCurveRequest):
-    points = [{"temp": p.temp, "speed": p.speed} for p in req.points]
-    fan.set_curve(points)
+
+@app.post("/api/fan/curve", tags=["Lüfter"], summary="Eigene Temperaturkurve setzen")
+def fan_set_curve(req: FanCurveRequest) -> dict[str, Any]:
+    fan.set_curve([{"temp": p.temp, "speed": p.speed} for p in req.points])
     return {"ok": True, **fan.get_state()}
 
-@app.post("/api/fan/manual-speed", tags=["Lüfter"],
-          summary="Manuelle Geschwindigkeit setzen (0-100%)")
-def fan_set_manual_speed(req: FanManualSpeed):
+
+@app.post("/api/fan/manual-speed", tags=["Lüfter"], summary="Manuelle Geschwindigkeit (0 bis 100 %)")
+def fan_set_manual_speed(req: FanManualSpeed) -> dict[str, Any]:
     fan.set_manual_speed(req.speed)
     return {"ok": True, "speed": req.speed}
 
-@app.post("/api/fan/settings", tags=["Lüfter"],
-          summary="Feineinstellungen (Hysterese)")
-def fan_set_fine_settings(req: FanFineSettings):
-    fan.set_fine_settings(
-        hysteresis=req.hysteresis,
-        threshold_on=req.threshold_on,
-        threshold_off=req.threshold_off,
-        case_profile=req.case_profile,
-    )
+
+@app.post("/api/fan/settings", tags=["Lüfter"], summary="Feineinstellungen (Hysterese, Gehäuselüfter)")
+def fan_set_fine_settings(req: FanFineSettings) -> dict[str, Any]:
+    fan.set_fine_settings(hysteresis=req.hysteresis, threshold_on=req.threshold_on,
+                          threshold_off=req.threshold_off, case_profile=req.case_profile)
     return {"ok": True, **fan.get_state()}
 
-@app.get("/api/fan/duty-for-temp", tags=["Lüfter"],
-         summary="Berechne PWM-Duty für eine Temperatur")
-def fan_duty_for_temp(temp: float = Query()):
+
+@app.get("/api/fan/duty-for-temp", tags=["Lüfter"], summary="PWM-Leistung für eine Temperatur")
+def fan_duty_for_temp(temp: float = Query()) -> dict[str, float]:
     return {"temp": temp, "duty": round(fan.get_duty_for_temp(temp), 1)}
 
 
-# ─── SIMULATION ─────────────────────────────────────────────
-_sim_temp: float | None = None
+# Simulation
 
-@app.post("/api/simulate/temp", tags=["Simulation"],
-          summary="Temperatur simulieren (wirkt auf LEDs und Lüfter)")
-def simulate_temp(req: dict):
+@app.post("/api/simulate/temp", tags=["Simulation"], summary="Temperatur simulieren (wirkt auf LEDs und Lüfter)")
+def simulate_temp(req: SimulateTemp) -> dict[str, Any]:
     global _sim_temp
-    temp = req.get("temp")
-    if temp is None:
+    if req.temp is None:
         _sim_temp = None
+        echte_temp = hw_client.get_temp()
         if fan:
             fan.sim_temp = None
-            # Sofort echte Temperatur lesen und Fan-State aktualisieren
-            real_temp = hw_client.get_temp() if hw_client else 40.0
-            fan.current_temp = real_temp
-        # Sofort echte Temperatur an HW-Proxy pushen
+            fan.current_temp = echte_temp
         if leds:
-            real_temp = hw_client.get_temp() if hw_client else 40.0
-            leds.update_system_data(real_temp, leds.cpu_load)
+            leds.update_system_data(echte_temp, leds.cpu_load)
         return {"ok": True, "simulation": False}
-    _sim_temp = float(temp)
-    if leds: leds.update_system_data(_sim_temp, leds.cpu_load)
-    if fan: fan.sim_temp = _sim_temp
+    _sim_temp = float(req.temp)
+    if leds:
+        leds.update_system_data(_sim_temp, leds.cpu_load)
+    if fan:
+        fan.sim_temp = _sim_temp
     return {"ok": True, "simulation": True, "temp": _sim_temp}
 
 
-# ─── OLED ───────────────────────────────────────────────────
-@app.get("/api/oled", tags=["OLED Display"])
-def oled_get_state():
-    return oled.get_state()
+# LEDs
 
-@app.get("/api/oled/widget-catalog", tags=["OLED Display"],
-         summary="Verfügbare Datenquellen und Display-Modi")
-def oled_widget_catalog():
-    return {"info": "Widget-Katalog wird im Frontend verwaltet (catalog.js)"}
-
-@app.post("/api/oled/display-raw", tags=["OLED Display"],
-          summary="Bild direkt an OLED senden (Base64 PNG)")
-def oled_display_raw(req: dict):
-    image_base64 = req.get("image_base64", "")
-    if not image_base64:
-        return {"error": "Kein Bild"}
-    result = hw_client.oled_display(image_base64)
-    return {"ok": result}
-
-@app.post("/api/oled/mode/{mode}", tags=["OLED Display"],
-          summary="Display-Modus: auto | manual | off")
-def oled_set_mode(mode: str):
-    if mode not in ("auto", "manual", "off"):
-        return {"error": "Ungültiger Modus. Erlaubt: auto, manual, off"}
-    oled.set_mode(mode)
-    return {"ok": True, "mode": mode}
-
-@app.post("/api/oled/brightness/{value}", tags=["OLED Display"])
-def oled_set_brightness(value: int):
-    oled.set_brightness(value)
-    return {"ok": True, "brightness": oled.brightness}
-
-@app.post("/api/oled/rotation/{seconds}", tags=["OLED Display"])
-def oled_set_rotation(seconds: int):
-    oled.set_rotation_interval(seconds)
-    return {"ok": True, "rotation_interval": oled.rotation_interval}
-
-@app.post("/api/oled/screen/{index}", tags=["OLED Display"])
-def oled_set_screen(index: int):
-    oled.set_screen(index)
-    return {"ok": True, "current_screen": oled.current_screen, "preview": oled._last_preview}
-
-@app.post("/api/oled/screens", tags=["OLED Display"],
-          summary="Screen hinzufügen")
-def oled_add_screen(req: OLEDScreenData):
-    data = {k: v for k, v in req.model_dump().items() if v is not None}
-    idx = oled.add_screen(data)
-    return {"ok": True, "index": idx, "screens": oled.screens}
-
-@app.put("/api/oled/screens/{index}", tags=["OLED Display"],
-         summary="Screen aktualisieren")
-def oled_update_screen(index: int, req: OLEDScreenData):
-    data = {k: v for k, v in req.model_dump().items() if v is not None}
-    oled.update_screen(index, data)
-    return {"ok": True, "screens": oled.screens, "preview": oled._last_preview}
-
-@app.delete("/api/oled/screens/{index}", tags=["OLED Display"])
-def oled_remove_screen(index: int):
-    oled.remove_screen(index)
-    return {"ok": True, "screens": oled.screens}
-
-@app.post("/api/oled/screens/reorder", tags=["OLED Display"],
-          summary="Screens umsortieren")
-def oled_reorder_screens(order: list[int]):
-    oled.reorder_screens(order)
-    return {"ok": True, "screens": oled.screens}
-
-@app.get("/api/oled/preview", tags=["OLED Display"])
-def oled_get_preview():
-    return {"preview": oled._last_preview}
-
-@app.post("/api/oled/clock", tags=["OLED Display"],
-          summary="Uhr-Einstellungen")
-def oled_set_clock(req: OLEDClockSettings):
-    settings = {k: v for k, v in req.model_dump().items() if v is not None}
-    oled.set_clock_settings(settings)
-    return {"ok": True, "clock_settings": oled.clock_settings}
-
-# ─── Pixel Art ─────────────────────────────────────────────
-@app.get("/api/oled/pixel-arts", tags=["OLED Pixel Art"])
-def oled_list_pixel_arts():
-    return {"pixel_arts": oled.list_pixel_arts()}
-
-@app.get("/api/oled/pixel-arts/{art_id}", tags=["OLED Pixel Art"])
-def oled_get_pixel_art(art_id: str):
-    data = oled.get_pixel_art(art_id)
-    if not data:
-        return {"error": "Nicht gefunden"}
-    return data
-
-@app.post("/api/oled/pixel-arts", tags=["OLED Pixel Art"],
-          summary="Pixel Art speichern")
-def oled_save_pixel_art(req: PixelArtData):
-    data = oled.save_pixel_art(req.id, [p for p in req.pixels], req.name)
-    return {"ok": True, "pixel_art": data}
-
-@app.delete("/api/oled/pixel-arts/{art_id}", tags=["OLED Pixel Art"])
-def oled_delete_pixel_art(art_id: str):
-    oled.delete_pixel_art(art_id)
-    return {"ok": True}
-
-
-# ─── LEDs ───────────────────────────────────────────────────
 @app.get("/api/leds", tags=["WS2812B LEDs"])
-def leds_get_state():
-    return leds.get_state()
+def leds_get_state() -> dict[str, Any]:
+    return leds.get_state() if leds else {}
 
-@app.get("/api/leds/effects", tags=["WS2812B LEDs"],
-         summary="Alle verfügbaren LED-Effekte")
-def leds_get_effects():
+
+@app.get("/api/leds/effects", tags=["WS2812B LEDs"], summary="Alle verfügbaren LED-Effekte")
+def leds_get_effects() -> dict[str, Any]:
     return leds.get_effects_list()
 
-@app.post("/api/leds/effect/{name}", tags=["WS2812B LEDs"],
-          summary="LED-Effekt aktivieren (oder 'off' zum Ausschalten)")
-def leds_set_effect(name: str):
+
+@app.post("/api/leds/effect/{name}", tags=["WS2812B LEDs"], summary="Effekt aktivieren ('off' schaltet aus)")
+def leds_set_effect(name: str) -> dict[str, Any]:
     if name != "off" and name not in leds.EFFECTS:
         return {"error": f"Unbekannter Effekt: {name}"}
     leds.set_effect(name)
     return {"ok": True, "effect": name}
 
-@app.post("/api/leds/color", tags=["WS2812B LEDs"],
-          summary="Primärfarbe setzen (RGB)")
-def leds_set_color(color: ColorModel):
+
+@app.post("/api/leds/color", tags=["WS2812B LEDs"], summary="Primärfarbe (RGB)")
+def leds_set_color(color: ColorModel) -> dict[str, Any]:
     leds.set_color(color.r, color.g, color.b)
     return {"ok": True, "color": leds.color}
 
-@app.post("/api/leds/color2", tags=["WS2812B LEDs"],
-          summary="Sekundärfarbe setzen (RGB)")
-def leds_set_color2(color: ColorModel):
+
+@app.post("/api/leds/color2", tags=["WS2812B LEDs"], summary="Sekundärfarbe (RGB)")
+def leds_set_color2(color: ColorModel) -> dict[str, Any]:
     leds.set_color2(color.r, color.g, color.b)
     return {"ok": True, "color2": leds.color2}
 
-@app.post("/api/leds/brightness/{value}", tags=["WS2812B LEDs"],
-          summary="LED-Helligkeit (1-1000, nicht-linear auf 0-255 gemappt)")
-def leds_set_brightness(value: int):
+
+@app.post("/api/leds/brightness/{value}", tags=["WS2812B LEDs"], summary="Helligkeit (1 bis 1000)")
+def leds_set_brightness(value: int) -> dict[str, Any]:
     leds.set_brightness(value)
     return {"ok": True, "brightness": leds.brightness}
 
-@app.post("/api/leds/speed/{value}", tags=["WS2812B LEDs"],
-          summary="Effekt-Geschwindigkeit (1-1000)")
-def leds_set_speed(value: float):
+
+@app.post("/api/leds/speed/{value}", tags=["WS2812B LEDs"], summary="Effekt-Geschwindigkeit (1 bis 1000)")
+def leds_set_speed(value: float) -> dict[str, Any]:
     leds.set_speed(value)
     return {"ok": True, "speed": leds.speed}
 
-@app.post("/api/leds/individual", tags=["WS2812B LEDs"],
-          summary="Einzelne LED steuern (Index 0-3)")
-def leds_set_individual(req: LEDIndividualColor):
+
+@app.post("/api/leds/individual", tags=["WS2812B LEDs"], summary="Einzelne LED (Index 0 bis 3)")
+def leds_set_individual(req: LEDIndividualColor) -> dict[str, Any]:
     leds.set_individual_color(req.index, req.color.r, req.color.g, req.color.b)
     return {"ok": True, "index": req.index, "color": leds.individual_colors[req.index]}
 
+
 @app.post("/api/leds/individual-mode/{enabled}", tags=["WS2812B LEDs"])
-def leds_set_individual_mode(enabled: bool):
+def leds_set_individual_mode(enabled: bool) -> dict[str, Any]:
     leds.individual_mode = enabled
     hw_client.leds_config(individual_mode=enabled)
     leds._save_settings()
     return {"ok": True, "individual_mode": enabled}
 
 
-# ─── Quick Actions ──────────────────────────────────────────
+# Schnellzugriff
+
 @app.post("/api/quick/leds-off", tags=["Schnellzugriff"])
-def quick_leds_off():
+def quick_leds_off() -> dict[str, Any]:
     leds.set_effect("off")
     return {"ok": True, "effect": "off"}
 
+
 @app.post("/api/quick/leds-on", tags=["Schnellzugriff"])
-def quick_leds_on():
+def quick_leds_on() -> dict[str, Any]:
     last = leds.effect if leds.effect and leds.effect != "off" else "static"
     leds.set_effect(last)
     return {"ok": True, "effect": leds.effect}
 
+
 @app.post("/api/quick/oled-off", tags=["Schnellzugriff"])
-def quick_oled_off():
-    oled.set_mode("off")
+def quick_oled_off() -> dict[str, Any]:
+    from oled.models import OledMode, OledSettingsPatch
+    oled.patch_settings(OledSettingsPatch(mode=OledMode.off))
     return {"ok": True, "mode": "off"}
 
+
 @app.post("/api/quick/oled-on", tags=["Schnellzugriff"])
-def quick_oled_on():
-    oled.set_mode("auto")
+def quick_oled_on() -> dict[str, Any]:
+    from oled.models import OledMode, OledSettingsPatch
+    oled.patch_settings(OledSettingsPatch(mode=OledMode.auto))
     return {"ok": True, "mode": "auto"}
 
+
 @app.post("/api/quick/fan-auto", tags=["Schnellzugriff"])
-def quick_fan_auto():
+def quick_fan_auto() -> dict[str, Any]:
     fan.set_mode("auto")
     return {"ok": True, "mode": "auto"}
 
+
 @app.post("/api/quick/fan-off", tags=["Schnellzugriff"])
-def quick_fan_off():
+def quick_fan_off() -> dict[str, Any]:
     fan.set_mode("off")
     return {"ok": True, "mode": "off"}
 
 
-# ─── Disk Config ───────────────────────────────────────────
-@app.get("/api/disks/all", tags=["System"],
-         summary="Alle erkannten Laufwerke (für Settings)")
-def get_all_disks():
+# Laufwerke
+
+@app.get("/api/disks/all", tags=["System"], summary="Alle erkannten Laufwerke")
+def get_all_disks() -> dict[str, Any]:
     from stats import get_all_disks as _all
     return {"disks": _all()}
 
-@app.get("/api/disks/config", tags=["System"],
-         summary="Aktuelle Disk-Überwachungskonfiguration")
-def get_disk_config():
+
+@app.get("/api/disks/config", tags=["System"], summary="Überwachte Laufwerke")
+def get_disk_config() -> dict[str, Any]:
     from stats import get_disk_config as _cfg
     return _cfg()
 
-class DiskConfigModel(BaseModel):
-    monitored_mounts: list[str]
 
-@app.post("/api/disks/config", tags=["System"],
-          summary="Disk-Überwachung konfigurieren")
-def set_disk_config(req: DiskConfigModel):
+@app.post("/api/disks/config", tags=["System"], summary="Überwachte Laufwerke setzen")
+def set_disk_config(req: DiskConfigModel) -> dict[str, Any]:
     from stats import set_disk_config as _set
     _set({"monitored_mounts": req.monitored_mounts})
     return {"ok": True, "monitored_mounts": req.monitored_mounts}
 
 
-# ─── Custom Data ────────────────────────────────────────────
-@app.get("/api/custom", tags=["Custom Data"],
-         summary="Alle registrierten Custom-Datenquellen")
-def get_custom_data():
+# Fremddaten
+
+@app.get("/api/custom", tags=["Fremddaten"], summary="Alle registrierten Fremddaten")
+def get_custom_data() -> dict[str, Any]:
     return {"entries": _custom_data, "count": len(_custom_data)}
 
-@app.get("/api/custom/{key}", tags=["Custom Data"])
-def get_custom_entry(key: str):
+
+@app.get("/api/custom/{key}", tags=["Fremddaten"])
+def get_custom_entry(key: str) -> dict[str, Any]:
     if key not in _custom_data:
-        return {"error": f"Key '{key}' nicht gefunden"}
+        return {"error": f"Schlüssel '{key}' nicht gefunden"}
     return _custom_data[key]
 
-@app.put("/api/custom/{key}", tags=["Custom Data"],
-         summary="Custom-Datenquelle registrieren/aktualisieren")
-def put_custom_entry(key: str, entry: CustomDataEntry):
-    """Externe Scripte können per PUT eigene Daten registrieren.
 
-    Beispiel (z.B. als Cronjob):
-    ```
-    curl -X PUT http://localhost:8071/api/custom/pihole \\
-      -H 'Content-Type: application/json' \\
-      -H 'X-API-Token: DEIN_TOKEN' \\
-      -d '{"label":"Pi-hole Blocked","value":"1234","unit":"heute","icon":"🛡️"}'
-    ```
-    """
-    _custom_data[key] = {
-        "key": key, **entry.model_dump(),
-        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-    }
+@app.put("/api/custom/{key}", tags=["Fremddaten"], summary="Fremddaten registrieren oder aktualisieren")
+def put_custom_entry(key: str, entry: CustomDataEntry) -> dict[str, Any]:
+    """Externe Skripte können per PUT eigene Werte einblenden."""
+    _custom_data[key] = {"key": key, **entry.model_dump(),
+                         "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
     return {"ok": True, "key": key}
 
-@app.delete("/api/custom/{key}", tags=["Custom Data"])
-def delete_custom_entry(key: str):
+
+@app.delete("/api/custom/{key}", tags=["Fremddaten"])
+def delete_custom_entry(key: str) -> dict[str, Any]:
     if key in _custom_data:
         del _custom_data[key]
         return {"ok": True}
-    return {"error": f"Key '{key}' nicht gefunden"}
+    return {"error": f"Schlüssel '{key}' nicht gefunden"}
 
 
-# ─── WebSocket ──────────────────────────────────────────────
+# WebSocket
+
 @app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
+async def websocket_endpoint(ws: WebSocket) -> None:
     await ws.accept()
     ws_clients.add(ws)
     try:
@@ -531,83 +439,35 @@ async def websocket_endpoint(ws: WebSocket):
     except Exception:
         ws_clients.discard(ws)
 
-async def _ws_push_loop():
+
+async def _ws_push_loop() -> None:
     while True:
         if ws_clients:
             try:
-                # WICHTIG: Blocking Calls in Thread-Pool auslagern!
-                # collect_stats() nutzt psutil/Docker SDK (synchron)
-                # refresh_led_states() macht HTTP zu HW-Proxy (synchron)
-                stats = await asyncio.to_thread(collect_stats)
-
-                # Simulation überschreibt Temperatur systemweit
-                # WICHTIG: Kopie erstellen, um den Stats-Cache nicht zu korrumpieren!
-                if _sim_temp is not None and stats.get("cpu"):
-                    stats = {**stats, "cpu": {**stats["cpu"], "temp": _sim_temp}}
-
-                # System-Daten an LED Engine für reaktive Effekte
+                stats = _stats_with_simulation(await asyncio.to_thread(collect_stats))
                 if leds and stats.get("cpu"):
-                    leds.update_system_data(
-                        stats["cpu"].get("temp", 40),
-                        stats["cpu"].get("percent", 10),
-                    )
-
-                # LED-States vom HW-Proxy holen (aktuell berechnete Farben)
-                if leds:
+                    leds.update_system_data(stats["cpu"].get("temp", 40), stats["cpu"].get("percent", 10))
                     await asyncio.to_thread(leds.refresh_led_states)
-
-                led_state = leds.get_ws_state() if leds else {}
-                oled_state = oled.get_ws_state() if oled else {}
-                fan_state = fan.get_state() if fan else {}
                 payload = json.dumps({
                     "type": "stats",
                     "data": {
                         "stats": stats,
-                        "fan": fan_state,
-                        "leds": led_state,
-                        "oled": oled_state,
+                        "fan": fan.get_state() if fan else {},
+                        "leds": leds.get_ws_state() if leds else {},
+                        "oled": _oled_payload(),
                         "custom_data": _custom_data,
                     },
                 })
-                disconnected = set()
+                getrennt: set[WebSocket] = set()
                 for ws in ws_clients.copy():
                     try:
                         await ws.send_text(payload)
                     except Exception:
-                        disconnected.add(ws)
-                ws_clients -= disconnected
-            except Exception as e:
-                logger.error(f"WS Push: {e}")
+                        getrennt.add(ws)
+                ws_clients.difference_update(getrennt)
+            except Exception as fehler:
+                logger.error(f"WebSocket-Push: {fehler}")
         await asyncio.sleep(WS_STATS_INTERVAL)
-
-
-# ─── Frontend Backup auf Host-Festplatte ──────────────────
-@app.post("/api/backup/save", tags=["Backup"],
-          summary="Frontend-State auf Host-Disk speichern")
-def backup_save(req: dict):
-    import json
-    path = DATA_DIR / "frontend_backup.json"
-    path.write_text(json.dumps(req, indent=2, ensure_ascii=False))
-    return {"ok": True, "path": str(path), "size": path.stat().st_size}
-
-@app.get("/api/backup/load", tags=["Backup"],
-         summary="Frontend-State von Host-Disk laden")
-def backup_load():
-    import json
-    path = DATA_DIR / "frontend_backup.json"
-    if not path.exists():
-        return {"error": "Kein Backup vorhanden"}
-    return json.loads(path.read_text())
-
-@app.get("/api/backup/info", tags=["Backup"],
-         summary="Backup-Info (Datum, Größe)")
-def backup_info():
-    path = DATA_DIR / "frontend_backup.json"
-    if not path.exists():
-        return {"exists": False}
-    import os
-    st = path.stat()
-    return {"exists": True, "size": st.st_size, "modified": st.st_mtime}
 
 
 if __name__ == "__main__":

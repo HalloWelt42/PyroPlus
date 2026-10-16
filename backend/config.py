@@ -1,30 +1,40 @@
 """
-PyroPlus v3.0.0 — Konfiguration
-© HalloWelt42 - Nur für private Nutzung
+PyroPlus: Konfiguration des Backends.
+
+Die Version kommt ausschließlich aus version.json (Wurzelverzeichnis oder, im
+Container, neben diesem Modul). Nirgends sonst steht eine Versionsnummer.
 """
 
+import json
+import logging
 import os
 import secrets
-import logging
 from pathlib import Path
 
-VERSION = "4.3.0"
 APP_NAME = "PyroPlus"
 
-# ─── Pfade ──────────────────────────────────────────────────
+# Pfade
 BASE_DIR = Path(__file__).parent
+ROOT_DIR = BASE_DIR.parent
 DATA_DIR = Path(os.getenv("DATA_DIR", BASE_DIR / "data"))
-PROFILES_DIR = DATA_DIR / "profiles"
-PRESETS_DIR = DATA_DIR / "presets"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-PROFILES_DIR.mkdir(parents=True, exist_ok=True)
-PRESETS_DIR.mkdir(parents=True, exist_ok=True)
 
-# ─── API Token ──────────────────────────────────────────────
-# Wird beim ersten Start generiert und in data/api_token.txt gespeichert.
-# Der User kann den Token dort auslesen.
-# Frontend bekommt ihn über den /api/token Endpoint (nur lokal erreichbar).
+
+def _lese_version() -> tuple[str, str]:
+    """Liest (version, voll) aus version.json; Rückfall '0.0.0'."""
+    for kandidat in (BASE_DIR / "version.json", ROOT_DIR / "version.json"):
+        if kandidat.exists():
+            daten = json.loads(kandidat.read_text(encoding="utf-8"))
+            version = str(daten.get("version", "0.0.0"))
+            return version, str(daten.get("voll", f"v{version}"))
+    return "0.0.0", "v0.0.0"
+
+
+VERSION, VERSION_VOLL = _lese_version()
+
+# API-Token: wird beim ersten Start erzeugt und in data/api_token.txt abgelegt.
 TOKEN_FILE = DATA_DIR / "api_token.txt"
+
 
 def _load_or_create_token() -> str:
     if TOKEN_FILE.exists():
@@ -35,28 +45,35 @@ def _load_or_create_token() -> str:
     TOKEN_FILE.write_text(token + "\n")
     return token
 
+
 API_TOKEN = _load_or_create_token()
 
-# ─── Server ─────────────────────────────────────────────────
+# Server
 HOST = "0.0.0.0"
 PORT = int(os.getenv("PORT", 8071))
 
-# ─── Hardware-Proxy ─────────────────────────────────────────
+# Hardware-Proxy. "none" schaltet jede Hardware-Kommunikation ab (Tests, Entwicklung ohne Pi).
 HW_PROXY_URL = os.getenv("HW_PROXY_URL", "http://host.docker.internal:8072")
+HW_PROXY_DISABLED = HW_PROXY_URL.strip().lower() in ("", "none", "off")
 
-# ─── OLED ───────────────────────────────────────────────────
+# OLED
 OLED_WIDTH = 128
 OLED_HEIGHT = 64
 OLED_DEFAULT_BRIGHTNESS = 200
 OLED_ROTATION_INTERVAL = 10
+OLED_RENDER_INTERVAL = float(os.getenv("OLED_RENDER_INTERVAL", "0.2"))
 
-# ─── LEDs ───────────────────────────────────────────────────
+# Wetter: Vorgabeort, falls noch keiner gespeichert ist
+WEATHER_DEFAULT_LOCATION = {"name": "Zeitz", "lat": 51.05, "lon": 12.13}
+WEATHER_REFRESH_SECONDS = int(os.getenv("WEATHER_REFRESH_SECONDS", "600"))
+
+# LEDs
 LED_COUNT = 4
 LED_DEFAULT_BRIGHTNESS = 500
 LED_DEFAULT_EFFECT = "static"
 LED_DEFAULT_COLOR = {"r": 0, "g": 100, "b": 255}
 
-# ─── Fan Defaults ───────────────────────────────────────────
+# Lüfter
 FAN_DEFAULT_MODE = "auto"
 FAN_DEFAULT_HYSTERESIS = 3.0
 FAN_DEFAULT_RAMP_UP = 3.0
@@ -87,10 +104,10 @@ FAN_PROFILES = {
     ],
 }
 
-# ─── WebSocket ──────────────────────────────────────────────
+# WebSocket
 WS_STATS_INTERVAL = 1.0
 
-# ─── Logging ────────────────────────────────────────────────
+# Logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL),

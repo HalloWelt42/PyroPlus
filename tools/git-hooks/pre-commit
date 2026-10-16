@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Erzwingt bei jedem Commit eine neue Version.
+# Ist version.json bereits manuell gestaged (z. B. nach tools/version.sh minor),
+# wird nur die Build-Kennung erneuert. Sonst wird die Patch-Version erhöht.
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+if git diff --cached --name-only | grep -qx "version.json"; then
+  tools/version.sh id >/dev/null
+else
+  tools/version.sh patch >/dev/null
+fi
+tools/version.sh check >/dev/null
+git add version.json frontend/package.json
+echo "Version: $(tools/version.sh show)"

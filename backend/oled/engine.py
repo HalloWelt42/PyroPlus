@@ -1,388 +1,452 @@
 """
-PyroPlus — OLED Display Engine (Orchestrator)
-Schlanke Steuerung: Render-Loop, Screen-Management, Persistenz.
-Rendering delegiert an renderer.py, widgets.py, weather.py.
+PyroPlus: OLED-Engine.
+
+Besitzt die Einstellungen, Vorlagen, Profile und Wetterorte, führt die
+Render-Schleife, die Rotation und die Hardware-Ausgabe. Jede Änderung läuft
+über eine Methode dieser Klasse, wird gespeichert und zählt die
+Bildschirm-Version hoch, damit die Oberfläche nachlädt.
 """
 
+from __future__ import annotations
+
+import base64
+import logging
 import threading
 import time
-import json
-import logging
 from datetime import datetime
-from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
 import hw_client
-from config import OLED_DEFAULT_BRIGHTNESS, OLED_ROTATION_INTERVAL, DATA_DIR
-from stats import get_system_stats
-from oled.renderer import W, H, create_buffer, buf_to_pil, buf_to_png_base64, draw_text
-from oled.widgets import render_widget, update_history
-from oled.weather import WeatherProvider, render_weather_compact, render_weather_hourly, render_weather_daily
+from oled.compose import RenderContext, render_screen
+from oled.models import (
+    Catalog, GeocodeHit, ImportResult, OledBundle, OledLive, OledMode, OledSettings,
+    OledSettingsPatch, OledState, Profile, RenderResponse, Screen, WeatherLocation,
+    WeatherLocationCreate, WeatherLocationState, WeatherSettings, WidgetBox, WidgetPreset, neue_id,
+)
+from oled.renderer import buf_to_pil, buf_to_png_base64
+from oled.store import OledStore
+from oled.values import StatsSnapshot
+from oled.weather import WeatherReport, WeatherService
+from oled.catalog import build_catalog
 
 logger = logging.getLogger("oled")
-
 TZ = ZoneInfo("Europe/Berlin")
-PIXEL_DIR = DATA_DIR / "pixel_screens"
-PIXEL_DIR.mkdir(parents=True, exist_ok=True)
 
-try:
-    from PIL import Image
-    PIL_OK = True
-except ImportError:
-    PIL_OK = False
-    logger.warning("Pillow nicht installiert — OLED deaktiviert")
+StatsProvider = Callable[[], dict]
+FanStateProvider = Callable[[], dict]
 
 
-class OLEDEngine:
-    def __init__(self):
-        self.enabled = False
-        self.brightness = OLED_DEFAULT_BRIGHTNESS
-        self.rotation_interval = OLED_ROTATION_INTERVAL
-        self.mode = "auto"
-        self.current_screen = 0
-        self._last_preview: Optional[str] = None
-        self._lock = threading.Lock()
+class NotFound(Exception):
+    pass
+
+
+class OledEngine:
+    def __init__(self, store: OledStore, weather: WeatherService, stats_provider: StatsProvider,
+                 fan_state_provider: Optional[FanStateProvider] = None,
+                 render_interval: float = 0.2, app_version: str = "") -> None:
+        self.store = store
+        self.weather = weather
+        self._stats_provider = stats_provider
+        self._fan_state_provider = fan_state_provider
+        self.render_interval = render_interval
+        self.app_version = app_version
+
+        self._lock = threading.RLock()
+        self.settings: OledSettings = store.load_settings()
+        self.presets: list[WidgetPreset] = store.load_presets()
+        self.profiles: list[Profile] = store.load_profiles()
+        self.screens_version = 1
+        self.preview: Optional[str] = None
+        self.last_boxes: list[WidgetBox] = []
+
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._rotation_reset = False
 
-        # Wetter
-        self.weather = WeatherProvider()
+        self.hardware = hw_client.oled_available()
+        hw_client.oled_brightness(self.settings.brightness)
+        self._ensure_current()
+        logger.info(f"OLED-Hardware: {self.hardware}, {len(self.settings.screens)} Bildschirme")
 
-        # Screen-Liste
-        self.screens: list[dict] = []
+    # Hilfen
 
-        # Clock Settings
-        self.clock_settings = {
-            "blink": True, "seconds": False, "tenths": False,
-            "date": True, "weekday": True, "format_24h": True,
-        }
+    def _ensure_current(self) -> None:
+        if self.settings.screen_by_id(self.settings.current_screen_id) is None and self.settings.screens:
+            self.settings.current_screen_id = self.settings.screens[0].id
 
-        # Hardware-Check
-        self.enabled = hw_client.oled_available()
-        hw_client.oled_brightness(self.brightness)
-        logger.info(f"OLED verfuegbar: {self.enabled}")
+    def _save(self, bump: bool = True) -> None:
+        self._ensure_current()
+        self.store.save_settings(self.settings)
+        if bump:
+            self.screens_version += 1
 
-        self._load_settings()
-        if not self.screens:
-            self._create_defaults()
+    def _snapshot(self) -> StatsSnapshot:
+        roh = dict(self._stats_provider() or {})
+        if self._fan_state_provider is not None:
+            fan = dict(roh.get("fan") or {})
+            fan.update({k: v for k, v in (self._fan_state_provider() or {}).items()
+                        if k in ("current_duty", "case_on", "mode", "current_rpm")})
+            if "current_rpm" in fan and not fan.get("rpm"):
+                fan["rpm"] = fan["current_rpm"]
+            roh["fan"] = fan
+        return StatsSnapshot.model_validate(roh)
 
-    # ═══ DEFAULTS ═══
-    def _create_defaults(self):
-        self.screens = [
-            {"type": "system", "name": "Uhr + System", "widgets": [
-                {"source": "zeit.uhr_blink", "display": "zahl_xl", "x": 0, "y": 0, "opts": {"scaleX": 3, "scaleY": 3, "prefix": "", "suffix": ""}},
-                {"source": "zeit.tag_datum", "display": "zahl", "x": 0, "y": 24, "opts": {"scaleX": 1, "scaleY": 1, "prefix": "", "suffix": ""}},
-                {"source": "cpu.temp", "display": "zahl", "x": 0, "y": 36, "opts": {"scaleX": 1, "scaleY": 1, "prefix": "CPU ", "suffix": "C"}},
-                {"source": "ram.percent", "display": "zahl", "x": 0, "y": 46, "opts": {"scaleX": 1, "scaleY": 1, "prefix": "RAM ", "suffix": "%"}},
-                {"source": "net.ip", "display": "zahl", "x": 0, "y": 56, "opts": {"scaleX": 1, "scaleY": 1, "prefix": "", "suffix": ""}},
-            ]},
-        ]
-        self._save_settings()
+    def _context(self, stats: StatsSnapshot, simulate: Optional[dict[str, float]] = None) -> RenderContext:
+        return RenderContext(stats=stats, now=datetime.now(TZ),
+                             weather_for=self.weather.report_for, simulate=simulate or {})
 
-    # ═══ MAIN RENDER ═══
-    def render(self, stats: dict) -> Optional[str]:
-        if not PIL_OK:
-            return None
+    def _screen_by_id(self, screen_id: str) -> Screen:
+        screen = self.settings.screen_by_id(screen_id)
+        if screen is None:
+            raise NotFound(f"Bildschirm {screen_id} nicht gefunden")
+        return screen
+
+    # Rendern
+
+    def render_draft(self, screen: Screen, simulate: Optional[dict[str, float]] = None) -> RenderResponse:
+        """Rendert einen Entwurf ohne ihn zu speichern oder anzuzeigen."""
+        stats = self._snapshot()
+        buf, boxes = render_screen(screen, self._context(stats, simulate))
+        return RenderResponse(image_base64=buf_to_png_base64(buf), boxes=boxes)
+
+    def render_current(self, stats: Optional[StatsSnapshot] = None) -> None:
+        """Rendert den aktiven Bildschirm, zeigt ihn an und merkt die Vorschau."""
         with self._lock:
-            buf = create_buffer()
+            settings = self.settings
+            screen = settings.screen_by_id(settings.current_screen_id)
+            mode = settings.mode
+        if stats is None:
+            stats = self._snapshot()
+        if mode == OledMode.off or screen is None:
+            buf, boxes = bytearray(128 * 64), []
+        else:
+            buf, boxes = render_screen(screen, self._context(stats))
+        if mode != OledMode.off:
+            self._send(buf)
+        self.preview = buf_to_png_base64(buf)
+        self.last_boxes = boxes
 
-            if self.mode != "off" and self.screens:
-                idx = min(self.current_screen, len(self.screens) - 1)
-                screen = self.screens[idx]
-                stype = screen.get("type", "system")
-
-                if stype == "system":
-                    self._render_system(buf, screen, stats)
-                elif stype == "clock":
-                    self._render_clock(buf)
-                elif stype == "weather_compact":
-                    render_weather_compact(buf, self.weather)
-                elif stype == "weather_hourly":
-                    render_weather_hourly(buf, self.weather)
-                elif stype == "weather_daily":
-                    render_weather_daily(buf, self.weather)
-                elif stype == "pixel_art":
-                    self._render_pixel_art(buf, screen)
-                elif stype == "marquee":
-                    self._render_marquee(buf, screen)
-
-            # An Hardware senden
-            if self.mode != "off":
-                img = buf_to_pil(buf)
-                import base64, io
-                out = io.BytesIO()
-                img.save(out, format="PNG")
-                hw_client.oled_display(base64.b64encode(out.getvalue()).decode())
-            else:
-                hw_client.oled_clear()
-
-            # Native 128x64 Preview — keine Skalierung!
-            self._last_preview = buf_to_png_base64(buf)
-            return self._last_preview
-
-    # ═══ SYSTEM WIDGETS ═══
-    def _render_system(self, buf: bytearray, screen: dict, stats: dict):
-        """Alle Widgets eines System-Screens rendern."""
-        # Weather-Daten mit Location anreichern
-        w = dict(self.weather.data or {})
-        w["location"] = self.weather.location
-        for widget in screen.get("widgets", []):
-            render_widget(buf, widget, stats, weather=w)
-
-    # ═══ CLOCK ═══
-    def _render_clock(self, buf: bytearray):
-        now = datetime.now(TZ)
-        cs = self.clock_settings
-        colon = ":" if not cs.get("blink") or now.second % 2 == 0 else " "
-        time_str = f"{now.strftime('%H')}{colon}{now.strftime('%M')}"
-        draw_text(buf, time_str, 2, 2, 3)
-
-        if cs.get("seconds"):
-            sec = f":{now.strftime('%S')}"
-            draw_text(buf, sec, 98, 8, 1)
-
-        y_pos = 34
-        if cs.get("weekday"):
-            days = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
-            draw_text(buf, days[now.weekday()], 2, y_pos, 1)
-            y_pos += 10
-        if cs.get("date"):
-            draw_text(buf, now.strftime("%d.%m.%Y"), 2, y_pos, 1)
-
-    # ═══ PIXEL ART ═══
-    def _render_pixel_art(self, buf: bytearray, screen: dict):
-        art_id = screen.get("art_id", "")
-        path = PIXEL_DIR / f"{art_id}.json"
-        if not path.exists():
-            draw_text(buf, "Kein Bild", 2, 28, 1)
+    def _send(self, buf: bytearray) -> None:
+        if not self.hardware:
             return
-        try:
-            data = json.loads(path.read_text())
-            pixels = data.get("pixels", [])
-            for p in pixels:
-                x, y = p.get("x", 0), p.get("y", 0)
-                if 0 <= x < W and 0 <= y < H:
-                    buf[y * W + x] = 1
-        except Exception as e:
-            logger.error(f"Pixel Art laden: {e}")
-            draw_text(buf, "Fehler", 2, 28, 1)
+        import io
+        img = buf_to_pil(buf)
+        out = io.BytesIO()
+        img.save(out, format="PNG")
+        hw_client.oled_display(base64.b64encode(out.getvalue()).decode())
 
-    # ═══ MARQUEE ═══
-    def _render_marquee(self, buf: bytearray, screen: dict):
-        from oled.renderer import draw_marquee
-        text = screen.get("text", "PyroPlus")
-        scale = screen.get("font_scale", 2)
-        y_pos = screen.get("y", 20)
-        offset = int(time.time() * 30) % (len(text) * 6 * scale + W)
-        draw_marquee(buf, text, y_pos, offset, scale)
+    # Schleife
 
-    # ═══ SCREEN MANAGEMENT ═══
-    def set_screen(self, index: int):
-        if 0 <= index < len(self.screens):
-            self.current_screen = index
-            self._rotation_reset = True
-            try:
-                self.render(get_system_stats())
-            except Exception:
-                pass
-            self._save_settings()
-
-    def add_screen(self, screen_data: dict) -> int:
-        self.screens.append(screen_data)
-        self._save_settings()
-        return len(self.screens) - 1
-
-    def update_screen(self, index: int, screen_data: dict):
-        if 0 <= index < len(self.screens):
-            self.screens[index] = screen_data
-            self._save_settings()
-            try:
-                self.render(get_system_stats())
-            except Exception:
-                pass
-
-    def remove_screen(self, index: int):
-        if len(self.screens) > 1 and 0 <= index < len(self.screens):
-            self.screens.pop(index)
-            if self.current_screen >= len(self.screens):
-                self.current_screen = 0
-            self._save_settings()
-
-    def reorder_screens(self, order: list[int]):
-        try:
-            new = [self.screens[i] for i in order if 0 <= i < len(self.screens)]
-            if new:
-                self.screens = new
-                self.current_screen = 0
-                self._save_settings()
-        except (IndexError, TypeError):
-            pass
-
-    # ═══ PIXEL ART MANAGEMENT ═══
-    def save_pixel_art(self, art_id: str, pixels: list[dict], name: str = ""):
-        data = {"id": art_id, "name": name, "pixels": pixels,
-                "created": datetime.now(TZ).isoformat()}
-        (PIXEL_DIR / f"{art_id}.json").write_text(json.dumps(data))
-        return data
-
-    def list_pixel_arts(self) -> list[dict]:
-        result = []
-        for f in sorted(PIXEL_DIR.glob("*.json")):
-            try:
-                d = json.loads(f.read_text())
-                result.append({"id": d.get("id", f.stem), "name": d.get("name", f.stem),
-                               "pixel_count": len(d.get("pixels", []))})
-            except Exception:
-                pass
-        return result
-
-    def delete_pixel_art(self, art_id: str):
-        path = PIXEL_DIR / f"{art_id}.json"
-        if path.exists():
-            path.unlink()
-
-    def get_pixel_art(self, art_id: str) -> Optional[dict]:
-        path = PIXEL_DIR / f"{art_id}.json"
-        if path.exists():
-            return json.loads(path.read_text())
-        return None
-
-    # ═══ SETTINGS ═══
-    def set_mode(self, mode: str):
-        if mode in ("auto", "manual", "off"):
-            self.mode = mode
-            if mode == "off":
-                hw_client.oled_clear()
-            self._save_settings()
-
-    def set_brightness(self, value: int):
-        self.brightness = max(0, min(255, value))
-        hw_client.oled_brightness(self.brightness)
-        self._save_settings()
-
-    def set_rotation_interval(self, seconds: int):
-        self.rotation_interval = max(3, min(120, seconds))
-        self._save_settings()
-
-    def set_clock_settings(self, settings: dict):
-        for k in ("blink", "seconds", "tenths", "date", "weekday", "format_24h"):
-            if k in settings:
-                self.clock_settings[k] = bool(settings[k])
-        self._save_settings()
-
-    # ═══ STATE ═══
-    def get_state(self) -> dict:
-        return {
-            "available": self.enabled or PIL_OK,
-            "hardware": self.enabled,
-            "mode": self.mode,
-            "brightness": self.brightness,
-            "rotation_interval": self.rotation_interval,
-            "current_screen": self.current_screen,
-            "screens": self.screens,
-            "clock_settings": self.clock_settings,
-            "pixel_arts": self.list_pixel_arts(),
-            "preview": self._last_preview,
-            "resolution": f"{W}x{H}",
-            "has_weather": self.weather.data is not None,
-            "weather_location": self.weather.location,
-        }
-
-    def get_ws_state(self) -> dict:
-        """Leichte Version fuer WebSocket Push."""
-        return {
-            "available": self.enabled or PIL_OK,
-            "hardware": self.enabled,
-            "mode": self.mode,
-            "brightness": self.brightness,
-            "rotation_interval": self.rotation_interval,
-            "current_screen": self.current_screen,
-            "screens": self.screens,
-            "clock_settings": self.clock_settings,
-            "preview": self._last_preview,
-            "resolution": f"{W}x{H}",
-            "has_weather": self.weather.data is not None,
-            "weather_location": self.weather.location,
-        }
-
-    # ═══ PERSISTENCE ═══
-    def _save_settings(self):
-        try:
-            data = {
-                "mode": self.mode, "brightness": self.brightness,
-                "rotation_interval": self.rotation_interval,
-                "screens": self.screens, "current_screen": self.current_screen,
-                "clock_settings": self.clock_settings,
-            }
-            (DATA_DIR / "oled_settings.json").write_text(json.dumps(data, indent=2))
-        except Exception as e:
-            logger.error(f"OLED Settings speichern: {e}")
-
-    def _load_settings(self):
-        path = DATA_DIR / "oled_settings.json"
-        if not path.exists():
-            return
-        try:
-            data = json.loads(path.read_text())
-            self.mode = data.get("mode", self.mode)
-            self.brightness = data.get("brightness", self.brightness)
-            self.rotation_interval = data.get("rotation_interval", self.rotation_interval)
-            if "screens" in data and data["screens"]:
-                self.screens = data["screens"]
-            self.current_screen = data.get("current_screen", 0)
-            if "clock_settings" in data:
-                self.clock_settings.update(data["clock_settings"])
-        except Exception as e:
-            logger.error(f"OLED Settings laden: {e}")
-
-    # ═══ RENDER LOOP ═══
-    def start(self):
+    def start(self) -> None:
         self._running = True
-        self._thread = threading.Thread(target=self._render_loop, daemon=True)
+        self._thread = threading.Thread(target=self._loop, daemon=True, name="oled-render")
         self._thread.start()
-        logger.info("OLED Engine gestartet")
+        logger.info("OLED-Engine gestartet")
 
-    def stop(self):
+    def stop(self) -> None:
         self._running = False
         if self._thread:
             self._thread.join(timeout=5)
         hw_client.oled_clear()
 
-    def _render_loop(self):
-        last_rotate = time.time()
-        last_stats = time.time()
-        cached_stats = {}
-        render_interval = 0.2  # 5 fps
-        stats_interval = 1.0   # Stats nur 1x/s holen
+    def _rotation_screens(self) -> list[Screen]:
+        return [s for s in self.settings.screens if s.enabled]
 
+    def _loop(self) -> None:
+        last_rotate = time.time()
+        last_stats = 0.0
+        last_weather = 0.0
+        stats: Optional[StatsSnapshot] = None
         while self._running:
             try:
-                if self._rotation_reset:
-                    last_rotate = time.time()
-                    self._rotation_reset = False
-
                 now = time.time()
-
-                # Stats + History nur 1x/s aktualisieren
-                if now - last_stats >= stats_interval:
-                    cached_stats = get_system_stats()
-                    update_history(cached_stats)
+                if self._rotation_reset:
+                    last_rotate = now
+                    self._rotation_reset = False
+                if now - last_stats >= 1.0 or stats is None:
+                    stats = self._snapshot()
                     last_stats = now
+                if now - last_weather >= 30.0:
+                    self.weather.refresh_due()
+                    last_weather = now
+                self.render_current(stats)
+                if self._rotate_if_due(now, last_rotate):
+                    last_rotate = now
+            except Exception as fehler:
+                logger.error(f"OLED-Schleife: {fehler}")
+            time.sleep(self.render_interval)
 
-                    # Wetter alle 5 min
-                    if self.weather.needs_update():
-                        self.weather.fetch()
+    def _rotate_if_due(self, now: float, last_rotate: float) -> bool:
+        """Schaltet in der Betriebsart auto zum nächsten aktiven Bildschirm; True bei Wechsel."""
+        with self._lock:
+            if self.settings.mode != OledMode.auto:
+                return False
+            kandidaten = self._rotation_screens()
+            if len(kandidaten) < 2:
+                return False
+            aktuell = self.settings.screen_by_id(self.settings.current_screen_id)
+            dauer = (aktuell.duration if aktuell and aktuell.duration else self.settings.rotation_interval)
+            if now - last_rotate < dauer:
+                return False
+            ids = [s.id for s in kandidaten]
+            if self.settings.current_screen_id in ids:
+                naechster = ids[(ids.index(self.settings.current_screen_id) + 1) % len(ids)]
+            else:
+                naechster = ids[0]
+            self.settings.current_screen_id = naechster
+            return True
 
-                # Rendering 5x/s mit gecachten Stats
-                self.render(cached_stats)
+    # Einstellungen
 
-                # Rotation
-                if self.mode == "auto" and len(self.screens) > 1:
-                    if now - last_rotate >= self.rotation_interval:
-                        self.current_screen = (self.current_screen + 1) % len(self.screens)
-                        last_rotate = now
-            except Exception as e:
-                logger.error(f"OLED Render-Loop: {e}")
-            time.sleep(render_interval)
+    def patch_settings(self, patch: OledSettingsPatch) -> OledSettings:
+        with self._lock:
+            if patch.mode is not None:
+                self.settings.mode = patch.mode
+                if patch.mode == OledMode.off:
+                    hw_client.oled_clear()
+            if patch.brightness is not None:
+                self.settings.brightness = patch.brightness
+                hw_client.oled_brightness(patch.brightness)
+            if patch.rotation_interval is not None:
+                self.settings.rotation_interval = patch.rotation_interval
+            if patch.current_screen_id is not None:
+                self._screen_by_id(patch.current_screen_id)
+                self.settings.current_screen_id = patch.current_screen_id
+                self._rotation_reset = True
+            self._save(bump=False)
+            self.screens_version += 1
+            return self.settings
+
+    def activate(self, screen_id: str) -> OledSettings:
+        return self.patch_settings(OledSettingsPatch(current_screen_id=screen_id))
+
+    # Bildschirme
+
+    def list_screens(self) -> list[Screen]:
+        with self._lock:
+            return list(self.settings.screens)
+
+    def replace_screens(self, screens: list[Screen]) -> list[Screen]:
+        with self._lock:
+            self.settings.screens = list(screens)
+            self._save()
+            return list(self.settings.screens)
+
+    def add_screen(self, screen: Screen) -> Screen:
+        with self._lock:
+            if self.settings.screen_by_id(screen.id) is not None:
+                screen.id = neue_id()
+            if not screen.name:
+                screen.name = f"Bildschirm {len(self.settings.screens) + 1}"
+            self.settings.screens.append(screen)
+            if self.settings.current_screen_id is None:
+                self.settings.current_screen_id = screen.id
+            self._save()
+            return screen
+
+    def update_screen(self, screen_id: str, screen: Screen) -> Screen:
+        with self._lock:
+            alt = self._screen_by_id(screen_id)
+            screen.id = alt.id
+            index = self.settings.screens.index(alt)
+            self.settings.screens[index] = screen
+            self._save()
+            return screen
+
+    def delete_screen(self, screen_id: str) -> None:
+        with self._lock:
+            screen = self._screen_by_id(screen_id)
+            if len(self.settings.screens) <= 1:
+                raise ValueError("Der letzte Bildschirm kann nicht gelöscht werden")
+            self.settings.screens.remove(screen)
+            if self.settings.current_screen_id == screen_id:
+                self.settings.current_screen_id = self.settings.screens[0].id
+            self._save()
+
+    def duplicate_screen(self, screen_id: str) -> Screen:
+        with self._lock:
+            original = self._screen_by_id(screen_id)
+            kopie = original.model_copy(deep=True)
+            kopie.id = neue_id()
+            kopie.name = f"{original.name} Kopie"
+            for widget in kopie.widgets:
+                widget.id = neue_id()
+            index = self.settings.screens.index(original)
+            self.settings.screens.insert(index + 1, kopie)
+            self._save()
+            return kopie
+
+    def reorder_screens(self, ids: list[str]) -> list[Screen]:
+        with self._lock:
+            nach_id = {s.id: s for s in self.settings.screens}
+            neu = [nach_id[i] for i in ids if i in nach_id]
+            rest = [s for s in self.settings.screens if s.id not in ids]
+            self.settings.screens = neu + rest
+            self._save()
+            return list(self.settings.screens)
+
+    # Vorlagen
+
+    def add_preset(self, preset: WidgetPreset) -> WidgetPreset:
+        with self._lock:
+            self.presets.append(preset)
+            self.store.save_presets(self.presets)
+            return preset
+
+    def update_preset(self, preset_id: str, preset: WidgetPreset) -> WidgetPreset:
+        with self._lock:
+            for i, p in enumerate(self.presets):
+                if p.id == preset_id:
+                    preset.id = preset_id
+                    self.presets[i] = preset
+                    self.store.save_presets(self.presets)
+                    return preset
+            raise NotFound(f"Vorlage {preset_id} nicht gefunden")
+
+    def delete_preset(self, preset_id: str) -> None:
+        with self._lock:
+            vorher = len(self.presets)
+            self.presets = [p for p in self.presets if p.id != preset_id]
+            if len(self.presets) == vorher:
+                raise NotFound(f"Vorlage {preset_id} nicht gefunden")
+            self.store.save_presets(self.presets)
+
+    # Profile
+
+    def save_profile(self, name: str) -> Profile:
+        """Aktuellen Stand unter einem Namen sichern; gleicher Name überschreibt."""
+        with self._lock:
+            profil = Profile(name=name, screens=[s.model_copy(deep=True) for s in self.settings.screens],
+                             rotation_interval=self.settings.rotation_interval)
+            self.profiles = [p for p in self.profiles if p.name != name] + [profil]
+            self.store.save_profiles(self.profiles)
+            return profil
+
+    def delete_profile(self, profile_id: str) -> None:
+        with self._lock:
+            vorher = len(self.profiles)
+            self.profiles = [p for p in self.profiles if p.id != profile_id]
+            if len(self.profiles) == vorher:
+                raise NotFound(f"Profil {profile_id} nicht gefunden")
+            self.store.save_profiles(self.profiles)
+
+    def apply_profile(self, profile_id: str) -> OledSettings:
+        with self._lock:
+            for p in self.profiles:
+                if p.id == profile_id:
+                    self.settings.screens = [s.model_copy(deep=True) for s in p.screens]
+                    self.settings.rotation_interval = p.rotation_interval
+                    self.settings.current_screen_id = self.settings.screens[0].id if self.settings.screens else None
+                    self._save()
+                    return self.settings
+            raise NotFound(f"Profil {profile_id} nicht gefunden")
+
+    # Wetterorte
+
+    def weather_states(self) -> list[WeatherLocationState]:
+        return self.weather.states()
+
+    def add_location(self, daten: WeatherLocationCreate) -> WeatherLocation:
+        with self._lock:
+            ort = WeatherLocation(name=daten.name, lat=daten.lat, lon=daten.lon, country=daten.country)
+            self.weather.settings.locations.append(ort)
+            if self.weather.settings.default_location_id is None:
+                self.weather.settings.default_location_id = ort.id
+            self.store.save_weather(self.weather.settings)
+        threading.Thread(target=self.weather.refresh_location, args=(ort,), daemon=True).start()
+        return ort
+
+    def delete_location(self, location_id: str) -> None:
+        with self._lock:
+            orte = self.weather.settings.locations
+            if len(orte) <= 1:
+                raise ValueError("Der letzte Wetterort kann nicht gelöscht werden")
+            if not any(o.id == location_id for o in orte):
+                raise NotFound(f"Wetterort {location_id} nicht gefunden")
+            self.weather.settings.locations = [o for o in orte if o.id != location_id]
+            if self.weather.settings.default_location_id == location_id:
+                self.weather.settings.default_location_id = self.weather.settings.locations[0].id
+            self.weather.forget(location_id)
+            self.store.save_weather(self.weather.settings)
+
+    def set_default_location(self, location_id: str) -> WeatherSettings:
+        with self._lock:
+            if self.weather.settings.location_by_id(location_id) is None:
+                raise NotFound(f"Wetterort {location_id} nicht gefunden")
+            self.weather.settings.default_location_id = location_id
+            self.store.save_weather(self.weather.settings)
+            return self.weather.settings
+
+    def refresh_weather(self, location_id: Optional[str] = None) -> None:
+        if location_id is None:
+            self.weather.refresh_due(force=True)
+            return
+        ort = self.weather.settings.location_by_id(location_id)
+        if ort is None:
+            raise NotFound(f"Wetterort {location_id} nicht gefunden")
+        self.weather.refresh_location(ort)
+
+    def geocode(self, query: str) -> list[GeocodeHit]:
+        return self.weather.geocode(query)
+
+    # Katalog, Zustand, Austausch
+
+    def catalog(self) -> Catalog:
+        stats = self._snapshot()
+        return build_catalog(stats, datetime.now(TZ), self.weather.report_for(None))
+
+    def get_live(self) -> OledLive:
+        with self._lock:
+            return OledLive(mode=self.settings.mode, brightness=self.settings.brightness,
+                            rotation_interval=self.settings.rotation_interval,
+                            current_screen_id=self.settings.current_screen_id,
+                            screens_version=self.screens_version, preview=self.preview)
+
+    def get_state(self) -> OledState:
+        with self._lock:
+            return OledState(mode=self.settings.mode, brightness=self.settings.brightness,
+                             rotation_interval=self.settings.rotation_interval,
+                             current_screen_id=self.settings.current_screen_id,
+                             screens_version=self.screens_version, preview=self.preview,
+                             available=True, hardware=self.hardware, screens=list(self.settings.screens),
+                             weather_ok=self.weather.any_ok(), version=self.app_version)
+
+    def export_bundle(self) -> OledBundle:
+        with self._lock:
+            return OledBundle(app_version=self.app_version, settings=self.settings.model_copy(deep=True),
+                              presets=list(self.presets), profiles=list(self.profiles),
+                              weather=self.weather.settings.model_copy(deep=True))
+
+    def import_bundle(self, bundle: OledBundle, replace: bool) -> ImportResult:
+        """Übernimmt einen Export. replace=True ersetzt den Bestand, sonst wird ergänzt."""
+        with self._lock:
+            if replace:
+                self.settings = bundle.settings
+                self.presets = list(bundle.presets)
+                self.profiles = list(bundle.profiles)
+                if bundle.weather.locations:
+                    self.weather.settings.locations = list(bundle.weather.locations)
+                    self.weather.settings.default_location_id = bundle.weather.default_location_id
+            else:
+                vorhandene = {s.id for s in self.settings.screens}
+                for screen in bundle.settings.screens:
+                    if screen.id in vorhandene:
+                        screen.id = neue_id()
+                    self.settings.screens.append(screen)
+                self.presets.extend(bundle.presets)
+                namen = {p.name for p in self.profiles}
+                self.profiles.extend(p for p in bundle.profiles if p.name not in namen)
+                bekannt = {(round(o.lat, 3), round(o.lon, 3)) for o in self.weather.settings.locations}
+                for ort in bundle.weather.locations:
+                    if (round(ort.lat, 3), round(ort.lon, 3)) not in bekannt:
+                        self.weather.settings.locations.append(ort)
+            if not self.settings.screens:
+                from oled.store import default_screen
+                self.settings.screens = [default_screen()]
+            self._save()
+            self.store.save_presets(self.presets)
+            self.store.save_profiles(self.profiles)
+            self.store.save_weather(self.weather.settings)
+            return ImportResult(screens=len(bundle.settings.screens), presets=len(bundle.presets),
+                                profiles=len(bundle.profiles), locations=len(bundle.weather.locations))
