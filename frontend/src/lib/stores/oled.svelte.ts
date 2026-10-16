@@ -29,8 +29,12 @@ export function leereOpts(): WidgetOpts {
     scaleX: 1, scaleY: null, prefix: '', suffix: '', decimals: null, thousands: false,
     invert: false, border: false, align: 'left', boxW: 0, width: null, height: null,
     radius: null, size: null, text: null, rotate: 0, locationId: null, bitmap: null,
+    icon: null, filled: false, steps: null,
   };
 }
+
+/* Bild eines einzelnen Widgets, wie es der Vorschau-Endpunkt liefert */
+export interface Vorschaubild { bild: string; w: number; h: number }
 
 class OledStore {
   /* Bestand */
@@ -52,6 +56,9 @@ class OledStore {
   simulate = $state<Record<string, number>>({});
   speicherzustand = $state<Speicherzustand>('gespeichert');
   vorschaubilder = $state<Record<string, string>>({});
+  /* Symbolbilder für die Auswahl, Schlüssel kennung@groesse */
+  symbolbilder = $state<Record<string, Vorschaubild>>({});
+  private symbolAnfragen = new Set<string>();
   vorlagenbilder = $state<Record<string, string>>({});
   zeichnen = $state(false);
   geladen = $state(false);
@@ -357,6 +364,16 @@ class OledStore {
     });
   }
 
+  zentrierenSenkrecht(ids: string[]): void {
+    this.aendere((s) => {
+      for (const w of s.widgets) {
+        if (!ids.includes(w.id)) continue;
+        const box = this.boxen.find((b) => b.id === w.id);
+        if (box && box.h > 0) w.y = begrenze(Math.round((H - box.h) / 2) + (w.y - box.y), 0, H - 1);
+      }
+    });
+  }
+
   verteilen(ids: string[]): void {
     const boxen = ids.map((id) => this.boxen.find((b) => b.id === id)).filter((b): b is WidgetBox => !!b).sort((a, b) => a.x - b.x);
     if (boxen.length < 3) return;
@@ -425,7 +442,15 @@ class OledStore {
       this.auswahl = [id];
     }
     const w = this.entwurf?.widgets.find((x) => x.id === id);
-    this.zeichnen = this.auswahl.length === 1 && w?.display === 'bitmap';
+    /* Der Zeichenmodus beginnt nur ausdrücklich (Knopf, Doppelklick, Menü); die Auswahl allein ändert ihn nicht */
+    this.zeichnen = this.zeichnen && this.auswahl.length === 1 && w?.display === 'bitmap';
+  }
+
+  zeichnenStarten(id: string): void {
+    const w = this.entwurf?.widgets.find((x) => x.id === id);
+    if (w?.display !== 'bitmap') return;
+    this.auswahl = [id];
+    this.zeichnen = true;
   }
 
   alleWaehlen(): void {
@@ -493,13 +518,23 @@ class OledStore {
     }
   }
 
-  async renderEinzeln(widget: Widget): Promise<{ bild: string; box: WidgetBox } | null> {
+  async renderEinzeln(widget: Widget): Promise<Vorschaubild | null> {
     try {
-      const antwort = await api.oled.render({ screen: { id: 'probe', name: '', kind: 'widgets', widgets: [{ ...widget, x: 0, y: 0 }], locationId: null, enabled: true, duration: null }, simulate: this.simulate });
-      return { bild: antwort.imageBase64, box: antwort.boxes[0] };
+      const antwort = await api.oled.renderWidget(widget, this.simulate);
+      return antwort.width > 0 ? { bild: antwort.imageBase64, w: antwort.width, h: antwort.height } : null;
     } catch {
       return null;
     }
+  }
+
+  /* Symbol aus der Bibliothek rendern und merken; jede Kombination nur einmal. */
+  async symbolVorschau(id: string, groesse: number): Promise<void> {
+    const schluessel = `${id}@${groesse}`;
+    if (this.symbolbilder[schluessel] || this.symbolAnfragen.has(schluessel)) return;
+    this.symbolAnfragen.add(schluessel);
+    const bild = await this.renderEinzeln({ id: 'symbol', source: 'layout.symbol', display: 'symbol', x: 0, y: 0, name: '', opts: { ...leereOpts(), icon: id, size: groesse } });
+    this.symbolAnfragen.delete(schluessel);
+    if (bild) this.symbolbilder = { ...this.symbolbilder, [schluessel]: bild };
   }
 
   async aktualisiereVorschaubilder(): Promise<void> {

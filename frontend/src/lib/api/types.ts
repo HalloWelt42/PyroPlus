@@ -10,6 +10,7 @@ export type DisplayMode =
   | 'balken' | 'balken_label' | 'balken_label_in'
   | 'gauge' | 'sparkline' | 'laufschrift'
   | 'fan_icon' | 'fan_icon_rpm'
+  | 'symbol' | 'symbol_wert' | 'ring' | 'balken_v' | 'stufen' | 'sieben_segment'
   | 'linie_h' | 'linie_v' | 'rahmen' | 'block' | 'section'
   | 'bitmap';
 export type ScreenKind = 'widgets' | 'weather_compact' | 'weather_hourly' | 'weather_daily';
@@ -33,6 +34,9 @@ export interface WidgetOpts {
   rotate: Rotation;
   locationId: string | null;
   bitmap: string | null;
+  icon: string | null;
+  filled: boolean;
+  steps: number | null;
 }
 
 export interface Widget {
@@ -116,15 +120,22 @@ export interface DisplayModeInfo {
   variants: ModeVariant[];
 }
 
+export interface SymbolInfo { id: string; label: string; category: string; }
+
 export interface Catalog {
   width: number;
   height: number;
   tabs: TabInfo[];
   sources: SourceInfo[];
   modes: DisplayModeInfo[];
+  symbols: SymbolInfo[];
+  symbolCategories: string[];
+  symbolSizes: number[];
 }
 
 export interface WidgetBox { id: string; x: number; y: number; w: number; h: number; }
+/* Vorschau eines einzelnen Widgets: Bild genau in Widgetgröße; width 0 = nichts gezeichnet */
+export interface WidgetRenderResponse { imageBase64: string; width: number; height: number; box: WidgetBox; }
 
 export interface RenderRequest { screen: Screen; simulate?: Record<string, number>; }
 export interface RenderResponse { imageBase64: string; boxes: WidgetBox[]; width: number; height: number; }

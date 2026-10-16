@@ -83,6 +83,7 @@
   .sb-collapse { width: 32px; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border); color: var(--text-muted); display: inline-flex; align-items: center; justify-content: center; }
   .sb-collapse:hover { color: var(--text-primary); border-color: var(--border-accent); }
   .sb-temp-mini { font: 700 22px var(--mono); }
+  .sb-temp-val { display: inline-block; min-width: 4ch; text-align: right; }
   .sidebar.zu .sb-leds { gap: 4px; }
   .sidebar.zu .sb-led { width: 10px; height: 10px; border-radius: 2px; }
   .sidebar.zu .nav-btn { justify-content: center; padding: 10px 0; width: 48px; }

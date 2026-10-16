@@ -32,22 +32,28 @@ export const ABSCHNITTE: Abschnitt[] = [
   {
     id: 'widgets', titel: 'Widgets einfügen und bearbeiten',
     html: `<h3>Widgets einfügen und bearbeiten</h3>
-<p>Im Reiter <b>Hinzufügen</b> wählst du zuerst den Bereich (CPU, Wetter, Zeiten ...), dann die Quelle. Neben jeder Quelle steht ihr aktueller Wert. Danach wählst du die Darstellung; das neue Widget erscheint sofort in der Vorschau an einer freien Stelle und wird mit <b>Einfügen</b> übernommen.</p>
+<p>Im Reiter <b>Hinzufügen</b> wählst du zuerst den Bereich (CPU, Wetter, Zeiten ...), dann die Quelle. Neben jeder Quelle steht ihr aktueller Wert. Danach wählst du die Darstellung; das neue Widget erscheint sofort in der Vorschau an einer freien Stelle und wird mit <b>Einfügen</b> übernommen. Die Vorschau im Reiter zeigt das Widget genau in seiner Pixelgröße.</p>
 <p>Ein Klick auf ein Widget in der Vorschau wählt es; <b>Umschalt</b> und Klick wählt mehrere. Ziehen verschiebt, die Pfeiltasten rücken um ein Pixel, mit Umschalt um acht. Rechtsklick öffnet das Menü mit Kopieren, Zentrieren, Verteilen, Reihenfolge und Löschen.</p>
+<p>Oben im Reiter <b>Eigenschaften</b> stehen <b>Kopie</b>, <b>Sichern</b> und <b>Löschen</b>; die Taste <b>Entf</b> löscht ebenfalls. Unter Position setzt du X und Y direkt oder richtest aus: waagerecht und senkrecht zur Displaymitte, an den linken oder oberen Rand. Bei mehreren gewählten Widgets kommen Oben bündig, Links bündig und Verteilen dazu.</p>
 <p><b>Sichern</b> legt ein Widget als eigenen Baustein ab, den du auf jedem Bildschirm wieder einfügen kannst.</p>`,
   },
   {
     id: 'darstellungsarten', titel: 'Darstellungsarten',
     html: `<h3>Darstellungsarten</h3>
-<p>Jedes Widget verbindet eine Datenquelle mit einer Darstellungsart. Die Quelle liefert den Wert, die Darstellungsart bestimmt, wie er auf dem Display erscheint. Größen sind keine eigenen Arten, sondern Optionen; die Vorgaben (Klein, Mittel, Groß ...) setzen nur die Skalierung.</p>
+<p>Jedes Widget verbindet eine Datenquelle mit einer Darstellungsart. Die Quelle liefert den Wert, die Darstellungsart bestimmt, wie er auf dem Display erscheint. Größen sind keine eigenen Arten, sondern Optionen; die Vorgaben (Klein, Mittel, Groß ...) setzen nur Skalierung oder Maße.</p>
 <h4>Für Zahlen und Prozentwerte</h4>
 <dl>
 <dt>Zahl oder Text</dt><dd>Der Wert als Schrift. Skalierung von 1 bis 8, Breite und Höhe getrennt. Dezimalstellen und Tausendertrenner sind einstellbar.</dd>
+<dt>Siebensegment</dt><dd>Ziffern wie auf einer Digitaluhr, Höhe frei von 7 bis 64 Pixeln. Doppelpunkt, Punkt und Minus gehören dazu; Buchstaben erscheinen in der Pixelschrift.</dd>
+<dt>Symbol + Wert</dt><dd>Ein Symbol aus der Bibliothek, daneben der Wert. Ohne eigene Wahl nimmt das Backend das Symbol, das zur Quelle passt: Thermometer für Temperaturen, Prozessor für die Auslastung, Tropfen für die Feuchte.</dd>
 <dt>Balken</dt><dd>Füllstand von 0 bis 100 Prozent. Für Werte ohne Prozentbezug rechnet das Backend um, zum Beispiel Temperatur bezogen auf 85 Grad.</dd>
 <dt>Balken + Wert</dt><dd>Balken, rechts daneben der Wert.</dd>
 <dt>Balken (Wert innen)</dt><dd>Balken mit dem Wert in der Mitte.</dd>
+<dt>Säule</dt><dd>Senkrechter Balken, füllt sich von unten.</dd>
+<dt>Stufen</dt><dd>Felder nebeneinander, gefüllt bis zum Wert; Anzahl 2 bis 32.</dd>
 <dt>Halbkreis</dt><dd>Ein halber Ring, der sich mit dem Wert füllt. Der Wert steht in der Mitte. Radius 4 bis 32 Pixel.</dd>
-<dt>Verlauf</dt><dd>Linie der letzten Minute. Nur für Quellen mit Verlaufsdaten: CPU, Temperatur, RAM, Drehzahl, Netzwerk.</dd>
+<dt>Ring</dt><dd>Voller Ring, füllt sich von oben im Uhrzeigersinn; der Wert steht in der Mitte, wenn er hineinpasst.</dd>
+<dt>Verlauf</dt><dd>Linie der letzten Minute, wahlweise als gefüllte Fläche. Nur für Quellen mit Verlaufsdaten: CPU, Temperatur, RAM, Drehzahl, Netzwerk.</dd>
 </dl>
 <h4>Für Texte und Zeiten</h4>
 <dl>
@@ -57,6 +63,7 @@ export const ABSCHNITTE: Abschnitt[] = [
 </dl>
 <h4>Layout und Besonderes</h4>
 <dl>
+<dt>Symbol</dt><dd>Festes Symbol aus der Bibliothek in 8, 16, 24 oder 32 Pixeln, siehe Abschnitt Symbole.</dd>
 <dt>Linie, Rahmen, Block, Trennlinie</dt><dd>Gestaltungselemente ohne Wert.</dd>
 <dt>Lüftersymbol</dt><dd>Dreht sich mit der Drehzahl, wahlweise mit Zahl daneben.</dd>
 <dt>Pixelbild</dt><dd>Frei gezeichnete Pixel, siehe Abschnitt Pixelbilder.</dd>
@@ -73,7 +80,8 @@ export const ABSCHNITTE: Abschnitt[] = [
   {
     id: 'pixelbilder', titel: 'Pixelbilder',
     html: `<h3>Pixelbilder</h3>
-<p>Ein Pixelbild ist ein Widget mit frei gesetzten Punkten. Füge es über Hinzufügen, Bereich Layout, Quelle Pixelbild ein. Mit <b>Zeichnen</b> wird der Rahmen des Bildes auf der Vorschau zum Zeichenbereich; alles außerhalb wird abgedunkelt.</p>
+<p>Ein Pixelbild ist ein Widget mit frei gesetzten Punkten. Füge es über die Bausteine ("Leeres Pixelbild") oder über Hinzufügen, Bereich Layout, Quelle Pixelbild ein. Ein gewähltes Pixelbild verschiebst und löschst du wie jedes andere Widget.</p>
+<p>Das <b>Zeichnen</b> beginnt ausdrücklich: über den Knopf im Reiter Eigenschaften, per Doppelklick auf das Bild oder über das Kontextmenü. Dann wird der Rahmen des Bildes auf der Vorschau zum Zeichenbereich; alles außerhalb wird abgedunkelt. <b>Fertig</b> oder <b>Esc</b> beendet das Zeichnen.</p>
 <dl>
 <dt>Stift, Radierer</dt><dd>Linke Maustaste setzt, rechte löscht. Stiftbreite 1 bis 4.</dd>
 <dt>Linie, Rechteck, Ellipse</dt><dd>Aufziehen; Formen wahlweise gefüllt.</dd>
@@ -81,13 +89,20 @@ export const ABSCHNITTE: Abschnitt[] = [
 <dt>Text</dt><dd>Setzt Text in der Pixelschrift des Displays an der Klickstelle ein.</dd>
 <dt>Verschieben</dt><dd>Zieht den Bildinhalt im Rahmen.</dd>
 </dl>
-<p>Die Bildgröße ist frei (bis 128 mal 64). <b>Zuschneiden</b> verkleinert das Bild auf den gezeichneten Inhalt. Tasten: P Stift, E Radierer, L Linie, R Rechteck, C Ellipse, F Füllen, T Text, V Verschieben.</p>`,
+<p>Die Bildgröße ist frei (bis 128 mal 64). <b>Zuschneiden</b> verkleinert das Bild auf den gezeichneten Inhalt. Tasten im Zeichenmodus: P Stift, E Radierer, L Linie, R Rechteck, C Ellipse, F Füllen, T Text, V Verschieben.</p>`,
+  },
+  {
+    id: 'symbole', titel: 'Symbole',
+    html: `<h3>Symbole</h3>
+<p>Die Symbolbibliothek liefert über 130 Symbole in den Gruppen Wetter, System, Netzwerk, Zeit, Status und Deko, jedes in 8, 16, 24 und 32 Pixeln. Sie werden aus der Symbolschrift der Oberfläche gerastert, damit Display und Oberfläche dieselbe Bildsprache sprechen.</p>
+<p>Zwei Darstellungsarten nutzen sie: <b>Symbol</b> zeigt ein festes Symbol, <b>Symbol + Wert</b> stellt den Wert einer Quelle daneben. Bei Symbol + Wert wählt das Backend ohne eigene Wahl ein passendes Symbol; "Automatisch" in der Symbolwahl stellt das wieder her.</p>
+<p>Das Lüftersymbol liegt in 32 Drehbildern vor und dreht sich mit der Drehzahl. Die Wettersymbole der fertigen Wetterbildschirme kommen aus derselben Bibliothek.</p>`,
   },
   {
     id: 'vorlagen', titel: 'Vorlagen und Bausteine',
     html: `<h3>Vorlagen und Bausteine</h3>
-<p><b>Bildschirmvorlagen</b> sind fertige Bildschirme nach Kategorie: Uhren, System, Laufwerke, Netzwerk, Wetter. Eine Vorlage wird als Kopie eingefügt; danach ist jedes Widget darin frei änderbar. Die Wetterbildschirme "kompakt", "nächste Stunden" und "fünf Tage" sind feste Layouts mit Symbolen und haben nur einen Ort als Einstellung.</p>
-<p><b>Bausteine</b> sind einzelne Widgets: mitgelieferte und eigene. Eigene Bausteine entstehen über <b>Sichern</b> am gewählten Widget.</p>`,
+<p><b>Bildschirmvorlagen</b> sind fertige Bildschirme nach Gruppen: Uhr, System, Laufwerke, Netzwerk, Wetter. Eine Vorlage wird als Kopie eingefügt; danach ist jedes Widget darin frei änderbar. Die Wetterbildschirme "kompakt", "nächste Stunden" und "fünf Tage" sind feste Layouts mit Symbolen und haben nur einen Ort als Einstellung.</p>
+<p><b>Bausteine</b> sind einzelne Widgets: mitgelieferte in den Gruppen Uhr, System, Laufwerke, Netzwerk, Lüfter, Wetter, Symbole und Layout, dazu eigene. Jede Kachel zeigt das Widget in seiner echten Pixelgröße mit den aktuellen Werten. Ein Klick fügt den Baustein an einer freien Stelle ein, danach lässt er sich wie jedes Widget verschieben, ändern und löschen. Eigene Bausteine entstehen über <b>Sichern</b> am gewählten Widget; über die Kachel lassen sie sich umbenennen und löschen.</p>`,
   },
   {
     id: 'wetterorte', titel: 'Wetterorte',

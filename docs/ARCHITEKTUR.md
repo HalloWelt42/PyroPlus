@@ -30,6 +30,8 @@ Hardware-Proxy (nativ, systemd)        GPIO, I2C, SPI; LED-Animation lokal
 | `oled/compose.py` | Rendert einen Bildschirm: Widgets einzeln zeichnen, Rahmen messen, drehen, zusammensetzen |
 | `oled/renderer.py`, `font.py`, `icons.py`, `sprites.py` | Pixel-Primitive auf dem 1-Bit-Puffer |
 | `oled/builtin.py` | Fertige Bildschirmarten (Wetter kompakt, stündlich, täglich) |
+| `oled/symbole.py`, `oled/symbole_daten.py` | Symbolbibliothek: Katalog (Kennung, Name, Gruppe, Glyphe) und erzeugte Pixeldaten in 8, 16, 24 und 32 Pixeln; Lüfter als 32 Drehbilder |
+| `oled/templates.py` | Mitgelieferte Bildschirmvorlagen und Bausteine (Widgetvorlagen) |
 | `oled/weather.py` | Wetteranbieter hinter einer Schnittstelle, mehrere Orte, Zwischenspeicher |
 | `oled/store.py` | Persistenz als JSON-Dateien, atomar geschrieben; Migration alter Dateien |
 | `oled/engine.py` | Render-Schleife, Rotation, Modus, Vorschau, Änderungszähler |
@@ -40,7 +42,8 @@ Hardware-Proxy (nativ, systemd)        GPIO, I2C, SPI; LED-Animation lokal
 - `Widget`: `id` (UUID), `source`, `display`, `x`, `y`, `name`, `opts`.
 - `WidgetOpts`: Skalierung, Präfix, Suffix, Dezimalstellen, Tausendertrenner,
   invertiert, Rahmen, Ausrichtung, Boxbreite, Breite, Höhe, Radius, Größe, Text,
-  Drehung, Wetterort, Bitmap. Nur fachliche Werte, keine Editor-Hilfswerte.
+  Drehung, Wetterort, Bitmap, Symbol, Fläche, Stufen. Nur fachliche Werte, keine
+  Editor-Hilfswerte.
 - `Screen`: `id` (UUID), `name`, `kind` (widgets, weather_compact, weather_hourly,
   weather_daily), `widgets`, `locationId`, `enabled`, `duration`.
 - `OledSettings`: Modus, Helligkeit, Rotationsintervall, aktiver Bildschirm,
@@ -56,6 +59,26 @@ eigenen Puffer, misst den belegten Rahmen pixelgenau, dreht bei Bedarf und
 kopiert in den Bildschirmpuffer. Ergebnis: Bild plus Liste `WidgetBox` je Widget.
 Dieselbe Funktion bedient die Render-Schleife und den Entwurfs-Endpunkt
 `POST /api/oled/render`; der Editor bekommt so exakte Trefferflächen.
+
+### Vorschau einzelner Widgets
+
+`POST /api/oled/render/widget` rendert ein Widget bei 0/0 und liefert das Bild
+genau in der Größe seines Rahmens (`WidgetRenderResponse`: Bild, Breite, Höhe,
+Rahmen). Jede Vorschau in der Oberfläche (Bausteinkacheln, Hinzufügen,
+Symbolwahl) nimmt diesen Weg; die Oberfläche vergrößert nur ganzzahlig und
+verzerrt nie. Ein Pixelbild belegt immer seine Zeichenfläche, auch leer, damit
+es wählbar bleibt.
+
+### Symbole
+
+Alle Symbole haben eine Quelle: die Symbolschrift der Oberfläche
+(`frontend/static/fonts/fa-solid-900.woff2`). `tools/symbole-erzeugen.py`
+rastert die im Katalog (`oled/symbole.py`) genannten Glyphen in die festen
+Größen und schreibt `oled/symbole_daten.py`; die Datei wird nicht von Hand
+geändert. Das Lüftersymbol wird zusätzlich in 32 Drehbildern erzeugt. Zwei
+Darstellungsarten nutzen die Bibliothek (`symbol`, `symbol_wert`), die
+Wetterbildschirme ebenso. "Symbol + Wert" wählt ohne eigene Angabe das zur
+Quelle passende Symbol (`vorgabe_fuer_quelle`).
 
 ### Persistenz
 

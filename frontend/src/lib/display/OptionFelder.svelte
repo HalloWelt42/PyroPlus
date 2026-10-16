@@ -6,6 +6,7 @@
   import Regler from '$lib/bausteine/Regler.svelte';
   import Schalter from '$lib/bausteine/Schalter.svelte';
   import Stufen from '$lib/bausteine/Stufen.svelte';
+  import SymbolWahl from './SymbolWahl.svelte';
 
   let { felder, opts, quelle, onaendern }: {
     felder: string[]; opts: WidgetOpts; quelle: SourceInfo | null; onaendern: (patch: Partial<WidgetOpts>) => void;
@@ -14,7 +15,7 @@
   const hat = (f: string) => felder.includes(f);
   const istText = $derived(hat('prefix') || hat('text'));
   const skalierung = $derived(hat('scaleX'));
-  const masse = $derived(hat('width') || hat('height') || hat('radius') || hat('size'));
+  const masse = $derived(hat('width') || hat('height') || hat('radius') || hat('size') || hat('steps') || hat('filled'));
 </script>
 
 {#if skalierung}
@@ -60,6 +61,13 @@
   </div>
 {/if}
 
+{#if hat('icon')}
+  <div class="gruppe">
+    <div class="gruppe-titel"><i class="fa-solid fa-icons"></i>Symbol</div>
+    <SymbolWahl wert={opts.icon} vorgabeErlaubt={hat('prefix')} onwahl={(id) => onaendern({ icon: id })} />
+  </div>
+{/if}
+
 {#if masse}
   <div class="gruppe">
     <div class="gruppe-titel"><i class="fa-solid fa-ruler-combined"></i>Maße</div>
@@ -70,13 +78,19 @@
       <div class="zeile"><span class="label">Höhe</span><Regler wert={opts.height ?? 6} min={1} max={64} einheit=" px" titel="Höhe in Pixeln, 1 bis 64" onwahl={(v) => onaendern({ height: v })} /></div>
     {/if}
     {#if hat('radius')}
-      <div class="zeile"><span class="label">Radius</span><Regler wert={opts.radius ?? 12} min={4} max={32} einheit=" px" titel="Radius des Halbkreises, 4 bis 32 Pixel" onwahl={(v) => onaendern({ radius: v })} /></div>
+      <div class="zeile"><span class="label">Radius</span><Regler wert={opts.radius ?? 12} min={4} max={32} einheit=" px" titel="Radius des Halbkreises oder Rings, 4 bis 32 Pixel" onwahl={(v) => onaendern({ radius: v })} /></div>
     {/if}
     {#if hat('size')}
       <div class="zeile"><span class="label">Größe</span>
         <Segment klein wert={String(opts.size ?? 16)} titel="Größe des Symbols in Pixeln" onwahl={(v) => onaendern({ size: Number(v) })}
-          optionen={[{ wert: '8', label: '8' }, { wert: '16', label: '16' }, { wert: '32', label: '32' }]} />
+          optionen={[{ wert: '8', label: '8' }, { wert: '16', label: '16' }, { wert: '24', label: '24' }, { wert: '32', label: '32' }]} />
       </div>
+    {/if}
+    {#if hat('steps')}
+      <div class="zeile"><span class="label">Stufen</span><Stufen wert={opts.steps ?? 10} min={2} max={32} titel="Anzahl der Felder, 2 bis 32" onwahl={(v) => onaendern({ steps: v })} /></div>
+    {/if}
+    {#if hat('filled')}
+      <div class="zeile"><span class="label">Fläche</span><Schalter an={opts.filled} klein titel="Fläche unter der Linie füllen" onwahl={(an) => onaendern({ filled: an })} /></div>
     {/if}
   </div>
 {/if}

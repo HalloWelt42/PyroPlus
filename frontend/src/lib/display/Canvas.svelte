@@ -95,6 +95,14 @@
     }
   }
 
+  /* Doppelklick auf ein Pixelbild startet das Zeichnen */
+  function doppelt(e: MouseEvent): void {
+    if (!schirm || bitmapWidget) return;
+    const r = schirm.getBoundingClientRect();
+    const box = treffer(oled.boxen, Math.floor((e.clientX - r.left) / zoom), Math.floor((e.clientY - r.top) / zoom));
+    if (box) oled.zeichnenStarten(box.id);
+  }
+
   function kontext(e: MouseEvent): void {
     e.preventDefault();
     if (!schirm || !feld || bitmapWidget) return;
@@ -174,7 +182,7 @@
     const probe: Widget = { id: 'text', source: 'text.frei', display: 'text', x: 0, y: 0, name: '', opts: { ...w.opts, bitmap: null, invert: false, text, scaleX: 1, scaleY: 1, align: 'left', boxW: 0, rotate: 0, width: null, height: null } };
     const ergebnis = await oled.renderEinzeln(probe);
     if (!ergebnis) return;
-    const pixel = await pixelAusPng(ergebnis.bild, Math.min(W, ergebnis.box.w), Math.min(H, ergebnis.box.h));
+    const pixel = await pixelAusPng(ergebnis.bild, Math.min(W, ergebnis.w), Math.min(H, ergebnis.h));
     const rows = bitmapVon(w);
     for (let y = 0; y < pixel.length; y++) {
       for (let x = 0; x < pixel[0].length; x++) if (pixel[y][x]) setzePixel(rows, l.x + x, l.y + y, 1);
@@ -216,7 +224,7 @@
         <div class="geraet-schirm" class:raster={ui.raster} class:zeichnet={!!bitmapWidget} bind:this={schirm}
           role="presentation"
           onpointerdown={runter} onpointermove={bewegen} onpointerup={hoch} onpointercancel={hoch}
-          onpointerleave={() => (cursor = null)} oncontextmenu={kontext}>
+          onpointerleave={() => (cursor = null)} oncontextmenu={kontext} ondblclick={doppelt}>
           {#if oled.bild}<img src="data:image/png;base64,{oled.bild}" alt="Vorschau vom Backend" draggable="false">{/if}
           {#if bitmapWidget}
             <div class="pixelrahmen" style="left:{bitmapWidget.x * zoom}px;top:{bitmapWidget.y * zoom}px;width:{(bitmapWidget.opts.width ?? 32) * zoom}px;height:{(bitmapWidget.opts.height ?? 16) * zoom}px">

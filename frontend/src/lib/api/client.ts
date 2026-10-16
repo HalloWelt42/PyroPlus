@@ -4,7 +4,7 @@ import type {
   Catalog, EffectCatalog, FanFineSettings, FanState, GeocodeHit, ImportResult, LedState, Ok,
   OledBundle, OledSettings, OledSettingsPatch, OledState, Profile, RenderRequest, RenderResponse,
   Rgb, Screen, SystemState, TemplateCatalog, WeatherLocation, WeatherLocationCreate,
-  WeatherLocationState, WeatherSettings, Widget, WidgetPreset, WsMessage,
+  WeatherLocationState, WeatherSettings, Widget, WidgetPreset, WidgetRenderResponse, WsMessage,
 } from './types';
 
 export class ApiFehler extends Error {
@@ -101,6 +101,7 @@ export const api = {
     patchSettings: (p: OledSettingsPatch) => patch<OledSettings>('/oled/settings', p),
     catalog: () => get<Catalog>('/oled/catalog'),
     render: (req: RenderRequest) => post<RenderResponse>('/oled/render', req),
+    renderWidget: (widget: Widget, simulate: Record<string, number> = {}) => post<WidgetRenderResponse>('/oled/render/widget', { widget, simulate }),
     screens: () => get<Screen[]>('/oled/screens'),
     replaceScreens: (screens: Screen[]) => put<Screen[]>('/oled/screens', screens),
     addScreen: (screen: Partial<Screen>) => post<Screen>('/oled/screens', screen),

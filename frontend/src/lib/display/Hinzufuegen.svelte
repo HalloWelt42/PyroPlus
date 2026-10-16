@@ -2,11 +2,12 @@
   /* Datenquelle und Darstellung wählen; das neue Widget wird im Bild mitgerendert, bis es eingefügt wird.
      Mit wechselFuer wird statt dessen die Quelle eines bestehenden Widgets getauscht. */
   import { onDestroy } from 'svelte';
-  import { oled, leereOpts } from '$lib/stores/oled.svelte';
+  import { oled, leereOpts, type Vorschaubild } from '$lib/stores/oled.svelte';
   import { ui } from '$lib/stores/ui.svelte';
   import type { DisplayModeInfo, SourceInfo, Tab, Widget, WidgetOpts } from '$lib/api/types';
   import OptionFelder from './OptionFelder.svelte';
   import Regler from '$lib/bausteine/Regler.svelte';
+  import WidgetVorschau from './WidgetVorschau.svelte';
 
   let { wechselFuer = null, onfertig }: { wechselFuer?: Widget | null; onfertig: () => void } = $props();
 
@@ -16,7 +17,7 @@
   let opts = $state<WidgetOpts>(leereOpts());
   let name = $state('');
   let probewert = $state<number | null>(null);
-  let klein = $state<{ bild: string; w: number; h: number } | null>(null);
+  let klein = $state<Vorschaubild | null>(null);
   let kleinTimer: ReturnType<typeof setTimeout> | null = null;
 
   const quellen = $derived((oled.katalog?.sources ?? []).filter((s) => s.tab === tab));
@@ -101,8 +102,7 @@
     if (kleinTimer) clearTimeout(kleinTimer);
     kleinTimer = setTimeout(async () => {
       if (!w) { klein = null; return; }
-      const erg = await oled.renderEinzeln(w);
-      klein = erg && erg.box.w > 0 ? { bild: erg.bild, w: erg.box.w, h: erg.box.h } : null;
+      klein = await oled.renderEinzeln(w);
     }, 80);
   }
 
@@ -165,14 +165,7 @@
   {/if}
   <div class="gruppe">
     <div class="gruppe-titel"><i class="fa-solid fa-eye"></i>Vorschau<span class="badge badge-neutral" style="margin-left:auto">vom Backend</span></div>
-    <div class="vorschau-box">
-      {#if klein}
-        <div class="ausschnitt" style="width:{klein.w * 3}px;height:{klein.h * 3}px"><img src="data:image/png;base64,{klein.bild}" alt="Vorschau des neuen Widgets" style="width:{128 * 3}px;height:{64 * 3}px"></div>
-        <span class="mass">{klein.w} x {klein.h} Pixel</span>
-      {:else}
-        <span class="mass">Keine Vorschau</span>
-      {/if}
-    </div>
+    <WidgetVorschau bild={klein} hoehe={88} maxSkala={3} mass />
     {#if quelle.valueType === 'number' || quelle.valueType === 'percent'}
       <div class="zeile"><span class="label">Probewert</span>
         {#if probewert === null}
@@ -190,7 +183,3 @@
   <button class="btn btn-primary btn-breit" title="Widget an der markierten Stelle einfügen" onclick={einfuegen}><i class="fa-solid fa-plus"></i>Einfügen</button>
 {/if}
 
-<style>
-  .ausschnitt { overflow: hidden; position: relative; max-width: 100%; }
-  .ausschnitt img { position: absolute; left: 0; top: 0; image-rendering: pixelated; }
-</style>

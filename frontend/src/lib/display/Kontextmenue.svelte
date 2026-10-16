@@ -22,6 +22,7 @@
 <div class="kontext" style="left:{x}px;top:{y}px" role="menu">
   <button onclick={() => tu(() => oled.duplizierenWidgets(ids))}><i class="fa-solid fa-copy"></i>Kopieren{mehrere ? ` (${ids.length} Widgets)` : ''}</button>
   <button onclick={() => tu(() => oled.zentrieren(ids))}><i class="fa-solid fa-align-center"></i>Waagerecht zentrieren</button>
+  <button onclick={() => tu(() => oled.zentrierenSenkrecht(ids))}><i class="fa-solid fa-arrows-up-down"></i>Senkrecht zentrieren</button>
   {#if ids.length > 2}
     <button onclick={() => tu(() => oled.verteilen(ids))}><i class="fa-solid fa-arrows-left-right"></i>Gleichmäßig verteilen</button>
   {/if}

@@ -116,6 +116,16 @@ Die Version wird nur in `version.json` gepflegt (`tools/version.sh`); ein Git-Ho
 erhöht sie bei jedem Commit. Mockups der Oberfläche liegen unter `mockups/`,
 die Architektur ist in `docs/ARCHITEKTUR.md` beschrieben.
 
+Die Symbole des Displays werden aus der Symbolschrift der Oberfläche erzeugt.
+Nach einer Änderung am Katalog in `backend/oled/symbole.py`:
+
+```bash
+backend/.venv/bin/python tools/symbole-erzeugen.py
+```
+
+Das schreibt `backend/oled/symbole_daten.py` neu; die Werkzeuge dafür stehen in
+`backend/requirements-dev.txt`.
+
 ## Fehlersuche
 
 - `journalctl -u pyroplus-hw -n 50` zeigt das Protokoll des Hardware-Proxys.
@@ -127,4 +137,6 @@ die Architektur ist in `docs/ARCHITEKTUR.md` beschrieben.
 
 ## Lizenz
 
-Siehe Datei `LICENSE`.
+Siehe Datei `LICENSE`. Die Displaysymbole werden aus der mitgelieferten
+Symbolschrift (Font Awesome Free, Symbole CC BY 4.0, Schrift SIL OFL 1.1)
+gerastert.

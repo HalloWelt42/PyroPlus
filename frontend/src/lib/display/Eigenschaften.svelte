@@ -77,6 +77,21 @@
     <button class="btn btn-accent" onclick={onhinzufuegen}><i class="fa-solid fa-plus"></i>Widget hinzufügen</button>
   </div>
 {:else if einzel}
+  <div class="aktionen">
+    <button class="btn btn-klein" title="Kopie 4 Pixel versetzt einfügen (Strg+D)" onclick={() => oled.duplizierenWidgets(ids)}><i class="fa-solid fa-copy"></i>Kopie</button>
+    <button class="btn btn-klein" title="Als Baustein für andere Bildschirme sichern" onclick={() => { sichernOffen = !sichernOffen; sichernName = einzel?.name ?? ''; }}><i class="fa-solid fa-puzzle-piece"></i>Sichern</button>
+    <button class="btn btn-klein btn-gefahr" title="Widget vom Bildschirm entfernen (Entf)" onclick={() => oled.entfernen(ids)}><i class="fa-solid fa-trash-can"></i>Löschen</button>
+  </div>
+  {#if sichernOffen}
+    <div class="gruppe">
+      <div class="gruppe-titel"><i class="fa-solid fa-puzzle-piece"></i>Als Baustein sichern</div>
+      <div class="feld-zeile">
+        <!-- svelte-ignore a11y_autofocus -->
+        <input class="feld" placeholder="Name des Bausteins" bind:value={sichernName} autofocus onkeydown={(e) => { if (e.key === 'Enter') sichern(); if (e.key === 'Escape') sichernOffen = false; }}>
+        <button class="btn btn-klein btn-primary" onclick={sichern}>Sichern</button>
+      </div>
+    </div>
+  {/if}
   <div class="gruppe">
     <div class="quelle-kopf">
       <div class="symbol"><i class="fa-solid {SYMBOLE[quelle?.tab ?? 'layout'] ?? 'fa-shapes'}"></i></div>
@@ -122,7 +137,14 @@
       <div class="feld-zeile">
         <input class="feld feld-klein" type="number" min="0" max="127" value={einzel.x} title="Abstand vom linken Rand in Pixeln, 0 bis 127" onchange={(e) => oled.widgetAendern(einzel.id, { x: Math.max(0, Math.min(127, Number((e.currentTarget as HTMLInputElement).value))) })}>
         <input class="feld feld-klein" type="number" min="0" max="63" value={einzel.y} title="Abstand vom oberen Rand in Pixeln, 0 bis 63" onchange={(e) => oled.widgetAendern(einzel.id, { y: Math.max(0, Math.min(63, Number((e.currentTarget as HTMLInputElement).value))) })}>
-        <button class="btn btn-klein" title="Waagerecht in der Mitte des Displays ausrichten" onclick={() => oled.zentrieren(ids)}><i class="fa-solid fa-align-center"></i>Mitte</button>
+      </div>
+    </div>
+    <div class="zeile"><span class="label">Ausrichten</span>
+      <div class="feld-zeile">
+        <button class="btn btn-klein btn-symbol" title="Waagerecht in der Mitte des Displays" onclick={() => oled.zentrieren(ids)}><i class="fa-solid fa-align-center"></i></button>
+        <button class="btn btn-klein btn-symbol" title="Senkrecht in der Mitte des Displays" onclick={() => oled.zentrierenSenkrecht(ids)}><i class="fa-solid fa-arrows-up-down"></i></button>
+        <button class="btn btn-klein btn-symbol" title="An den linken Rand" onclick={() => oled.widgetAendern(einzel.id, { x: 0 })}><i class="fa-solid fa-align-left"></i></button>
+        <button class="btn btn-klein btn-symbol" title="An den oberen Rand" onclick={() => oled.widgetAendern(einzel.id, { y: 0 })}><i class="fa-solid fa-arrow-up-short-wide"></i></button>
       </div>
     </div>
     {#if modus?.fields.includes('rotate')}
@@ -133,21 +155,6 @@
     {/if}
   </div>
 
-  {#if sichernOffen}
-    <div class="gruppe">
-      <div class="gruppe-titel"><i class="fa-solid fa-puzzle-piece"></i>Als Baustein sichern</div>
-      <div class="feld-zeile">
-        <!-- svelte-ignore a11y_autofocus -->
-        <input class="feld" placeholder="Name des Bausteins" bind:value={sichernName} autofocus onkeydown={(e) => { if (e.key === 'Enter') sichern(); if (e.key === 'Escape') sichernOffen = false; }}>
-        <button class="btn btn-klein btn-primary" onclick={sichern}>Sichern</button>
-      </div>
-    </div>
-  {/if}
-  <div class="btn-reihe">
-    <button class="btn btn-klein" title="Kopie 4 Pixel versetzt einfügen" onclick={() => oled.duplizierenWidgets(ids)}><i class="fa-solid fa-copy"></i>Kopie</button>
-    <button class="btn btn-klein" title="Als Baustein für andere Bildschirme sichern" onclick={() => { sichernOffen = true; sichernName = einzel?.name ?? ''; }}><i class="fa-solid fa-puzzle-piece"></i>Sichern</button>
-    <button class="btn btn-klein btn-gefahr" title="Widget vom Bildschirm entfernen" onclick={() => oled.entfernen(ids)}><i class="fa-solid fa-trash-can"></i>Löschen</button>
-  </div>
 {:else}
   <div class="gruppe">
     <div class="quelle-kopf"><div class="symbol"><i class="fa-solid fa-object-group"></i></div><div><div class="titel">{gewaehlt.length} Widgets gewählt</div><div class="unter">{gewaehlt.map((w) => w.name || oled.quelle(w.source)?.label || w.source).join(', ')}</div></div></div>
@@ -159,7 +166,8 @@
       <button class="btn btn-klein" title="Linke Kanten angleichen" onclick={() => oled.buendig(ids, 'links')}><i class="fa-solid fa-align-left"></i>Links bündig</button>
     </div>
     <div class="btn-reihe">
-      <button class="btn btn-klein" title="Jedes Widget waagerecht zentrieren" onclick={() => oled.zentrieren(ids)}><i class="fa-solid fa-align-center"></i>Zentrieren</button>
+      <button class="btn btn-klein" title="Jedes Widget waagerecht zentrieren" onclick={() => oled.zentrieren(ids)}><i class="fa-solid fa-align-center"></i>Waagerecht</button>
+      <button class="btn btn-klein" title="Jedes Widget senkrecht zentrieren" onclick={() => oled.zentrierenSenkrecht(ids)}><i class="fa-solid fa-arrows-up-down"></i>Senkrecht</button>
       <button class="btn btn-klein" title="Gleichmäßig über die Breite verteilen" disabled={ids.length < 3} onclick={() => oled.verteilen(ids)}><i class="fa-solid fa-arrows-left-right"></i>Verteilen</button>
     </div>
   </div>
@@ -184,4 +192,6 @@
 
 <style>
   .btn:disabled { opacity: 0.45; cursor: default; }
+  .aktionen { display: flex; gap: 8px; }
+  .aktionen .btn { flex: 1; }
 </style>
