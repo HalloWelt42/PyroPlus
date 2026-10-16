@@ -129,7 +129,8 @@ Das schreibt `backend/oled/symbole_daten.py` neu; die Werkzeuge dafür stehen in
 Die Layoutprüfung klickt alle Bereiche in sechs Fensterbreiten vom Telefon bis
 zum großen Bildschirm durch und meldet abgeschnittene Inhalte, zu breite Kästen,
 umbrechende Knöpfe und überlappende Bedienelemente. Sie läuft gegen die
-Entwicklungsumgebung und beim Push automatisch, sobald diese läuft:
+Entwicklungsumgebung. Ohne Befunde vermerkt sie den geprüften Stand; der
+Push wird nur angenommen, wenn die Prüfung für genau diesen Stand bestanden ist:
 
 ```bash
 node tools/ui-pruefung.mjs http://localhost:5173 --bilder

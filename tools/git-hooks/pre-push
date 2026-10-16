@@ -22,11 +22,13 @@ if [ -d frontend/node_modules ]; then
 else
   echo "Hinweis: frontend/node_modules fehlt, Frontend-Build übersprungen" >&2
 fi
-# Layoutprüfung der Oberfläche in allen Bereichen und Fensterbreiten (braucht tools/entwicklung.sh)
-if curl -s -o /dev/null -m 2 http://localhost:5173/ && curl -s -o /dev/null -m 2 http://127.0.0.1:8071/health; then
-  echo "Layoutprüfung ..."
-  node tools/ui-pruefung.mjs http://localhost:5173 || { echo "Layoutprüfung hat Befunde, Push abgebrochen" >&2; exit 1; }
-else
-  echo "Hinweis: Entwicklungsumgebung läuft nicht, Layoutprüfung übersprungen (tools/entwicklung.sh starten)" >&2
+# Layoutprüfung: muss für genau diesen Stand der Oberfläche bestanden sein. Sie läuft vorher für sich
+# (node tools/ui-pruefung.mjs), weil sie Minuten dauert und GitHub die Verbindung sonst schließt.
+STAND=$(node tools/ui-pruefung.mjs --stand)
+if [ "$(cat tools/ui-pruefung/bestanden 2>/dev/null)" != "$STAND" ]; then
+  echo "Layoutprüfung für diesen Stand der Oberfläche fehlt oder ist veraltet." >&2
+  echo "Erst tools/entwicklung.sh starten, dann: node tools/ui-pruefung.mjs" >&2
+  exit 1
 fi
+echo "Layoutprüfung bestanden für diesen Stand"
 echo "Push freigegeben: $(tools/version.sh show)"

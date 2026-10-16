@@ -9,13 +9,34 @@
 // Braucht ein laufendes Backend; die Prüfung klickt nur auf Reiter, Auswahl und Fenster, sie speichert nichts
 // außer der Wahl im LED-Bereich. Nicht gegen den Betrieb mit echter Hardware laufen lassen.
 // Ergebnis: Liste der Befunde je Ansicht und Breite, Rückgabewert 1 bei Befunden.
-import { mkdir, writeFile, rm } from "node:fs/promises";
+// Ohne Befunde vermerkt die Prüfung den geprüften Stand (Prüfsumme über frontend/src, frontend/static,
+// frontend/index.html) in tools/ui-pruefung/bestanden. node tools/ui-pruefung.mjs --stand gibt die
+// Prüfsumme des aktuellen Stands aus; der Pre-Push-Hook vergleicht beides.
+import { mkdir, writeFile, rm, readFile, readdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:http";
 
 const WURZEL = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+/* Prüfsumme über alles, was das Aussehen der Oberfläche bestimmt */
+async function stand() {
+  const hash = createHash("sha256");
+  const sammeln = async (pfad) => {
+    let eintraege;
+    try { eintraege = await readdir(pfad, { withFileTypes: true }); } catch { hash.update(await readFile(pfad)); return; }
+    for (const e of eintraege.sort((a, b) => a.name.localeCompare(b.name))) {
+      const voll = join(pfad, e.name);
+      if (e.isDirectory()) await sammeln(voll); else { hash.update(voll.slice(WURZEL.length)); hash.update(await readFile(voll)); }
+    }
+  };
+  for (const teil of ["frontend/src", "frontend/static", "frontend/index.html"]) await sammeln(join(WURZEL, teil));
+  return hash.digest("hex");
+}
+if (process.argv.includes("--stand")) { console.log(await stand()); process.exit(0); }
+const STAND_VORHER = await stand();
 const ADRESSE = process.argv.slice(2).find((a) => !a.startsWith("--")) ?? "http://localhost:5173";
 const BILDER = process.argv.includes("--bilder");
 const ABLAGE = join(WURZEL, "tools", "ui-pruefung");
@@ -214,4 +235,9 @@ ws.close(); chrome.kill();
 await schlafen(300);
 await rm(profil, { recursive: true, force: true });
 console.log(gesamt ? `\n${gesamt} Befunde` : "Keine Befunde");
+if (!gesamt) {
+  if (await stand() !== STAND_VORHER) { console.error("Die Oberfläche wurde während der Prüfung geändert, kein Vermerk."); process.exit(1); }
+  await mkdir(ABLAGE, { recursive: true });
+  await writeFile(join(ABLAGE, "bestanden"), STAND_VORHER + "\n");
+}
 process.exit(gesamt ? 1 : 0);
