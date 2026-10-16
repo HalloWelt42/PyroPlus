@@ -137,11 +137,11 @@ pyroplus/
 
 ## Lizenz
 
-**Creative Commons BY-SA 4.0**: siehe [LICENSE](LICENSE)
+**Nicht-kommerzielle Nutzung** - siehe [LICENSE](LICENSE)
 
-Erlaubt: nutzen, verändern und weitergeben, auch in eigenen Projekten
+Erlaubt: Private Nutzung, Installation, persönliche Anpassungen, Teilen mit Quellenangabe
 
-Bedingungen: Namensnennung und Weitergabe unter derselben Lizenz
+Verboten: Kommerzielle Nutzung, Verkauf, Einbindung in kommerzielle Produkte
 
 Die Displaysymbole werden aus der mitgelieferten Symbolschrift gerastert (Font Awesome Free: Symbole CC BY 4.0, Schrift SIL OFL 1.1).
 
