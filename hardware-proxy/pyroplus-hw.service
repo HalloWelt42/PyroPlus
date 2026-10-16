@@ -1,5 +1,5 @@
 [Unit]
-Description=PyroPlus Hardware-Proxy
+Description=PyroPlus Hardware-Proxy (GPIO, I2C, SPI)
 After=network.target
 Wants=network.target
 

@@ -1,13 +1,12 @@
 """
-PyroPlus v3.0.0 — Hardware-Proxy
-© HalloWelt42 - Nur für private Nutzung
+PyroPlus: Hardware-Proxy.
 
-Nativer systemd-Service mit integrierter LED-Engine.
+Nativer systemd-Dienst mit integrierter LED-Engine.
 LEDs werden lokal berechnet und direkt per SPI ausgegeben.
 Backend sendet nur Konfigurationsänderungen (kein HTTP pro Frame).
 
 Architektur:
-  Backend (Docker) ─── 1x bei Änderung ──→ HW-Proxy ──→ SPI/I2C/GPIO
+  Backend (Docker) -> bei Änderung -> HW-Proxy -> SPI, I2C, GPIO
     Config-Manager                          LED-Engine (lokal, 25 FPS)
     OLED Renderer (1/s)                     Direct HW Access
     Stats/WebSocket                         Reports led_states zurück
@@ -31,8 +30,21 @@ logging.basicConfig(
 )
 logger = logging.getLogger("hw-proxy")
 
-VERSION = "4.3.0"
 PORT = 8072
+
+
+def _lese_version() -> str:
+    """Version aus version.json neben diesem Modul (wird vom Installer kopiert)."""
+    import json
+    pfad = os.path.join(os.path.dirname(os.path.abspath(__file__)), "version.json")
+    try:
+        with open(pfad, encoding="utf-8") as f:
+            return str(json.load(f).get("voll", "v0.0.0"))
+    except Exception:
+        return "v0.0.0"
+
+
+VERSION = _lese_version()
 
 # ─── Hardware State ─────────────────────────────────────────
 _fan_gpio = None

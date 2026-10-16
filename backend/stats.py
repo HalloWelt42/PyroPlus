@@ -1,8 +1,7 @@
 """
-PyroPlus v3.0.0 — System-Statistiken
-© HalloWelt42 - Nur für private Nutzung
+PyroPlus: Systemwerte.
 
-Sammelt CPU, RAM, Disk, Netzwerk, Docker, Fan-State.
+Sammelt CPU, RAM, Laufwerke, Netzwerk und Lüfterwerte.
 Liest aus /host/* Mounts für echte Host-Daten im Container.
 """
 
@@ -413,76 +412,6 @@ def get_network():
     return result
 
 
-_docker_client = None
-_docker_cache = None
-_docker_cache_time = 0
-_DOCKER_CACHE_TTL = 10.0  # Docker nur alle 10s abfragen
-
-def get_docker_containers():
-    """Docker-Container via Python SDK — cached für 10 Sekunden."""
-    global _docker_client, _docker_cache, _docker_cache_time
-    now = time.time()
-    if _docker_cache is not None and (now - _docker_cache_time) < _DOCKER_CACHE_TTL:
-        return _docker_cache
-
-    containers = []
-    try:
-        import docker as docker_sdk
-        if _docker_client is None:
-            _docker_client = docker_sdk.DockerClient(base_url="unix:///var/run/docker.sock", timeout=5)
-        for c in _docker_client.containers.list(all=True):
-            name = c.name
-            status_raw = c.status  # running, exited, paused, etc.
-            running = status_raw == "running"
-            # Ports extrahieren
-            ports_dict = c.attrs.get("NetworkSettings", {}).get("Ports", {}) or {}
-            port_strs = []
-            for internal, bindings in ports_dict.items():
-                if bindings:
-                    for b in bindings:
-                        hp = b.get("HostPort", "")
-                        if hp:
-                            port_strs.append(f"{hp}→{internal}")
-                else:
-                    port_strs.append(internal)
-            containers.append({
-                "name": name,
-                "status": "running" if running else "stopped",
-                "status_raw": status_raw,
-                "ports": ", ".join(port_strs[:4]),
-                "image": c.image.tags[0] if c.image.tags else str(c.image.short_id),
-            })
-        # Client bleibt offen (persistent)
-    except Exception as ex:
-        logger.warning(f"Docker SDK Fehler: {ex}")
-        _docker_client = None  # Reset bei Fehler
-        # Fallback: docker CLI
-        try:
-            result = subprocess.run(
-                ["docker", "ps", "-a", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.Image}}"],
-                capture_output=True, text=True, timeout=10,
-            )
-            for line in result.stdout.strip().split("\n"):
-                if not line.strip():
-                    continue
-                parts = line.split("\t")
-                if len(parts) >= 2:
-                    containers.append({
-                        "name": parts[0],
-                        "status": "running" if parts[1].lower().startswith("up") else "stopped",
-                        "status_raw": parts[1],
-                        "ports": parts[2] if len(parts) > 2 else "",
-                        "image": parts[3] if len(parts) > 3 else "",
-                    })
-            logger.info(f"Docker CLI fallback: {len(containers)} Container")
-        except Exception as ex2:
-            logger.warning(f"Docker CLI Fehler: {ex2}")
-    running = sum(1 for c in containers if c["status"] == "running")
-    _docker_cache = {"containers": containers, "running": running, "total": len(containers)}
-    _docker_cache_time = time.time()
-    return _docker_cache
-
-
 def get_fan_state():
     """Fan: PWM Kernel-Stufe (0-3) + RPM."""
     state = {"pwm_level": 0, "rpm": 0, "pwm_supported": False, "level_name": "Aus"}
@@ -549,7 +478,6 @@ def collect_stats():
         network = get_network()
     except Exception:
         network = {"interface": "?", "ip": "?", "rx_bytes_sec": 0, "tx_bytes_sec": 0}
-    docker = {"running": 0, "total": 0, "containers": []}
     try:
         fan = get_fan_state()
     except Exception:
@@ -576,7 +504,6 @@ def collect_stats():
         "ram": ram,
         "disks": disks,
         "network": network,
-        "docker": docker,
         "fan": fan,
         "uptime": uptime,
         "history": {k: list(v) for k, v in _history.items()},
