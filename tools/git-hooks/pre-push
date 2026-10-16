@@ -5,6 +5,9 @@ ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
 tools/version.sh check
+for paket in vite svelte-check typescript; do
+  grep -q "\"$paket\"" frontend/package.json || { echo "frontend/package.json: Entwicklungsabhängigkeit $paket fehlt" >&2; exit 1; }
+done
 
 if [ -x backend/.venv/bin/python ]; then
   echo "Backend-Tests ..."
