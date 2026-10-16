@@ -126,6 +126,12 @@ backend/.venv/bin/python tools/symbole-erzeugen.py
 Das schreibt `backend/oled/symbole_daten.py` neu; die Werkzeuge dafür stehen in
 `backend/requirements-dev.txt`.
 
+Die Bilder der README entstehen reproduzierbar aus der laufenden Oberfläche:
+`tools/bilder/vorbereiten.py` stellt Beispielbildschirme aus den Vorlagen zusammen
+(nur lesend, der Bestand auf dem Pi bleibt unberührt), `tools/bilder/aufnehmen.mjs`
+nimmt die Szenen kopflos auf, `tools/bilder/zusammensetzen.py` montiert die Tafeln
+nach `.github/bilder`. `tools/bilder/qa-shot.mjs` macht eine einzelne Prüfaufnahme.
+
 ## Fehlersuche
 
 - `journalctl -u pyroplus-hw -n 50` zeigt das Protokoll des Hardware-Proxys.

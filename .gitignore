@@ -49,3 +49,6 @@ hardware-proxy/data/
 # Docker
 docker-compose.override.yml
 data/
+tools/bilder/roh/
+tools/bilder/szenen.json
+tools/bilder/chrome-*/
