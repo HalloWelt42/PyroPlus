@@ -232,22 +232,21 @@ def draw_gauge(buf: bytearray, pct: float, x: int, y: int, r: int, label: str | 
     import math
     cx, cy = x + r, y + r
     clamped = max(0, min(100, pct))
-    # Halbkreis-Outline
-    for a in range(180, 361, 2):
+    # Winkelschritt so, dass der Bogen ohne Lücken bleibt (etwa ein Pixel Bogenlänge)
+    schritt = min(2.0, 57.3 / max(1, r))
+    a = 180.0
+    while a <= 360.0:
         rad = math.radians(a)
-        px = round(cx + r * math.cos(rad))
-        py = round(cy + r * math.sin(rad))
-        set_pixel(buf, px, py, 1)
-    # Gefuellter Bogen
+        set_pixel(buf, round(cx + r * math.cos(rad)), round(cy + r * math.sin(rad)), 1)
+        a += schritt
+    # Gefüllter Bogen
     end_angle = 180 + (clamped / 100) * 180
     a = 180.0
     while a <= end_angle:
         rad = math.radians(a)
         for ri in range(r - 2, r + 1):
-            px = round(cx + ri * math.cos(rad))
-            py = round(cy + ri * math.sin(rad))
-            set_pixel(buf, px, py, 1)
-        a += 1.0
+            set_pixel(buf, round(cx + ri * math.cos(rad)), round(cy + ri * math.sin(rad)), 1)
+        a += schritt
     # Wert zentriert
     text = label if label else f"{round(clamped)}%"
     tw = len(text) * 6
@@ -297,7 +296,7 @@ def draw_fan_icon(buf: bytearray, x: int, y: int, size: int, frame: int):
     frames = FAN_16 if size >= 16 else FAN_8
     rows = frames[frame % len(frames)]
     s = 16 if size >= 16 else 8
-    scale = max(1, round(size / s))
+    scale = max(1, size // s)
     for ry, row in enumerate(rows):
         for rx in range(len(row)):
             if row[rx] == '1':

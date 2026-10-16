@@ -17,8 +17,9 @@ from oled.migrate import migrate_screen
 from oled.models import (
     Catalog, GeocodeHit, ImportResult, OledBundle, OledMode, OledSettings, OledSettingsPatch,
     OledState, Profile, ProfileCreate, RenderRequest, RenderResponse, Screen, ScreenOrder,
-    WeatherLocation, WeatherLocationCreate, WeatherLocationState, WeatherSettings, WidgetPreset,
+    WeatherLocation, WeatherLocationCreate, WeatherLocationState, WeatherSettings, Widget, WidgetPreset,
 )
+from oled.templates import TemplateCatalog, screen_template, template_catalog, widget_template
 
 router = APIRouter(prefix="/api/oled", tags=["OLED"])
 legacy = APIRouter(prefix="/api/oled", tags=["OLED (veraltet)"], deprecated=True)
@@ -245,6 +246,31 @@ def oled_weather_search(request: Request, q: str = Query(min_length=2, max_lengt
         return _engine(request).geocode(q)
     except Exception as fehler:
         raise HTTPException(status_code=502, detail=f"Ortssuche nicht erreichbar: {fehler}")
+
+
+# Vorlagen (mitgeliefert)
+
+@router.get("/templates", response_model=TemplateCatalog, summary="Mitgelieferte Bildschirm- und Widgetvorlagen")
+def oled_templates() -> TemplateCatalog:
+    return template_catalog()
+
+
+@router.post("/templates/screens/{template_id}", response_model=Screen, status_code=201,
+             summary="Bildschirmvorlage als neuen Bildschirm einfügen")
+def oled_add_template_screen(template_id: str, request: Request) -> Screen:
+    screen = screen_template(template_id)
+    if screen is None:
+        raise HTTPException(status_code=404, detail=f"Vorlage {template_id} nicht gefunden")
+    return _engine(request).add_screen(screen)
+
+
+@router.get("/templates/widgets/{template_id}", response_model=Widget,
+            summary="Widgetvorlage mit neuer Kennung holen")
+def oled_template_widget(template_id: str) -> Widget:
+    widget = widget_template(template_id)
+    if widget is None:
+        raise HTTPException(status_code=404, detail=f"Vorlage {template_id} nicht gefunden")
+    return widget
 
 
 # Austausch

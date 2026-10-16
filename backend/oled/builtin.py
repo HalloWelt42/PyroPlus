@@ -42,9 +42,11 @@ def _compact(buf: bytearray, b: WeatherReport | None, now: datetime) -> None:
         return
     c = b.current
     temp = f"{c.temperature:.1f}" if c.temperature is not None else "--"
-    draw_text(buf, f"{temp}°C", 0, 12, 2)
-    _icon(buf, c.condition_text, 68, 12)
-    draw_text(buf, c.condition_text[:10], 78, 14, 1)
+    temp_text = f"{temp}°C"
+    draw_text(buf, temp_text, 0, 12, 2)
+    rechts = len(temp_text) * 12 + 2
+    _icon(buf, c.condition_text, rechts, 12)
+    draw_text(buf, c.condition_text[:8], rechts + 10, 14, 1)
     feuchte = f"{c.humidity:.0f}" if c.humidity is not None else "--"
     wind = f"{c.wind_speed:.0f}" if c.wind_speed is not None else "--"
     druck = f"{c.pressure:.0f}" if c.pressure is not None else "--"

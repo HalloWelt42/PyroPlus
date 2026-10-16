@@ -206,7 +206,7 @@ def _fan_frame(rpm: float) -> int:
 @mode(DisplayMode.fan_icon, "Lüftersymbol", [ValueType.animated], ["size", "rotate"],
       WidgetOpts(size=16), description="Dreht sich mit der Drehzahl",
       variants=[_variante("klein", "Klein (8)", size=8), _variante("mittel", "Mittel (16)", size=16),
-                _variante("gross", "Groß (24)", size=24)])
+                _variante("gross", "Groß (32)", size=32)])
 def _fan_icon(buf: bytearray, w: Widget, v: Value, ctx: ValueContext) -> None:
     draw_fan_icon(buf, w.x, w.y, w.opts.size or 16, _fan_frame(v.number or 0.0))
 
