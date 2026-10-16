@@ -43,9 +43,11 @@ fi
 if [ ! -d "$INSTALL_DIR/venv" ]; then
     echo "Erstelle Python-Umgebung (einige Minuten)"
     python3 -m venv "$INSTALL_DIR/venv"
-    "$INSTALL_DIR/venv/bin/pip" install --upgrade pip -q
 fi
-"$INSTALL_DIR/venv/bin/pip" install -r "$INSTALL_DIR/requirements.txt" -q
+# Immer über den Interpreter aufrufen: die Startskripte einer verschobenen Umgebung
+# zeigen noch auf den alten Pfad, der Interpreter selbst findet pyvenv.cfg relativ.
+"$INSTALL_DIR/venv/bin/python" -m pip install --upgrade pip -q
+"$INSTALL_DIR/venv/bin/python" -m pip install -r "$INSTALL_DIR/requirements.txt" -q
 
 cp "$HIER/pyroplus-hw.service" /etc/systemd/system/
 rm -f /etc/systemd/system/pironman-deluxe-hw.service
