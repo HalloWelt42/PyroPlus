@@ -52,3 +52,5 @@ data/
 tools/bilder/roh/
 tools/bilder/szenen.json
 tools/bilder/chrome-*/
+tools/ui-pruefung/
+tools/chrome-pruefung-*/

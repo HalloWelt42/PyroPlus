@@ -15,7 +15,13 @@
   let menue = $state<{ x: number; y: number } | null>(null);
   let cursor = $state<{ x: number; y: number } | null>(null);
 
-  const zoom = $derived(ui.zoom);
+  /* Vergrößerung: die gewählte Stufe, aber nie größer als der Platz in der Spalte erlaubt */
+  const ZOOM_STUFEN = [2, 3, 4, 6];
+  const RAND = 2 * 20 + 2 * 14 + 4;   // Innenabstand der Fläche, Rahmen des Geräts, Luft
+  let feldBreite = $state(0);
+  let feldHoehe = $state(0);
+  const passend = $derived(feldBreite > 0 ? Math.max(1, Math.floor(Math.min((feldBreite - RAND) / W, (feldHoehe - RAND) / H))) : ui.zoom);
+  const zoom = $derived(Math.min(ui.zoom, passend));
   const gewaehlt = $derived(oled.gewaehlte);
   const einzel = $derived(gewaehlt.length === 1 ? gewaehlt[0] : null);
   const bitmapWidget = $derived(oled.zeichnen && einzel && einzel.display === 'bitmap' ? einzel : null);
@@ -194,7 +200,7 @@
 <section class="spalte spalte-canvas">
   <div class="canvas-leiste">
     <Segment klein wert={String(zoom)} titel="Vergrößerung der Vorschau; das Display hat 128 mal 64 Pixel" onwahl={(z) => ui.setzeZoom(Number(z))}
-      optionen={[{ wert: '2', label: '2x' }, { wert: '3', label: '3x' }, { wert: '4', label: '4x' }, { wert: '6', label: '6x' }]} />
+      optionen={ZOOM_STUFEN.map((z) => ({ wert: String(z), label: `${z}x`, gesperrt: z > passend && z > 2, titel: z > passend ? 'Passt hier nicht; das Fenster ist zu schmal' : '' }))} />
     <button class="btn btn-klein" class:active={ui.raster} title="Hilfslinien alle 8 Pixel einblenden" onclick={() => ui.setzeRaster(!ui.raster)}><i class="fa-solid fa-border-all"></i>Raster</button>
     <button class="btn btn-klein" class:active={ui.einrasten} title="Beim Verschieben auf das 8-Pixel-Raster einrasten" onclick={() => ui.setzeEinrasten(!ui.einrasten)}><i class="fa-solid fa-magnet"></i>Einrasten</button>
     <button class="btn btn-klein btn-symbol" title="Letzte Änderung zurücknehmen (Strg+Z)" disabled={!oled.kannRueckgaengig} onclick={() => oled.rueckgaengig()}><i class="fa-solid fa-rotate-left"></i></button>
@@ -218,7 +224,7 @@
     </div>
   </div>
 
-  <div class="canvas-feld" bind:this={feld}>
+  <div class="canvas-feld" bind:this={feld} bind:clientWidth={feldBreite} bind:clientHeight={feldHoehe}>
     {#if oled.entwurf}
       <div class="geraet" style="--zoom:{zoom}">
         <div class="geraet-schirm" class:raster={ui.raster} class:zeichnet={!!bitmapWidget} bind:this={schirm}

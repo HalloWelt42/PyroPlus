@@ -19,7 +19,7 @@
 {#if ui.mobil}
   <MobilApp />
 {:else}
-  <div class="app" class:eng={!ui.seitenleisteOffen}>
+  <div class="app" class:eng={ui.knapp || !ui.seitenleisteOffen} class:schwebt={ui.knapp && ui.schwebendOffen}>
     <Seitenleiste />
     {#if ui.ansicht === 'display'}
       <DisplayView />
@@ -36,4 +36,7 @@
 
 <style>
   .app.eng { --sb: 64px; }
+  /* Schmales Fenster: ausgeklappte Leiste liegt über dem Inhalt statt ihn zu verdrängen */
+  .app.schwebt { grid-template-columns: minmax(0, 1fr); padding-left: 64px; box-sizing: border-box; }
+  .app.schwebt :global(.sidebar) { position: fixed; z-index: 40; top: 0; left: 0; bottom: 0; width: 240px; box-shadow: 8px 0 32px rgba(0,0,0,0.6); }
 </style>

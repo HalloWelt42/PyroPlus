@@ -59,7 +59,7 @@
       <div class="panel-kopf"><i class="fa-solid fa-lightbulb"></i><div><div class="titel">Die vier LEDs</div><div class="unter">Farben, wie die Hardware sie gerade meldet</div></div></div>
       <div class="streifen">
         {#each live.ledFarben as c, i (i)}
-          <div class="led"><div class="schein" style="background:radial-gradient(circle, {glow(c)}, transparent 70%)"></div><div class="chip-led" style="background:{rgb(c)};box-shadow:0 0 12px {glow(c)}, 0 0 30px {glow(c)}"><span>{i + 1}</span></div></div>
+          <div class="led"><div class="chip-led" style="background:{rgb(c)};box-shadow:0 0 12px {glow(c)}, 0 0 30px {glow(c)}, 0 0 46px 10px {glow(c)}"><span>{i + 1}</span></div></div>
         {/each}
       </div>
       <div class="zeile"><span class="label"><i class="fa-solid fa-sun"></i> Helligkeit</span><Regler wert={helligkeitAnzeige} min={1} max={100} einheit=" %" titel="Helligkeit aller LEDs" onwahl={(v) => (helligkeit = v)} onende={(v) => { helligkeit = null; void live.setLedBrightness(v * 10); }} /></div>
@@ -118,7 +118,7 @@
 </div>
 
 <style>
-  .inhalt { flex: 1; min-height: 0; overflow-y: auto; overflow-x: clip; padding: 16px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-content: start; }
+  .inhalt { flex: 1; min-height: 0; overflow-y: auto; overflow-x: clip; padding: 16px 20px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-content: start; }
   .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   .panel-kopf { display: flex; align-items: center; gap: 12px; }
   .panel-kopf > i { font-size: 26px; color: var(--accent); }
@@ -126,10 +126,9 @@
   .panel-kopf .unter { font-size: var(--fs-xs); color: var(--text-muted); }
   .streifen { background: #000; border: 1px solid #222; border-radius: var(--radius); padding: 22px; display: flex; justify-content: center; gap: 28px; }
   .led { position: relative; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; }
-  .schein { position: absolute; width: 90px; height: 90px; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; transition: background 0.6s; }
   .chip-led { width: 30px; height: 30px; border-radius: 7px; border: 2px solid #555; position: relative; display: flex; align-items: center; justify-content: center; transition: background 0.6s, box-shadow 0.6s; }
   .chip-led span { font: 700 11px var(--mono); color: rgba(255,255,255,0.45); }
-  .zeile { grid-template-columns: 130px 1fr; }
+  .zeile { grid-template-columns: 130px minmax(0, 1fr); }
   .zeile .label { display: flex; align-items: center; gap: 6px; }
   .zeile .label i { color: var(--accent); }
   .reaktiv { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -138,7 +137,7 @@
   .ziel { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); font-size: var(--fs-sm); }
   .ziel.active { border-color: var(--border-accent); background: var(--accent-dim); color: var(--accent); }
   .probe { width: 20px; height: 20px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.25); }
-  .palette { display: grid; grid-template-columns: repeat(10, 1fr); gap: 8px; }
+  .palette { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 8px; }
   .farbe { aspect-ratio: 1; border-radius: 8px; border: 2px solid rgba(255,255,255,0.12); }
   .farbe:hover { border-color: #fff; transform: scale(1.08); }
   .effekte { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
@@ -147,5 +146,5 @@
   .effekt:hover { border-color: var(--border-strong); color: var(--text-primary); }
   .effekt.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
   .chip-status.neutral { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
-  @media (max-width: 1100px) { .inhalt { grid-template-columns: 1fr; } }
+  @media (max-width: 1100px) { .inhalt { grid-template-columns: minmax(0, 1fr); } }
 </style>

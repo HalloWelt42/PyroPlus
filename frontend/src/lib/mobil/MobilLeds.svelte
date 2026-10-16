@@ -42,10 +42,10 @@
 <style>
   .streifen { background: #000; border: 1px solid #222; border-radius: 12px; padding: 22px; display: flex; justify-content: center; gap: 26px; }
   .led { width: 30px; height: 30px; border-radius: 7px; border: 2px solid #555; transition: background 0.6s, box-shadow 0.6s; }
-  .palette { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .palette { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
   .farbe { aspect-ratio: 1; border-radius: 10px; border: 2px solid rgba(255,255,255,0.12); }
-  .effekte { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .effekt { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--border); background: #0b0f1a; color: var(--text-secondary); font-size: 16px; }
+  .effekte { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .effekt { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--border); background: #0b0f1a; color: var(--text-secondary); font-size: 16px; }
   .effekt i { color: var(--accent); width: 22px; text-align: center; }
   .effekt.active { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
   .hinweis { font-size: 15px; color: var(--text-muted); text-align: center; }

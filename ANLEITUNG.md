@@ -126,6 +126,17 @@ backend/.venv/bin/python tools/symbole-erzeugen.py
 Das schreibt `backend/oled/symbole_daten.py` neu; die Werkzeuge dafür stehen in
 `backend/requirements-dev.txt`.
 
+Die Layoutprüfung klickt alle Bereiche in sechs Fensterbreiten vom Telefon bis
+zum großen Bildschirm durch und meldet abgeschnittene Inhalte, zu breite Kästen,
+umbrechende Knöpfe und überlappende Bedienelemente. Sie läuft gegen die
+Entwicklungsumgebung und beim Push automatisch, sobald diese läuft:
+
+```bash
+node tools/ui-pruefung.mjs http://localhost:5173 --bilder
+```
+
+Mit `--bilder` legt sie zu jeder Ansicht eine Aufnahme unter `tools/ui-pruefung/` ab.
+
 Die Bilder der README entstehen reproduzierbar aus der laufenden Oberfläche:
 `tools/bilder/vorbereiten.py` stellt Beispielbildschirme aus den Vorlagen zusammen
 (nur lesend, der Bestand auf dem Pi bleibt unberührt), `tools/bilder/aufnehmen.mjs`

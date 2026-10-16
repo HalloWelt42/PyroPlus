@@ -224,7 +224,7 @@
 </div>
 
 <style>
-  .inhalt { flex: 1; min-height: 0; overflow-y: auto; overflow-x: clip; padding: 16px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-content: start; }
+  .inhalt { flex: 1; min-height: 0; overflow-y: auto; overflow-x: clip; padding: 16px 20px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-content: start; }
   .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   .panel-kopf { display: flex; align-items: center; gap: 12px; }
   .panel-kopf > i { font-size: 26px; color: var(--accent); }
@@ -241,7 +241,7 @@
   .simlinie { stroke: var(--amber); stroke-width: 1.5; stroke-dasharray: 3 3; }
   .punkt { fill: var(--accent); stroke: var(--bg-card); stroke-width: 3; }
   .punkt.frei { cursor: grab; }
-  .zeile { grid-template-columns: 130px 1fr; }
+  .zeile { grid-template-columns: 130px minmax(0, 1fr); }
   .zeile .label { display: flex; align-items: center; gap: 6px; }
   .kopf-gruppe.sim { gap: 12px; }
   .chip .x { margin-left: 4px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--text-muted); }
@@ -249,5 +249,5 @@
   .chip-status.neutral { background: rgba(255,255,255,0.06); }
   .dreht { animation: drehen 1s linear infinite; }
   @keyframes drehen { to { transform: rotate(360deg); } }
-  @media (max-width: 1100px) { .inhalt { grid-template-columns: 1fr; } }
+  @media (max-width: 1100px) { .inhalt { grid-template-columns: minmax(0, 1fr); } }
 </style>

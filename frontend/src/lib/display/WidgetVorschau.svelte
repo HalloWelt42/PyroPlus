@@ -20,7 +20,7 @@
 
 <div class="vorschau" style="height:{hoehe}px;{breite ? `width:${breite}px;` : ''}" bind:clientWidth={innenBreite}>
   {#if bild}
-    <img src="data:image/png;base64,{bild.bild}" alt="" style="width:{bild.w * skala}px;height:{bild.h * skala}px">
+    <img src="data:image/png;base64,{bild.bild}" alt="" style="width:{bild.w * skala}px">
   {:else}
     <span class="leer">{leer}</span>
   {/if}
@@ -28,8 +28,8 @@
 {#if mass && bild}<span class="mass">{bild.w} x {bild.h} Pixel</span>{/if}
 
 <style>
-  .vorschau { display: flex; align-items: center; justify-content: center; background: #000; border-radius: 4px; border: 1px solid #2b3245; overflow: hidden; box-sizing: border-box; }
-  .vorschau img { image-rendering: pixelated; max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+  .vorschau { width: 100%; min-width: 0; display: flex; align-items: center; justify-content: center; background: #000; border-radius: 4px; border: 1px solid #2b3245; overflow: hidden; box-sizing: border-box; }
+  .vorschau img { image-rendering: pixelated; max-width: 100%; height: auto; display: block; }
   .leer { font-size: var(--fs-xs); color: var(--text-muted); }
   .mass { display: block; text-align: center; font: 500 var(--fs-xs) var(--mono); color: var(--text-muted); margin-top: 6px; }
 </style>

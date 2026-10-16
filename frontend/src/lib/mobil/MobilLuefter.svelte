@@ -35,7 +35,7 @@
 </div>
 
 <style>
-  .werte { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .werte { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
   .wert { display: flex; flex-direction: column; align-items: center; padding: 12px 6px; border-radius: 12px; border: 1px solid var(--border); background: #0b0f1a; }
   .zahl { font: 700 24px var(--mono); }
   .einheit { font-size: 14px; color: var(--text-muted); }

@@ -25,7 +25,7 @@
   }
   const rgb = (c: { r: number; g: number; b: number }) => `rgb(${c.r},${c.g},${c.b})`;
   const glow = (c: { r: number; g: number; b: number }) => `rgba(${c.r},${c.g},${c.b},0.55)`;
-  const offen = $derived(ui.seitenleisteOffen);
+  const offen = $derived(ui.leisteOffen);
 </script>
 
 <aside class="sidebar" class:zu={!offen}>
@@ -54,7 +54,7 @@
 
   <nav class="sb-nav">
     {#each nav as n (n.id)}
-      <button class="nav-btn" class:active={ui.ansicht === n.id} title={offen ? '' : n.label} onclick={() => ui.zeige(n.id)}>
+      <button class="nav-btn" class:active={ui.ansicht === n.id} title={offen ? '' : n.label} onclick={() => { ui.zeige(n.id); if (ui.knapp) ui.setzeSeitenleiste(false); }}>
         <i class="fa-solid {n.symbol}"></i>{#if offen}<span>{n.label}</span>{/if}
       </button>
     {/each}

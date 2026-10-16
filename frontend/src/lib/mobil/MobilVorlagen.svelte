@@ -60,5 +60,6 @@
 <style>
   .hinweis { font-size: 15px; color: var(--text-muted); text-align: center; }
   .halten { touch-action: none; }
+  .mobil-karte .text { min-width: 0; overflow-wrap: anywhere; hyphens: auto; }
   .mobil-karte .unter { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 </style>
