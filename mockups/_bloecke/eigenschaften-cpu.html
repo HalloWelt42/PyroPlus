@@ -1,0 +1,57 @@
+<section class="spalte spalte-rechts">
+  <nav class="reiter">
+    <button class="active"><i class="fa-solid fa-sliders"></i>Eigenschaften</button>
+    <button><i class="fa-solid fa-plus"></i>Hinzufügen</button>
+    <button><i class="fa-solid fa-puzzle-piece"></i>Bausteine</button>
+  </nav>
+  <div class="spalte-inhalt">
+    <div class="gruppe">
+      <div class="quelle-kopf">
+        <div class="symbol"><i class="fa-solid fa-microchip"></i></div>
+        <div><div class="titel">CPU Auslastung</div><div class="unter">Quelle cpu.percent · Prozent · jetzt 37 %</div></div>
+      </div>
+      <div class="zeile"><span class="label">Name</span><input class="feld" value="CPU" title="Eigener Name, erscheint in der Auswahl und im Kontextmenü"></div>
+      <div class="zeile"><span class="label">Quelle</span><button class="btn btn-klein" title="Andere Datenquelle wählen; Darstellung und Optionen bleiben erhalten"><i class="fa-solid fa-right-left"></i>Wechseln</button></div>
+    </div>
+    <div class="gruppe">
+      <div class="gruppe-titel"><i class="fa-solid fa-shapes"></i>Darstellung<button class="hilfe" title="Hilfe zu Darstellungsarten öffnen">i</button></div>
+      <div class="chips">
+        <button class="chip">Zahl</button><button class="chip">Invertiert</button><button class="chip">Rahmen</button>
+        <button class="chip">Balken</button><button class="chip">Balken + Wert</button><button class="chip">Balken (innen)</button>
+        <button class="chip active">Halbkreis</button><button class="chip">Verlauf</button>
+      </div>
+      <div class="zeile"><span class="label">Größe</span>
+        <div class="segment klein" title="Vorgaben für den Radius: 12, 22 oder 28 Pixel"><button>Klein</button><button class="active">Groß</button><button>XL</button></div>
+      </div>
+      <div class="zeile"><span class="label">Radius</span>
+        <div class="regler" title="Radius des Halbkreises, 4 bis 32 Pixel"><input type="range" min="4" max="32" value="22"><span class="wert">22</span></div>
+      </div>
+    </div>
+    <div class="gruppe">
+      <div class="gruppe-titel"><i class="fa-solid fa-font"></i>Beschriftung</div>
+      <div class="zeile"><span class="label">Davor</span><input class="feld" value="" placeholder="z. B. CPU " title="Text vor dem Wert"></div>
+      <div class="zeile"><span class="label">Danach</span><input class="feld" value="%" title="Text nach dem Wert, z. B. Einheit"></div>
+      <div class="zeile"><span class="label">Dezimal</span>
+        <div class="segment klein" title="Nachkommastellen; Auto nimmt die Vorgabe der Quelle"><button class="active">Auto</button><button>0</button><button>1</button><button>2</button></div>
+      </div>
+    </div>
+    <div class="gruppe">
+      <div class="gruppe-titel"><i class="fa-solid fa-arrows-up-down-left-right"></i>Position</div>
+      <div class="zeile"><span class="label">X / Y</span>
+        <div class="feld-zeile">
+          <input class="feld feld-klein" value="8" title="Abstand vom linken Rand in Pixeln, 0 bis 127">
+          <input class="feld feld-klein" value="4" title="Abstand vom oberen Rand in Pixeln, 0 bis 63">
+          <button class="btn btn-klein" title="Waagerecht in der Mitte des Displays ausrichten"><i class="fa-solid fa-align-center"></i>Mitte</button>
+        </div>
+      </div>
+      <div class="zeile"><span class="label">Drehung</span>
+        <div class="segment klein" title="Widget um seine linke obere Ecke drehen"><button class="active">0°</button><button>90°</button><button>180°</button><button>270°</button></div>
+      </div>
+    </div>
+    <div class="btn-reihe">
+      <button class="btn btn-klein" title="Kopie 4 Pixel versetzt einfügen"><i class="fa-solid fa-copy"></i>Kopie</button>
+      <button class="btn btn-klein" title="Als Baustein für andere Bildschirme sichern"><i class="fa-solid fa-puzzle-piece"></i>Sichern</button>
+      <button class="btn btn-klein btn-gefahr" title="Widget vom Bildschirm entfernen"><i class="fa-solid fa-trash-can"></i>Löschen</button>
+    </div>
+  </div>
+</section>

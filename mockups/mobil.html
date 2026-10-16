@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<!-- block:kopf -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/frontend/static/favicon.svg">
+<link rel="stylesheet" href="/frontend/static/fonts/fontawesome.min.css">
+<link rel="stylesheet" href="/frontend/static/fonts/solid.min.css">
+<link rel="stylesheet" href="/mockups/stil.css">
+<script src="/mockups/_gemeinsam.js" defer></script>
+<!-- /block:kopf -->
+<title>PyroPlus Mockup: Display am Telefon</title>
+</head>
+<body data-seite="mobil.html">
+<div class="mobil">
+  <div class="mobil-kopf">
+    <h1><i class="fa-solid fa-display" style="color:var(--accent);margin-right:10px"></i>Display</h1>
+    <span class="temp">46.3°</span>
+    <button class="btn btn-klein" style="width:44px;height:44px;padding:0" title="Hilfe öffnen"><i class="fa-solid fa-question"></i></button>
+  </div>
+  <div class="mobil-inhalt">
+    <div class="mobil-schirm"><img src="/mockups/bilder/vorlage-messuhren.png" alt="Das Display gerade"></div>
+    <div class="mobil-abschnitt">Betriebsart</div>
+    <div class="segment">
+      <button class="active" title="Alle Bildschirme der Reihe nach anzeigen"><i class="fa-solid fa-rotate"></i>Rotation</button>
+      <button title="Nur den gewählten Bildschirm anzeigen"><i class="fa-solid fa-thumbtack"></i>Fest</button>
+      <button title="Display dunkel schalten"><i class="fa-solid fa-power-off"></i>Aus</button>
+    </div>
+    <div class="mobil-regler" title="Helligkeit des Displays von 0 bis 255"><span class="label">Helligkeit</span><input type="range" min="0" max="255" value="30"><span class="wert">30</span></div>
+    <div class="mobil-regler" title="Anzeigedauer je Bildschirm bei Rotation"><span class="label">Wechsel</span><input type="range" min="1" max="120" value="10"><span class="wert">10 s</span></div>
+    <div class="mobil-abschnitt">Bildschirme</div>
+    <div class="mobil-karte active">
+      <img src="/mockups/bilder/vorlage-messuhren.png" alt="">
+      <div class="text"><div class="name">Messuhren</div><div class="unter">Auf dem Display</div></div>
+      <span class="schalter klein on" title="In der Rotation"></span>
+    </div>
+    <div class="mobil-karte">
+      <img src="/mockups/bilder/vorlage-klassisch.png" alt="">
+      <div class="text"><div class="name">Uhr und System</div><div class="unter">10 s</div></div>
+      <button class="btn btn-accent" title="Jetzt anzeigen"><i class="fa-solid fa-eye"></i></button>
+    </div>
+    <div class="mobil-karte">
+      <img src="/mockups/bilder/vorlage-wetter_jetzt.png" alt="">
+      <div class="text"><div class="name">Wetter Zeitz</div><div class="unter">20 s</div></div>
+      <button class="btn btn-accent" title="Jetzt anzeigen"><i class="fa-solid fa-eye"></i></button>
+    </div>
+    <div class="mobil-karte">
+      <img src="/mockups/bilder/vorlage-laufwerke.png" alt="">
+      <div class="text"><div class="name">Laufwerke</div><div class="unter">Nicht in Rotation</div></div>
+      <button class="btn btn-accent" title="Jetzt anzeigen"><i class="fa-solid fa-eye"></i></button>
+    </div>
+    <button class="btn btn-breit" style="height:48px" title="Fertigen Bildschirm aus den Vorlagen einfügen"><i class="fa-solid fa-layer-group"></i>Vorlage einfügen</button>
+    <p style="font-size:15px;color:var(--text-muted);text-align:center">Widgets bearbeiten geht am Rechner. Hier siehst du das Display, schaltest um und wählst Bildschirme.</p>
+  </div>
+  <nav class="mobil-fuss">
+    <button><i class="fa-solid fa-fan"></i>Lüfter</button>
+    <button><i class="fa-solid fa-lightbulb"></i>LEDs</button>
+    <button class="active"><i class="fa-solid fa-display"></i>Display</button>
+  </nav>
+</div>
+<!-- block:mock-leiste -->
+<div class="mock-leiste"><i class="fa-solid fa-pen-ruler"></i><span class="mock-name">Mockup</span><a href="/mockups/index.html">Alle Seiten</a></div>
+<!-- /block:mock-leiste -->
+</body>
+</html>

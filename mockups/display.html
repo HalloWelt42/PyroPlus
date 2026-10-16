@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<!-- block:kopf -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/frontend/static/favicon.svg">
+<link rel="stylesheet" href="/frontend/static/fonts/fontawesome.min.css">
+<link rel="stylesheet" href="/frontend/static/fonts/solid.min.css">
+<link rel="stylesheet" href="/mockups/stil.css">
+<script src="/mockups/_gemeinsam.js" defer></script>
+<!-- /block:kopf -->
+<title>PyroPlus Mockup: Display, Widget gewählt</title>
+</head>
+<body data-seite="display.html">
+<div class="app">
+<!-- block:seitenleiste -->
+<aside class="sidebar">
+  <div class="sb-logo"><div class="sb-logo-icon"><i class="fa-solid fa-fire"></i></div><div class="sb-logo-text">Pyro<span>Plus</span></div></div>
+  <div class="sb-temp"><span class="sb-temp-val">46.3</span><span class="sb-temp-unit">°C</span></div>
+  <div class="sb-leds">
+    <div class="sb-led" style="background:#ff0000;box-shadow:0 0 10px rgba(255,0,0,0.6)"></div>
+    <div class="sb-led" style="background:#0000ff;box-shadow:0 0 10px rgba(0,0,255,0.6)"></div>
+    <div class="sb-led" style="background:#00ff00;box-shadow:0 0 10px rgba(0,255,0,0.6)"></div>
+    <div class="sb-led" style="background:#ffc000;box-shadow:0 0 10px rgba(255,192,0,0.6)"></div>
+  </div>
+  <div class="sb-oled"><div class="sb-oled-screen"><img src="/mockups/bilder/vorlage-messuhren.png" alt="Display jetzt"></div></div>
+  <nav class="sb-nav">
+    <button class="nav-btn"><i class="fa-solid fa-fan"></i><span>Lüfter</span></button>
+    <button class="nav-btn"><i class="fa-solid fa-lightbulb"></i><span>LEDs</span></button>
+    <button class="nav-btn active"><i class="fa-solid fa-display"></i><span>Display</span></button>
+  </nav>
+  <div class="sb-section-title">Schnellzugriff</div>
+  <div class="toggle-row"><span class="toggle-label">Lüfter</span><span class="schalter klein"></span></div>
+  <div class="toggle-row"><span class="toggle-label">LEDs</span><span class="schalter klein"></span></div>
+  <div class="toggle-row"><span class="toggle-label">Display</span><span class="schalter klein on"></span></div>
+  <div class="sb-footer">
+    <div><span class="status-dot"></span>Verbunden</div>
+    <div>Version 5.1.0 · Hardware 5.1.0</div>
+    <div class="mono">12:34:56</div>
+  </div>
+</aside>
+<!-- /block:seitenleiste -->
+<main class="main">
+<!-- block:kopfzeile -->
+<header class="kopf">
+  <div class="kopf-zeile">
+    <h1><i class="fa-solid fa-display"></i>Display</h1>
+    <span class="chip-status" title="Das Display antwortet; Bilder kommen an"><i class="fa-solid fa-circle-check"></i>Verbunden</span>
+    <div class="kopf-rechts">
+      <button class="btn" title="Fertige Bildschirme einfügen und danach anpassen"><i class="fa-solid fa-layer-group"></i>Vorlagen</button>
+      <button class="btn" title="Zusammenstellungen sichern und wechseln, Export und Import"><i class="fa-solid fa-box-archive"></i>Profile</button>
+      <button class="btn" title="Orte für die Wetterwerte verwalten"><i class="fa-solid fa-cloud-sun"></i>Wetterorte</button>
+      <button class="btn" style="width:44px;padding:0" title="Hilfe öffnen"><i class="fa-solid fa-question"></i></button>
+    </div>
+  </div>
+  <div class="kopf-zeile">
+    <div class="kopf-gruppe">
+      <span class="label">Betriebsart</span>
+      <div class="segment">
+        <button class="active" title="Alle Bildschirme der Reihe nach anzeigen, jeweils für das eingestellte Intervall"><i class="fa-solid fa-rotate"></i>Rotation</button>
+        <button title="Nur den gewählten Bildschirm anzeigen, ohne Wechsel"><i class="fa-solid fa-thumbtack"></i>Fest</button>
+        <button title="Display dunkel schalten; die Bildschirme bleiben erhalten"><i class="fa-solid fa-power-off"></i>Aus</button>
+      </div>
+    </div>
+    <div class="kopf-gruppe">
+      <span class="label">Wechsel alle</span>
+      <div class="stufen" title="Anzeigedauer je Bildschirm bei Rotation, 1 bis 3600 Sekunden"><button><i class="fa-solid fa-minus"></i></button><span class="wert">10 s</span><button><i class="fa-solid fa-plus"></i></button></div>
+    </div>
+    <div class="kopf-gruppe">
+      <span class="label">Helligkeit</span>
+      <div class="regler" title="Helligkeit des Displays von 0 bis 255; niedrige Werte schonen das Display"><input type="range" min="0" max="255" value="30"><span class="wert">30</span></div>
+    </div>
+  </div>
+</header>
+<!-- /block:kopfzeile -->
+<div class="editor">
+<!-- block:bildschirme -->
+<section class="spalte spalte-bildschirme">
+  <div class="spalte-kopf"><span>Bildschirme</span><span class="badge badge-neutral">4</span></div>
+  <div class="spalte-inhalt">
+    <div class="bs-karte active ziel" title="Wird gerade bearbeitet und auf dem Display angezeigt">
+      <div class="bs-bild"><img src="/mockups/bilder/vorlage-messuhren.png" alt="Messuhren"></div>
+      <div class="bs-zeile"><i class="fa-solid fa-grip-vertical bs-griff"></i><span class="bs-name">Messuhren</span></div>
+      <div class="bs-meta"><span class="bs-marke"><i class="fa-solid fa-circle-dot"></i>Auf dem Display</span><span class="schalter klein on" title="Nimmt an der Rotation teil"></span></div>
+    </div>
+    <div class="bs-karte">
+      <div class="bs-bild"><img src="/mockups/bilder/vorlage-klassisch.png" alt="Klassisch"></div>
+      <div class="bs-zeile"><i class="fa-solid fa-grip-vertical bs-griff"></i><span class="bs-name">Uhr und System</span></div>
+      <div class="bs-meta"><span class="bs-marke aus">10 s</span><span class="schalter klein on" title="Nimmt an der Rotation teil"></span></div>
+    </div>
+    <div class="bs-karte">
+      <div class="bs-bild"><img src="/mockups/bilder/vorlage-wetter_jetzt.png" alt="Wetter jetzt"></div>
+      <div class="bs-zeile"><i class="fa-solid fa-grip-vertical bs-griff"></i><span class="bs-name">Wetter Zeitz</span></div>
+      <div class="bs-meta"><span class="bs-marke aus">20 s</span><span class="schalter klein on" title="Nimmt an der Rotation teil"></span></div>
+    </div>
+    <div class="bs-karte">
+      <div class="bs-bild"><img src="/mockups/bilder/vorlage-laufwerke.png" alt="Laufwerke"></div>
+      <div class="bs-zeile"><i class="fa-solid fa-grip-vertical bs-griff"></i><span class="bs-name">Laufwerke</span></div>
+      <div class="bs-meta"><span class="bs-marke aus">Nicht in Rotation</span><span class="schalter klein" title="Nimmt an der Rotation teil"></span></div>
+    </div>
+  </div>
+  <div class="spalte-fuss">
+    <button class="btn btn-accent btn-breit" title="Leeren Bildschirm anlegen"><i class="fa-solid fa-plus"></i>Neuer Bildschirm</button>
+    <div class="btn-reihe">
+      <button class="btn btn-klein" title="Fertigen Bildschirm aus den Vorlagen einfügen"><i class="fa-solid fa-layer-group"></i>Vorlage</button>
+      <button class="btn btn-klein" title="Gewählten Bildschirm kopieren"><i class="fa-solid fa-copy"></i>Kopie</button>
+    </div>
+  </div>
+</section>
+<!-- /block:bildschirme -->
+<!-- block:canvas-messuhren -->
+<section class="spalte spalte-canvas">
+  <div class="canvas-leiste">
+    <div class="segment klein" title="Vergrößerung der Vorschau; das Display hat 128 mal 64 Pixel">
+      <button>2x</button><button>3x</button><button class="active">4x</button><button>6x</button>
+    </div>
+    <button class="btn btn-klein active" title="Hilfslinien alle 8 Pixel einblenden"><i class="fa-solid fa-border-all"></i>Raster</button>
+    <button class="btn btn-klein" title="Beim Verschieben auf das Raster einrasten"><i class="fa-solid fa-magnet"></i>Einrasten</button>
+    <button class="btn btn-klein btn-symbol" title="Letzte Änderung zurücknehmen"><i class="fa-solid fa-rotate-left"></i></button>
+    <button class="btn btn-klein btn-symbol" title="Zurückgenommene Änderung wiederholen"><i class="fa-solid fa-rotate-right"></i></button>
+    <div class="rechts">
+      <span class="badge badge-ok"><i class="fa-solid fa-circle-check"></i>Gespeichert</span>
+      <button class="btn btn-klein btn-accent" title="Diesen Bildschirm jetzt auf dem Display zeigen und die Rotation dort fortsetzen"><i class="fa-solid fa-eye"></i>Auf dem Display zeigen</button>
+    </div>
+  </div>
+  <div class="canvas-feld">
+    <div class="geraet">
+      <div class="geraet-schirm raster">
+        <img src="/mockups/bilder/vorlage-messuhren.png" alt="Messuhren, Vorschau vom Backend">
+        <div class="auswahl" style="left:32px;top:16px;width:180px;height:104px"><span class="etikett">CPU</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="canvas-fuss">
+    <span>Position <span class="mono">8, 4</span></span>
+    <span>Größe <span class="mono">45 x 26</span></span>
+    <span>Widgets <span class="mono">7</span></span>
+    <span class="hinweis">Ziehen verschiebt · <span class="kbd">Pfeile</span> 1 px · Rechtsklick: Menü</span>
+  </div>
+</section>
+<!-- /block:canvas-messuhren -->
+<!-- block:eigenschaften-cpu -->
+<section class="spalte spalte-rechts">
+  <nav class="reiter">
+    <button class="active"><i class="fa-solid fa-sliders"></i>Eigenschaften</button>
+    <button><i class="fa-solid fa-plus"></i>Hinzufügen</button>
+    <button><i class="fa-solid fa-puzzle-piece"></i>Bausteine</button>
+  </nav>
+  <div class="spalte-inhalt">
+    <div class="gruppe">
+      <div class="quelle-kopf">
+        <div class="symbol"><i class="fa-solid fa-microchip"></i></div>
+        <div><div class="titel">CPU Auslastung</div><div class="unter">Quelle cpu.percent · Prozent · jetzt 37 %</div></div>
+      </div>
+      <div class="zeile"><span class="label">Name</span><input class="feld" value="CPU" title="Eigener Name, erscheint in der Auswahl und im Kontextmenü"></div>
+      <div class="zeile"><span class="label">Quelle</span><button class="btn btn-klein" title="Andere Datenquelle wählen; Darstellung und Optionen bleiben erhalten"><i class="fa-solid fa-right-left"></i>Wechseln</button></div>
+    </div>
+    <div class="gruppe">
+      <div class="gruppe-titel"><i class="fa-solid fa-shapes"></i>Darstellung<button class="hilfe" title="Hilfe zu Darstellungsarten öffnen">i</button></div>
+      <div class="chips">
+        <button class="chip">Zahl</button><button class="chip">Invertiert</button><button class="chip">Rahmen</button>
+        <button class="chip">Balken</button><button class="chip">Balken + Wert</button><button class="chip">Balken (innen)</button>
+        <button class="chip active">Halbkreis</button><button class="chip">Verlauf</button>
+      </div>
+      <div class="zeile"><span class="label">Größe</span>
+        <div class="segment klein" title="Vorgaben für den Radius: 12, 22 oder 28 Pixel"><button>Klein</button><button class="active">Groß</button><button>XL</button></div>
+      </div>
+      <div class="zeile"><span class="label">Radius</span>
+        <div class="regler" title="Radius des Halbkreises, 4 bis 32 Pixel"><input type="range" min="4" max="32" value="22"><span class="wert">22</span></div>
+      </div>
+    </div>
+    <div class="gruppe">
+      <div class="gruppe-titel"><i class="fa-solid fa-font"></i>Beschriftung</div>
+      <div class="zeile"><span class="label">Davor</span><input class="feld" value="" placeholder="z. B. CPU " title="Text vor dem Wert"></div>
+      <div class="zeile"><span class="label">Danach</span><input class="feld" value="%" title="Text nach dem Wert, z. B. Einheit"></div>
+      <div class="zeile"><span class="label">Dezimal</span>
+        <div class="segment klein" title="Nachkommastellen; Auto nimmt die Vorgabe der Quelle"><button class="active">Auto</button><button>0</button><button>1</button><button>2</button></div>
+      </div>
+    </div>
+    <div class="gruppe">
+      <div class="gruppe-titel"><i class="fa-solid fa-arrows-up-down-left-right"></i>Position</div>
+      <div class="zeile"><span class="label">X / Y</span>
+        <div class="feld-zeile">
+          <input class="feld feld-klein" value="8" title="Abstand vom linken Rand in Pixeln, 0 bis 127">
+          <input class="feld feld-klein" value="4" title="Abstand vom oberen Rand in Pixeln, 0 bis 63">
+          <button class="btn btn-klein" title="Waagerecht in der Mitte des Displays ausrichten"><i class="fa-solid fa-align-center"></i>Mitte</button>
+        </div>
+      </div>
+      <div class="zeile"><span class="label">Drehung</span>
+        <div class="segment klein" title="Widget um seine linke obere Ecke drehen"><button class="active">0°</button><button>90°</button><button>180°</button><button>270°</button></div>
+      </div>
+    </div>
+    <div class="btn-reihe">
+      <button class="btn btn-klein" title="Kopie 4 Pixel versetzt einfügen"><i class="fa-solid fa-copy"></i>Kopie</button>
+      <button class="btn btn-klein" title="Als Baustein für andere Bildschirme sichern"><i class="fa-solid fa-puzzle-piece"></i>Sichern</button>
+      <button class="btn btn-klein btn-gefahr" title="Widget vom Bildschirm entfernen"><i class="fa-solid fa-trash-can"></i>Löschen</button>
+    </div>
+  </div>
+</section>
+<!-- /block:eigenschaften-cpu -->
+</div>
+</main>
+</div>
+<!-- block:mock-leiste -->
+<div class="mock-leiste"><i class="fa-solid fa-pen-ruler"></i><span class="mock-name">Mockup</span><a href="/mockups/index.html">Alle Seiten</a></div>
+<!-- /block:mock-leiste -->
+</body>
+</html>

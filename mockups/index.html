@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<!-- block:kopf -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/frontend/static/favicon.svg">
+<link rel="stylesheet" href="/frontend/static/fonts/fontawesome.min.css">
+<link rel="stylesheet" href="/frontend/static/fonts/solid.min.css">
+<link rel="stylesheet" href="/mockups/stil.css">
+<script src="/mockups/_gemeinsam.js" defer></script>
+<!-- /block:kopf -->
+<title>PyroPlus Mockups: Übersicht</title>
+<style>
+  body { overflow: auto; }
+  .galerie { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; display: flex; flex-direction: column; gap: 28px; }
+  .galerie h1 { font-size: var(--fs-xl); display: flex; align-items: center; gap: 12px; }
+  .galerie h1 i { color: var(--accent); }
+  .galerie h2 { font-size: var(--fs-lg); margin-top: 10px; }
+  .galerie p { color: var(--text-secondary); max-width: 760px; }
+  .seiten { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+  .seite { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary); text-decoration: none; }
+  .seite:hover { border-color: var(--border-accent); }
+  .seite .name { font-weight: 600; font-size: var(--fs-base); display: flex; align-items: center; gap: 10px; }
+  .seite .name i { color: var(--accent); width: 22px; text-align: center; }
+  .seite .text { font-size: var(--fs-sm); color: var(--text-muted); }
+</style>
+</head>
+<body data-seite="index.html">
+<div class="galerie">
+  <h1><i class="fa-solid fa-pen-ruler"></i>PyroPlus Mockups: Display-Ansicht</h1>
+  <p>Entwürfe für den neuen Editor. Alle Bilder auf den Seiten kommen aus dem echten Renderer des Backends; die Oberfläche zeigt nur, was das Backend gerendert hat. Jede Seite steht für einen Zustand.</p>
+
+  <h2>Desktop</h2>
+  <div class="seiten">
+    <a class="seite" href="display.html"><span class="name"><i class="fa-solid fa-sliders"></i>Widget gewählt</span><span class="text">Hauptansicht mit Bildschirmliste, Vorschau und Eigenschaften des gewählten Widgets</span></a>
+    <a class="seite" href="display-hinzufuegen.html"><span class="name"><i class="fa-solid fa-plus"></i>Hinzufügen</span><span class="text">Datenquelle wählen, Darstellung festlegen, Vorschau, einfügen</span></a>
+    <a class="seite" href="display-bausteine.html"><span class="name"><i class="fa-solid fa-puzzle-piece"></i>Bausteine</span><span class="text">Mitgelieferte Widgets und eigene gesicherte Bausteine</span></a>
+    <a class="seite" href="display-vorlagen.html"><span class="name"><i class="fa-solid fa-layer-group"></i>Bildschirmvorlagen</span><span class="text">Fenster mit fertigen Bildschirmen nach Kategorie, Einfügen als Kopie</span></a>
+    <a class="seite" href="display-kontext.html"><span class="name"><i class="fa-solid fa-bars"></i>Kontextmenü und Mehrfachauswahl</span><span class="text">Rechtsklick auf ein Widget, zwei Widgets gewählt</span></a>
+    <a class="seite" href="display-pixelbild.html"><span class="name"><i class="fa-solid fa-paintbrush"></i>Pixelbild zeichnen</span><span class="text">Bitmap-Widget gewählt, Zeichenwerkzeuge, abgedunkelter Rest</span></a>
+    <a class="seite" href="display-leer.html"><span class="name"><i class="fa-solid fa-wand-magic-sparkles"></i>Neuer leerer Bildschirm</span><span class="text">Leitfaden in drei Schritten statt leerer Fläche</span></a>
+    <a class="seite" href="display-wetterorte.html"><span class="name"><i class="fa-solid fa-cloud-sun"></i>Wetterorte</span><span class="text">Orte mit Zustand, Vorgabeort, Suche und Hinzufügen</span></a>
+    <a class="seite" href="display-profile.html"><span class="name"><i class="fa-solid fa-box-archive"></i>Profile und Sicherung</span><span class="text">Zusammenstellungen sichern und laden, Export, Import, alte Sicherung übernehmen</span></a>
+    <a class="seite" href="display-hilfe.html"><span class="name"><i class="fa-solid fa-question"></i>Hilfe</span><span class="text">Freischwebendes, durchsuchbares Hilfefenster mit Sprungmarken</span></a>
+  </div>
+
+  <h2>Telefon</h2>
+  <div class="seiten">
+    <a class="seite" href="mobil.html"><span class="name"><i class="fa-solid fa-mobile-screen"></i>Display am Telefon</span><span class="text">Was man unterwegs tut: sehen, umschalten, Helligkeit, Bildschirm wählen</span></a>
+    <a class="seite" href="mobil-vorlagen.html"><span class="name"><i class="fa-solid fa-layer-group"></i>Vorlage einfügen am Telefon</span><span class="text">Vorlage auswählen und mit Drücken und Halten einfügen</span></a>
+  </div>
+</div>
+<!-- block:mock-leiste -->
+<div class="mock-leiste"><i class="fa-solid fa-pen-ruler"></i><span class="mock-name">Mockup</span><a href="/mockups/index.html">Alle Seiten</a></div>
+<!-- /block:mock-leiste -->
+</body>
+</html>
