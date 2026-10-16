@@ -1,8 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect x="2" y="2" width="28" height="28" rx="6" fill="#0f172a"/>
-  <rect x="6" y="8" width="20" height="12" rx="2" fill="#000" stroke="#334155" stroke-width="1"/>
-  <text x="10" y="14" fill="#22d3ee" font-size="4" font-family="monospace" font-weight="600">42°C</text>
-  <rect x="10" y="16" width="12" height="2" rx="0.5" fill="#334155"/>
-  <rect x="10" y="16" width="7" height="2" rx="0.5" fill="#6366f1"/>
-  <circle cx="16" cy="24" r="1.5" fill="#334155"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00b4ff"/>
+      <stop offset="1" stop-color="#0066ff"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#g)"/>
+  <path d="M32 9 C 39 19, 47 24, 47 36 C 47 45.5 40.5 53 32 53 C 23.5 53 17 45.5 17 36 C 17 30 20 25.5 23.5 22 C 23.5 28 26.5 31.5 29.5 31.5 C 27.5 26 28.5 17 32 9 Z" fill="#ffffff"/>
+  <path d="M32 33 C 35.5 37.5, 38.5 40, 38.5 44.5 C 38.5 48.5 35.5 51 32 51 C 28.5 51 25.5 48.5 25.5 44.5 C 25.5 40 28.5 37.5 32 33 Z" fill="#0066ff"/>
 </svg>
