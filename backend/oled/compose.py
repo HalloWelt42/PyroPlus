@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable, Optional
 
-from oled.models import Rotation, Screen, ScreenKind, Widget, WidgetBox
+from oled.models import DisplayMode, Rotation, Screen, ScreenKind, Widget, WidgetBox
 from oled.modes import get_mode
 from oled.renderer import W, H, create_buffer
 from oled.values import StatsSnapshot, ValueContext, get_source, resolve, split_disk_source
@@ -80,6 +80,16 @@ def render_widget(widget: Widget, ctx: RenderContext) -> tuple[bytearray, Widget
                         disk_index=disk_index or 0, simulate=ctx.simulate)
     wert = resolve(widget.source, vctx)
     definition.draw(buf, widget, wert, vctx)
+
+    if widget.display == DisplayMode.bitmap:
+        # Ein Pixelbild belegt immer seine Zeichenfläche, auch wenn noch kein Pixel gesetzt ist
+        bw = max(1, min(widget.opts.width or 32, W - widget.x))
+        bh = max(1, min(widget.opts.height or 16, H - widget.y))
+        if widget.opts.rotate != Rotation.r0:
+            buf = _gedreht(buf, widget.x, widget.y, bw, bh, widget.opts.rotate)
+            if widget.opts.rotate in (Rotation.r90, Rotation.r270):
+                bw, bh = bh, bw
+        return buf, WidgetBox(id=widget.id, x=widget.x, y=widget.y, w=min(bw, W - widget.x), h=min(bh, H - widget.y))
 
     rahmen = _messen(buf)
     if rahmen is None:

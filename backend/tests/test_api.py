@@ -195,3 +195,28 @@ def test_gesamtstatus_enthaelt_oled(client: TestClient) -> None:
     daten = client.get("/api/state").json()
     assert daten["oled"]["screens"] and "preview" in daten["oled"]
     assert daten["fan"] and "stats" in daten
+
+
+def _kopf() -> dict[str, str]:
+    return {"X-API-Token": API_TOKEN}
+
+
+def test_widget_vorschau_ist_zugeschnitten(client: TestClient) -> None:
+    from PIL import Image
+    widget = {"id": "x", "source": "cpu.percent", "display": "ring", "x": 40, "y": 20, "name": "", "opts": {"radius": 14}}
+    antwort = client.post("/api/oled/render/widget", json={"widget": widget}, headers=_kopf())
+    assert antwort.status_code == 200, antwort.text
+    daten = antwort.json()
+    assert daten["width"] == 29 and daten["height"] == 29
+    bild = Image.open(io.BytesIO(base64.b64decode(daten["imageBase64"])))
+    assert bild.size == (29, 29)
+    leer = client.post("/api/oled/render/widget", json={"widget": {**widget, "source": "text.leer", "display": "text", "opts": {}}}, headers=_kopf())
+    assert leer.status_code == 200 and leer.json()["width"] == 0 and leer.json()["imageBase64"] == ""
+
+
+def test_katalog_enthaelt_symbole(client: TestClient) -> None:
+    katalog = client.get("/api/oled/catalog", headers=_kopf()).json()
+    assert len(katalog["symbols"]) >= 100
+    assert "Wetter" in katalog["symbolCategories"] and 16 in katalog["symbolSizes"]
+    assert any(m["id"] == "symbol_wert" for m in katalog["modes"])
+    assert any(s["id"] == "layout.symbol" for s in katalog["sources"])

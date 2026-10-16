@@ -9,17 +9,15 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from oled.icons import ICONS_8x8, condition_to_icon
 from oled.models import Screen, ScreenKind
-from oled.renderer import draw_icon, draw_text
+from oled.renderer import draw_text
+from oled.symbole import draw_symbol, symbol_fuer_wetter
 from oled.values import TAGE_KURZ
 from oled.weather import WeatherReport
 
 
 def _icon(buf: bytearray, text: str, x: int, y: int) -> None:
-    rows = ICONS_8x8.get(condition_to_icon(text), [])
-    if rows:
-        draw_icon(buf, rows, x, y)
+    draw_symbol(buf, symbol_fuer_wetter(text), x, y, 8)
 
 
 def render_builtin(buf: bytearray, screen: Screen, ctx: object) -> None:
@@ -53,13 +51,9 @@ def _compact(buf: bytearray, b: WeatherReport | None, now: datetime) -> None:
     draw_text(buf, f"Feu.{feuchte}%", 0, 30, 1)
     draw_text(buf, f"W.{wind}km/h", 0, 40, 1)
     draw_text(buf, f"{druck}hPa", 66, 40, 1)
-    sonne = ICONS_8x8.get("sun", [])
-    mond = ICONS_8x8.get("moon", [])
-    if sonne:
-        draw_icon(buf, sonne, 0, 52)
+    draw_symbol(buf, "sonne", 0, 52, 8)
     draw_text(buf, c.sunrise[:5], 10, 54, 1)
-    if mond:
-        draw_icon(buf, mond, 70, 52)
+    draw_symbol(buf, "mond", 70, 52, 8)
     draw_text(buf, c.sunset[:5], 80, 54, 1)
 
 

@@ -18,13 +18,14 @@ from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
 import hw_client
-from oled.compose import RenderContext, render_screen
+from oled.compose import RenderContext, render_screen, render_widget
 from oled.models import (
-    Catalog, GeocodeHit, ImportResult, OledBundle, OledLive, OledMode, OledSettings,
+    Catalog, GeocodeHit, ImportResult, neue_id, OledBundle, OledLive, OledMode, OledSettings,
     OledSettingsPatch, OledState, Profile, RenderResponse, Screen, WeatherLocation,
-    WeatherLocationCreate, WeatherLocationState, WeatherSettings, WidgetBox, WidgetPreset, neue_id,
+    WeatherLocationCreate, WeatherLocationState, WeatherSettings, Widget, WidgetBox, WidgetPreset,
+    WidgetRenderResponse,
 )
-from oled.renderer import buf_to_pil, buf_to_png_base64
+from oled.renderer import buf_to_pil, buf_to_png_base64, ausschnitt_png_base64
 from oled.store import OledStore
 from oled.values import StatsSnapshot
 from oled.weather import WeatherReport, WeatherService
@@ -109,6 +110,16 @@ class OledEngine:
         stats = self._snapshot()
         buf, boxes = render_screen(screen, self._context(stats, simulate))
         return RenderResponse(image_base64=buf_to_png_base64(buf), boxes=boxes)
+
+    def render_widget_preview(self, widget: Widget, simulate: Optional[dict[str, float]] = None) -> WidgetRenderResponse:
+        """Rendert ein einzelnes Widget bei 0/0 und schneidet das Bild auf seinen Rahmen zu."""
+        kopie = widget.model_copy(deep=True)
+        kopie.x, kopie.y = 0, 0
+        buf, box = render_widget(kopie, self._context(self._snapshot(), simulate))
+        if box.w <= 0 or box.h <= 0:
+            return WidgetRenderResponse(image_base64="", width=0, height=0, box=box)
+        return WidgetRenderResponse(image_base64=ausschnitt_png_base64(buf, box.x, box.y, box.w, box.h),
+                                    width=box.w, height=box.h, box=box)
 
     def render_current(self, stats: Optional[StatsSnapshot] = None) -> None:
         """Rendert den aktiven Bildschirm, zeigt ihn an und merkt die Vorschau."""

@@ -66,7 +66,8 @@
     modusId = m?.id ?? null;
     if (m) {
       opts = { ...leereOpts(), ...m.defaults };
-      if (q && q.unit && m.fields.includes('suffix') && !opts.suffix) opts.suffix = ` ${q.unit}`;
+      /* Die Einheit der Quelle schlägt die allgemeine Vorgabe der Darstellung: 50 °C statt 50 % */
+      if (q && q.unit && m.fields.includes('suffix')) opts.suffix = ` ${q.unit}`;
     }
     probeAktualisieren();
   }

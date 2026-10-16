@@ -93,6 +93,12 @@ class DisplayMode(str, Enum):
     laufschrift = "laufschrift"
     fan_icon = "fan_icon"
     fan_icon_rpm = "fan_icon_rpm"
+    symbol = "symbol"
+    symbol_wert = "symbol_wert"
+    ring = "ring"
+    balken_v = "balken_v"
+    stufen = "stufen"
+    sieben_segment = "sieben_segment"
     linie_h = "linie_h"
     linie_v = "linie_v"
     rahmen = "rahmen"
@@ -132,6 +138,9 @@ class WidgetOpts(ApiModel):
     rotate: Rotation = Rotation.r0
     location_id: Optional[str] = Field(None, description="Wetterort; leer = Vorgabeort")
     bitmap: Optional[str] = Field(None, description="Base64, Bits zeilenweise gepackt, width x height")
+    icon: Optional[str] = Field(None, max_length=40, description="Symbolkennung aus dem Katalog; leer = Vorgabe der Quelle")
+    filled: bool = Field(False, description="Fläche unter dem Verlauf füllen")
+    steps: Optional[int] = Field(None, ge=2, le=32, description="Anzahl der Stufen")
 
     @model_validator(mode="before")
     @classmethod
@@ -319,12 +328,21 @@ class DisplayModeInfo(ApiModel):
     variants: list[ModeVariant] = Field(default_factory=list)
 
 
+class SymbolInfo(ApiModel):
+    id: str
+    label: str
+    category: str
+
+
 class Catalog(ApiModel):
     width: int = W
     height: int = H
     tabs: list[TabInfo]
     sources: list[SourceInfo]
     modes: list[DisplayModeInfo]
+    symbols: list[SymbolInfo] = Field(default_factory=list)
+    symbol_categories: list[str] = Field(default_factory=list)
+    symbol_sizes: list[int] = Field(default_factory=list)
 
 
 # Rendern
@@ -347,6 +365,20 @@ class RenderResponse(ApiModel):
     boxes: list[WidgetBox]
     width: int = W
     height: int = H
+
+
+class WidgetRenderRequest(ApiModel):
+    """Ein einzelnes Widget für eine Vorschau; die Lage auf dem Display spielt keine Rolle."""
+    widget: Widget
+    simulate: dict[str, float] = Field(default_factory=dict, description="Quelle -> simulierter Zahlenwert")
+
+
+class WidgetRenderResponse(ApiModel):
+    """Bild genau in der Größe des Widgets; leer, wenn das Widget nichts zeichnet."""
+    image_base64: str
+    width: int
+    height: int
+    box: WidgetBox
 
 
 # Zustand

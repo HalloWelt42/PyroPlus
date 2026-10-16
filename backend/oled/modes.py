@@ -15,9 +15,10 @@ from typing import Callable, Optional
 
 from oled.models import DisplayMode, ModeVariant, ValueType, Widget, WidgetOpts
 from oled.renderer import (
-    W, H, draw_bar, draw_fan_icon, draw_gauge, draw_hline, draw_marquee, draw_rect,
-    draw_section_header, draw_sparkline, draw_text, draw_text_ex, draw_vline,
+    W, H, draw_bar, draw_bar_v, draw_gauge, draw_hline, draw_marquee, draw_rect, draw_ring,
+    draw_section_header, draw_seven_segment, draw_sparkline, draw_steps, draw_text, draw_text_ex, draw_vline,
 )
+from oled.symbole import LUEFTER_BILDER, draw_luefter, draw_symbol, vorgabe_fuer_quelle
 from oled.values import Value, ValueContext
 
 ZEILENHOEHE = 8  # 7 Pixel Schrift plus 1 Pixel Abstand
@@ -158,12 +159,36 @@ def _balken_label_in(buf: bytearray, w: Widget, v: Value, ctx: ValueContext) -> 
             buf[i] = 0 if buf[i] else 1
 
 
+@mode(DisplayMode.balken_v, "Säule", NUMERIC, ["width", "height", "rotate"],
+      WidgetOpts(width=8, height=32), description="Senkrechter Balken, füllt sich von unten",
+      variants=[_variante("schmal", "Schmal (6x24)", width=6, height=24), _variante("standard", "Standard (8x32)", width=8, height=32),
+                _variante("breit", "Breit (12x48)", width=12, height=48), _variante("voll", "Volle Höhe (10x62)", width=10, height=62)])
+def _balken_v(buf: bytearray, w: Widget, v: Value, ctx: ValueContext) -> None:
+    draw_bar_v(buf, w.x, w.y, w.opts.width or 8, w.opts.height or 32, v.percent_or_number)
+
+
+@mode(DisplayMode.stufen, "Stufen", NUMERIC, ["steps", "width", "height", "rotate"],
+      WidgetOpts(steps=10, width=62, height=6), description="Felder nebeneinander, gefüllt bis zum Wert",
+      variants=[_variante("zehn", "10 Stufen (62x6)", steps=10, width=62, height=6), _variante("fuenf", "5 Stufen (40x8)", steps=5, width=40, height=8),
+                _variante("zwanzig", "20 Stufen (126x6)", steps=20, width=126, height=6), _variante("hoch", "10 Stufen hoch (80x12)", steps=10, width=80, height=12)])
+def _stufen(buf: bytearray, w: Widget, v: Value, ctx: ValueContext) -> None:
+    draw_steps(buf, w.x, w.y, w.opts.width or 62, w.opts.height or 6, w.opts.steps or 10, v.percent_or_number)
+
+
 @mode(DisplayMode.gauge, "Halbkreis", NUMERIC, ["radius", "prefix", "suffix", "decimals", "rotate"],
       WidgetOpts(radius=12, suffix="%"), description="Halbkreis mit Füllbogen und Wert",
       variants=[_variante("klein", "Klein (12)", radius=12), _variante("gross", "Groß (20)", radius=20),
                 _variante("xl", "XL (28)", radius=28)])
 def _gauge(buf: bytearray, w: Widget, v: Value, ctx: ValueContext) -> None:
     draw_gauge(buf, v.percent_or_number, w.x, w.y, w.opts.radius or 12, label=_volltext(v, w.opts))
+
+
+@mode(DisplayMode.ring, "Ring", NUMERIC, ["radius", "prefix", "suffix", "decimals", "rotate"],
+      WidgetOpts(radius=14, suffix="%"), description="Voller Ring, der sich von oben im Uhrzeigersinn füllt",
+      variants=[_variante("klein", "Klein (10)", radius=10), _variante("mittel", "Mittel (14)", radius=14),
+                _variante("gross", "Groß (20)", radius=20), _variante("xl", "XL (28)", radius=28)])
+def _ring(buf: bytearray, w: Widget, v: Value, ctx: ValueContext) -> None:
+    draw_ring(buf, v.percent_or_number, w.x, w.y, w.opts.radius or 14, label=_volltext(v, w.opts))
 
 
 HISTORY_KEYS: dict[str, str] = {
@@ -173,8 +198,8 @@ HISTORY_KEYS: dict[str, str] = {
 }
 
 
-@mode(DisplayMode.sparkline, "Verlauf", NUMERIC, ["width", "height", "rotate"],
-      WidgetOpts(width=50, height=16), description="Verlauf der letzten Minute",
+@mode(DisplayMode.sparkline, "Verlauf", NUMERIC, ["width", "height", "filled", "rotate"],
+      WidgetOpts(width=50, height=16), description="Verlauf der letzten Minute, wahlweise als Fläche",
       variants=[_variante("klein", "Klein (50x16)", width=50, height=16),
                 _variante("gross", "Groß (80x24)", width=80, height=24),
                 _variante("breit", "Breit (100x16)", width=100, height=16),
@@ -183,7 +208,15 @@ def _sparkline(buf: bytearray, w: Widget, v: Value, ctx: ValueContext) -> None:
     basis = w.source.rsplit(".", 1)[0] if w.source.count(".") == 2 else w.source
     schluessel = HISTORY_KEYS.get(w.source) or HISTORY_KEYS.get(basis, "")
     werte = ctx.history.get(schluessel, [])
-    draw_sparkline(buf, werte, w.x, w.y, w.opts.width or 50, w.opts.height or 16)
+    draw_sparkline(buf, werte, w.x, w.y, w.opts.width or 50, w.opts.height or 16, filled=w.opts.filled)
+
+
+@mode(DisplayMode.sieben_segment, "Siebensegment", ALL_DATA, ["height", "prefix", "suffix", "decimals", "rotate"],
+      WidgetOpts(height=16), description="Ziffern wie auf einer Digitaluhr; Höhe frei wählbar",
+      variants=[_variante("klein", "Klein (10)", height=10), _variante("mittel", "Mittel (16)", height=16),
+                _variante("gross", "Groß (24)", height=24), _variante("riesig", "Riesig (40)", height=40)])
+def _sieben_segment(buf: bytearray, w: Widget, v: Value, ctx: ValueContext) -> None:
+    draw_seven_segment(buf, _volltext(v, w.opts), w.x, w.y, w.opts.height or 16)
 
 
 @mode(DisplayMode.laufschrift, "Laufschrift", [ValueType.string, ValueType.time],
@@ -196,29 +229,48 @@ def _laufschrift(buf: bytearray, w: Widget, v: Value, ctx: ValueContext) -> None
     draw_marquee(buf, text, w.y, offset, sx)
 
 
-def _fan_frame(rpm: float) -> int:
+def _luefter_bild(rpm: float) -> int:
+    """Drehbild aus Zeit und Drehzahl: bei voller Drehzahl etwa eine Dreivierteldrehung je Sekunde."""
     tempo = min(1.0, rpm / 3000)
-    if tempo <= 0.01:
+    if tempo <= 0.02:
         return 0
-    return int(time.time() * max(1.0, tempo * 12)) % 4
+    return int(time.time() * tempo * 24) % LUEFTER_BILDER
+
+
+SYMBOL_VARIANTS = [_variante("klein", "Klein (8)", size=8), _variante("mittel", "Mittel (16)", size=16),
+                   _variante("gross", "Groß (24)", size=24), _variante("xl", "XL (32)", size=32)]
 
 
 @mode(DisplayMode.fan_icon, "Lüftersymbol", [ValueType.animated], ["size", "rotate"],
-      WidgetOpts(size=16), description="Dreht sich mit der Drehzahl",
-      variants=[_variante("klein", "Klein (8)", size=8), _variante("mittel", "Mittel (16)", size=16),
-                _variante("gross", "Groß (32)", size=32)])
+      WidgetOpts(size=16), description="Dreht sich mit der Drehzahl", variants=SYMBOL_VARIANTS)
 def _fan_icon(buf: bytearray, w: Widget, v: Value, ctx: ValueContext) -> None:
-    draw_fan_icon(buf, w.x, w.y, w.opts.size or 16, _fan_frame(v.number or 0.0))
+    draw_luefter(buf, w.x, w.y, w.opts.size, _luefter_bild(v.number or 0.0))
 
 
 @mode(DisplayMode.fan_icon_rpm, "Symbol + Drehzahl", [ValueType.animated],
-      ["size", "scaleX", "scaleY", "suffix"], WidgetOpts(size=16, suffix=" RPM"))
+      ["size", "scaleX", "scaleY", "suffix", "rotate"], WidgetOpts(size=16, suffix=" RPM"),
+      description="Drehendes Symbol, daneben die Drehzahl", variants=SYMBOL_VARIANTS)
 def _fan_icon_rpm(buf: bytearray, w: Widget, v: Value, ctx: ValueContext) -> None:
-    groesse = w.opts.size or 16
     rpm = v.number or 0.0
-    draw_fan_icon(buf, w.x, w.y, groesse, _fan_frame(rpm))
-    draw_text(buf, f"{round(rpm)}{w.opts.suffix}", w.x + groesse + 2, w.y + groesse // 2 - 3,
-              w.opts.scale_x, w.opts.scale_y_effektiv)
+    g = draw_luefter(buf, w.x, w.y, w.opts.size, _luefter_bild(rpm))
+    sy = w.opts.scale_y_effektiv
+    draw_text(buf, f"{round(rpm)}{w.opts.suffix}", w.x + g + 3, w.y + max(0, (g - 7 * sy) // 2),
+              w.opts.scale_x, sy)
+
+
+@mode(DisplayMode.symbol_wert, "Symbol + Wert", ALL_DATA,
+      ["icon", "size", "scaleX", "scaleY", "prefix", "suffix", "decimals", "thousands", "rotate"],
+      WidgetOpts(size=16), description="Passendes Symbol, daneben der Wert", variants=SYMBOL_VARIANTS)
+def _symbol_wert(buf: bytearray, w: Widget, v: Value, ctx: ValueContext) -> None:
+    g = draw_symbol(buf, w.opts.icon or vorgabe_fuer_quelle(w.source), w.x, w.y, w.opts.size)
+    sy = w.opts.scale_y_effektiv
+    draw_text(buf, _volltext(v, w.opts), w.x + g + 3, w.y + max(0, (g - 7 * sy) // 2), w.opts.scale_x, sy)
+
+
+@mode(DisplayMode.symbol, "Symbol", [ValueType.shape], ["icon", "size", "rotate"],
+      WidgetOpts(size=16, icon="sonne"), description="Festes Symbol aus der Bibliothek", variants=SYMBOL_VARIANTS)
+def _symbol(buf: bytearray, w: Widget, v: Value, ctx: ValueContext) -> None:
+    draw_symbol(buf, w.opts.icon or "sonne", w.x, w.y, w.opts.size)
 
 
 @mode(DisplayMode.linie_h, "Linie waagerecht", [ValueType.shape], ["width"], WidgetOpts(width=60))

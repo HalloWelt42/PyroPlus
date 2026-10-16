@@ -96,3 +96,53 @@ def test_unbekannte_quelle_bricht_nicht_ab(stats_dict: dict) -> None:
     widget = Widget(source="gibt.es.nicht", display=DisplayMode.text, x=0, y=0)
     _, box = render_widget(widget, _ctx(stats_dict))
     assert box.w > 0
+
+
+def _breite_hoehe(buf: bytearray) -> tuple[int, int]:
+    xs = [i % W for i, b in enumerate(buf) if b]
+    ys = [i // W for i, b in enumerate(buf) if b]
+    return (max(xs) - min(xs) + 1, max(ys) - min(ys) + 1) if xs else (0, 0)
+
+
+def test_neue_darstellungen_zeichnen_im_rahmen(stats_dict: dict) -> None:
+    ctx = _ctx(stats_dict)
+    faelle = [
+        Widget(source="cpu.percent", display=DisplayMode.ring, x=0, y=0, opts=WidgetOpts(radius=14)),
+        Widget(source="cpu.percent", display=DisplayMode.balken_v, x=0, y=0, opts=WidgetOpts(width=8, height=32)),
+        Widget(source="cpu.percent", display=DisplayMode.stufen, x=0, y=0, opts=WidgetOpts(steps=10, width=62, height=6)),
+        Widget(source="zeit.uhr", display=DisplayMode.sieben_segment, x=0, y=0, opts=WidgetOpts(height=24)),
+        Widget(source="cpu.temp", display=DisplayMode.symbol_wert, x=0, y=0, opts=WidgetOpts(size=16, suffix=" C")),
+        Widget(source="layout.symbol", display=DisplayMode.symbol, x=0, y=0, opts=WidgetOpts(size=32, icon="rakete")),
+        Widget(source="fan.symbol_rpm", display=DisplayMode.fan_icon_rpm, x=0, y=0, opts=WidgetOpts(size=24, suffix=" RPM")),
+        Widget(source="cpu.percent", display=DisplayMode.sparkline, x=0, y=0, opts=WidgetOpts(width=50, height=16, filled=True)),
+    ]
+    for w in faelle:
+        buf, box = render_widget(w, ctx)
+        assert box.w > 0 and box.h > 0, w.display
+        assert (box.w, box.h) == _breite_hoehe(buf), w.display
+    ring_buf, ring_box = render_widget(faelle[0], ctx)
+    assert ring_box.w == 29 and ring_box.h == 29
+    saeule_buf, saeule_box = render_widget(faelle[1], ctx)
+    assert (saeule_box.w, saeule_box.h) == (8, 32)
+    symbol_buf, symbol_box = render_widget(faelle[5], ctx)
+    assert symbol_box.w <= 32 and symbol_box.h <= 32
+
+
+def test_siebensegment_ziffern_und_breite(stats_dict: dict) -> None:
+    from oled.renderer import create_buffer, draw_seven_segment
+    buf = create_buffer()
+    breite = draw_seven_segment(buf, "12:34", 0, 0, 16)
+    assert 40 <= breite <= 60
+    assert _breite_hoehe(buf)[1] == 16
+    leer = create_buffer()
+    draw_seven_segment(leer, "8", 0, 0, 16)
+    eins = create_buffer()
+    draw_seven_segment(eins, "1", 0, 0, 16)
+    assert sum(leer) > sum(eins) > 0
+
+
+def test_gefuellter_verlauf_hat_mehr_pixel(stats_dict: dict) -> None:
+    ctx = _ctx(stats_dict)
+    linie, _ = render_widget(Widget(source="cpu.percent", display=DisplayMode.sparkline, x=0, y=0, opts=WidgetOpts(width=50, height=16)), ctx)
+    flaeche, _ = render_widget(Widget(source="cpu.percent", display=DisplayMode.sparkline, x=0, y=0, opts=WidgetOpts(width=50, height=16, filled=True)), ctx)
+    assert sum(flaeche) > sum(linie)

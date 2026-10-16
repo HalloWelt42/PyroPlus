@@ -297,6 +297,70 @@ class _ScreenDef:
     factory: Callable[[], Screen]
 
 
+def _ringe() -> Screen:
+    return Screen(name="Drei Ringe", widgets=[
+        _w("cpu.percent", DisplayMode.ring, 6, 2, "CPU", radius=14, suffix="%", decimals=0),
+        _w("ram.percent", DisplayMode.ring, 50, 2, "RAM", radius=14, suffix="%", decimals=0),
+        _w("cpu.temp", DisplayMode.ring, 94, 2, "Temperatur", radius=14, suffix="°", decimals=0),
+        _w("text.frei", DisplayMode.text, 12, 33, "Beschriftung", text="CPU"),
+        _w("text.frei", DisplayMode.text, 56, 33, "Beschriftung", text="RAM"),
+        _w("text.frei", DisplayMode.text, 100, 33, "Beschriftung", text="TMP"),
+        _zentriert("zeit.uhr_blink", 48, 2, "Uhr"),
+    ])
+
+
+def _symbole() -> Screen:
+    return Screen(name="Symbole mit Werten", widgets=[
+        _w("cpu.temp", DisplayMode.symbol_wert, 0, 0, "Temperatur", size=16, icon="thermometer", suffix=" C", decimals=1),
+        _w("cpu.percent", DisplayMode.symbol_wert, 0, 16, "CPU", size=16, icon="chip", suffix="%", decimals=0),
+        _w("ram.percent", DisplayMode.symbol_wert, 0, 32, "RAM", size=16, icon="speicher", suffix="%", decimals=0),
+        _w("disk.percent.0", DisplayMode.symbol_wert, 0, 48, "Laufwerk", size=16, icon="laufwerk", suffix="%", decimals=0),
+        _w("zeit.uhr", DisplayMode.symbol_wert, 66, 0, "Uhr", size=16, icon="uhr"),
+        _w("zeit.datum_kurz", DisplayMode.symbol_wert, 66, 16, "Datum", size=16, icon="kalender"),
+        _w("fan.rpm", DisplayMode.symbol_wert, 66, 32, "Drehzahl", size=16, icon="luefter", decimals=0),
+        _w("fan.duty", DisplayMode.symbol_wert, 66, 48, "Leistung", size=16, icon="tacho", suffix="%", decimals=0),
+    ])
+
+
+def _digitaluhr() -> Screen:
+    return Screen(name="Digitaluhr", widgets=[
+        _w("zeit.uhr", DisplayMode.sieben_segment, 18, 4, "Uhr", height=32),
+        _zentriert("zeit.tag_datum", 44, 1, "Datum"),
+        _w("cpu.temp", DisplayMode.symbol_wert, 0, 56, "Temperatur", size=8, icon="thermometer", suffix=" C", decimals=1),
+        _rechts("ram.percent", 56, 1, "RAM", suffix="% RAM", decimals=0),
+    ])
+
+
+def _stufen() -> Screen:
+    return Screen(name="Stufenanzeige", widgets=[
+        _w("text.frei", DisplayMode.text, 0, 2, "Beschriftung", text="CPU"),
+        _w("cpu.percent", DisplayMode.stufen, 24, 1, "CPU", steps=10, width=104, height=8),
+        _w("text.frei", DisplayMode.text, 0, 18, "Beschriftung", text="RAM"),
+        _w("ram.percent", DisplayMode.stufen, 24, 17, "RAM", steps=10, width=104, height=8),
+        _w("text.frei", DisplayMode.text, 0, 34, "Beschriftung", text="TMP"),
+        _w("cpu.temp", DisplayMode.stufen, 24, 33, "Temperatur", steps=10, width=104, height=8),
+        _w("fan.rpm", DisplayMode.symbol_wert, 0, 52, "Drehzahl", size=8, icon="luefter", suffix=" RPM", decimals=0),
+        _rechts("zeit.uhr", 52, 1, "Uhr"),
+    ])
+
+
+def _saeulen() -> Screen:
+    return Screen(name="Säulen", widgets=[
+        _w("cpu.percent", DisplayMode.balken_v, 12, 4, "CPU", width=14, height=40),
+        _w("ram.percent", DisplayMode.balken_v, 42, 4, "RAM", width=14, height=40),
+        _w("cpu.temp", DisplayMode.balken_v, 72, 4, "Temperatur", width=14, height=40),
+        _w("fan.rpm_pct", DisplayMode.balken_v, 102, 4, "Drehzahl", width=14, height=40),
+        _w("text.frei", DisplayMode.text, 11, 48, "Beschriftung", text="CPU"),
+        _w("text.frei", DisplayMode.text, 41, 48, "Beschriftung", text="RAM"),
+        _w("text.frei", DisplayMode.text, 71, 48, "Beschriftung", text="TMP"),
+        _w("text.frei", DisplayMode.text, 101, 48, "Beschriftung", text="FAN"),
+        _w("cpu.percent", DisplayMode.text, 11, 57, "CPU-Wert", suffix="%", decimals=0),
+        _w("ram.percent", DisplayMode.text, 41, 57, "RAM-Wert", suffix="%", decimals=0),
+        _w("cpu.temp", DisplayMode.text, 71, 57, "Temperaturwert", suffix="°", decimals=0),
+        _w("fan.rpm_pct", DisplayMode.text, 101, 57, "Drehzahlwert", suffix="%", decimals=0),
+    ])
+
+
 SCREEN_TEMPLATES: list[_ScreenDef] = [
     _ScreenDef("klassisch", "Klassisch", "Blinkende Uhr, Datum, CPU, RAM und IP-Adresse", "Uhr", _klassisch),
     _ScreenDef("grosse_uhr", "Große Uhr", "Uhrzeit so groß wie möglich, darunter Wochentag und Datum", "Uhr", _grosse_uhr),
@@ -320,6 +384,11 @@ SCREEN_TEMPLATES: list[_ScreenDef] = [
     _ScreenDef("wetter_kompakt", "Wetter kompakt", "Fertiger Wetterbildschirm mit Symbolen", "Wetter", _wetter_kompakt),
     _ScreenDef("wetter_stunden", "Nächste Stunden", "Fertige Stundenvorhersage mit Symbolen", "Wetter", _wetter_stunden),
     _ScreenDef("wetter_tage", "Fünf Tage", "Fertige Tagesvorhersage mit Symbolen", "Wetter", _wetter_tage),
+    _ScreenDef("ringe", "Drei Ringe", "CPU, RAM und Temperatur als Ringe, darunter die Uhr", "System", _ringe),
+    _ScreenDef("symbole", "Symbole mit Werten", "Acht Werte mit passenden Symbolen in zwei Spalten", "System", _symbole),
+    _ScreenDef("stufen", "Stufenanzeige", "CPU, RAM und Temperatur in zehn Stufen, unten Drehzahl und Uhr", "System", _stufen),
+    _ScreenDef("saeulen", "Säulen", "Vier senkrechte Balken mit Beschriftung und Wert", "System", _saeulen),
+    _ScreenDef("digitaluhr", "Digitaluhr", "Siebensegmentanzeige, Datum, Temperatur und RAM", "Uhr", _digitaluhr),
 ]
 
 
@@ -334,41 +403,173 @@ class _WidgetDef:
     factory: Callable[[], Widget]
 
 
+def _symbolwert(source: str, name: str, icon: str | None = None, size: int = 16, **opts: object) -> Widget:
+    return _w(source, DisplayMode.symbol_wert, 0, 0, name, size=size, icon=icon, **opts)
+
+
 WIDGET_TEMPLATES: list[_WidgetDef] = [
+    # Uhr und Datum
     _WidgetDef("uhr_gross", "Uhr groß", "Blinkende Uhrzeit in dreifacher Größe", "Uhr",
                lambda: _w("zeit.uhr_blink", DisplayMode.text, 0, 0, "Uhr", scale_x=3, scale_y=3)),
     _WidgetDef("uhr_riesig", "Uhr riesig", "Uhrzeit in vierfacher Größe, fast volle Breite", "Uhr",
                lambda: _w("zeit.uhr_blink", DisplayMode.text, 0, 0, "Uhr", scale_x=4, scale_y=4)),
+    _WidgetDef("uhr_sekunden", "Uhr mit Sekunden", "Stunden, Minuten und Sekunden in doppelter Größe", "Uhr",
+               lambda: _w("zeit.uhr_s", DisplayMode.text, 0, 0, "Uhr", scale_x=2, scale_y=2)),
+    _WidgetDef("uhr_digital", "Digitaluhr", "Uhrzeit als Siebensegmentanzeige, 24 Pixel hoch", "Uhr",
+               lambda: _w("zeit.uhr", DisplayMode.sieben_segment, 0, 0, "Digitaluhr", height=24)),
+    _WidgetDef("uhr_digital_riesig", "Digitaluhr riesig", "Siebensegmentanzeige über fast die ganze Höhe", "Uhr",
+               lambda: _w("zeit.uhr", DisplayMode.sieben_segment, 0, 0, "Digitaluhr", height=40)),
+    _WidgetDef("uhr_symbol", "Uhr mit Symbol", "Uhrsymbol, daneben die Zeit in doppelter Größe", "Uhr",
+               lambda: _symbolwert("zeit.uhr", "Uhr", "uhr", scale_x=2, scale_y=2)),
     _WidgetDef("datum_lang", "Datum mit Wochentag", "Mo 16.10.2026", "Uhr",
                lambda: _w("zeit.tag_datum", DisplayMode.text, 0, 0, "Datum")),
+    _WidgetDef("datum_gross", "Datum groß", "16.10.2026 in doppelter Größe", "Uhr",
+               lambda: _w("zeit.datum", DisplayMode.text, 0, 0, "Datum", scale_x=2, scale_y=2)),
+    _WidgetDef("wochentag", "Wochentag", "Ausgeschriebener Wochentag in doppelter Größe", "Uhr",
+               lambda: _w("zeit.tag_lang", DisplayMode.text, 0, 0, "Wochentag", scale_x=2, scale_y=2)),
+    _WidgetDef("datum_symbol", "Datum mit Kalender", "Kalendersymbol und Datum", "Uhr",
+               lambda: _symbolwert("zeit.datum", "Datum", "kalender")),
+    _WidgetDef("laufzeit", "Laufzeit", "Betriebszeit seit dem Start, zum Beispiel UP 3d 4h 12m", "Uhr",
+               lambda: _w("zeit.uptime", DisplayMode.text, 0, 0, "Laufzeit", prefix="UP ")),
+    _WidgetDef("laufzeit_symbol", "Laufzeit mit Stoppuhr", "Stoppuhrsymbol und Betriebszeit", "Uhr",
+               lambda: _symbolwert("zeit.uptime", "Laufzeit", "stoppuhr")),
+    _WidgetDef("weltzeit", "Weltzeit", "Uhrzeit einer anderen Zeitzone mit Kürzel davor", "Uhr",
+               lambda: _w("zeit.london", DisplayMode.text, 0, 0, "London", prefix="LON ")),
+    # System
     _WidgetDef("cpu_balken", "CPU-Balken mit Wert", "Auslastung als Balken, rechts der Prozentwert", "System",
                lambda: _w("cpu.percent", DisplayMode.balken_label, 0, 0, "CPU", width=60, height=7, suffix="%")),
+    _WidgetDef("cpu_ring", "CPU-Ring", "Auslastung als Ring mit Wert in der Mitte", "System",
+               lambda: _w("cpu.percent", DisplayMode.ring, 0, 0, "CPU", radius=14, suffix="%", decimals=0)),
+    _WidgetDef("cpu_stufen", "CPU in Stufen", "Zehn Felder, gefüllt bis zur Auslastung", "System",
+               lambda: _w("cpu.percent", DisplayMode.stufen, 0, 0, "CPU", steps=10, width=62, height=6)),
+    _WidgetDef("cpu_saeule", "CPU-Säule", "Senkrechter Balken, füllt sich von unten", "System",
+               lambda: _w("cpu.percent", DisplayMode.balken_v, 0, 0, "CPU", width=8, height=32)),
+    _WidgetDef("cpu_verlauf", "CPU-Verlauf", "Verlauf der letzten Minute als Linie", "System",
+               lambda: _w("cpu.percent", DisplayMode.sparkline, 0, 0, "CPU-Verlauf", width=64, height=20)),
+    _WidgetDef("cpu_flaeche", "CPU-Verlauf als Fläche", "Verlauf der letzten Minute, Fläche gefüllt", "System",
+               lambda: _w("cpu.percent", DisplayMode.sparkline, 0, 0, "CPU-Verlauf", width=64, height=20, filled=True)),
+    _WidgetDef("cpu_symbol", "CPU mit Symbol", "Prozessorsymbol und Auslastung", "System",
+               lambda: _symbolwert("cpu.percent", "CPU", "chip", suffix="%", decimals=0)),
     _WidgetDef("ram_balken_innen", "RAM-Balken, Wert innen", "Balken über volle Breite mit Wert in der Mitte", "System",
                lambda: _w("ram.percent", DisplayMode.balken_label_in, 0, 0, "RAM", width=128, height=9, suffix="% RAM")),
+    _WidgetDef("ram_ring", "RAM-Ring", "Speicherbelegung als Ring", "System",
+               lambda: _w("ram.percent", DisplayMode.ring, 0, 0, "RAM", radius=14, suffix="%", decimals=0)),
+    _WidgetDef("ram_symbol", "RAM mit Symbol", "Speichersymbol und Belegung", "System",
+               lambda: _symbolwert("ram.percent", "RAM", "speicher", suffix="%", decimals=0)),
+    _WidgetDef("ram_frei", "RAM frei", "Freier Arbeitsspeicher in Gigabyte", "System",
+               lambda: _w("ram.available", DisplayMode.text, 0, 0, "RAM frei", suffix=" GB frei", decimals=1)),
     _WidgetDef("temp_messuhr", "Temperatur-Messuhr", "Halbkreis mit Temperatur in Grad", "System",
                lambda: _w("cpu.temp", DisplayMode.gauge, 0, 0, "Temperatur", radius=20, suffix="°", decimals=0)),
+    _WidgetDef("temp_ring", "Temperatur-Ring", "Ring, der sich mit der Temperatur füllt", "System",
+               lambda: _w("cpu.temp", DisplayMode.ring, 0, 0, "Temperatur", radius=14, suffix="°", decimals=0)),
     _WidgetDef("temp_gross", "Temperatur groß", "Zweifache Größe mit Grad", "System",
                lambda: _w("cpu.temp", DisplayMode.text, 0, 0, "Temperatur", scale_x=2, scale_y=2, suffix=" C", decimals=1)),
-    _WidgetDef("cpu_verlauf", "CPU-Verlauf", "Verlauf der letzten Minute", "System",
-               lambda: _w("cpu.percent", DisplayMode.sparkline, 0, 0, "CPU-Verlauf", width=64, height=20)),
-    _WidgetDef("luefter_drehzahl", "Lüfter mit Drehzahl", "Drehendes Symbol und Drehzahl", "System",
-               lambda: _w("fan.symbol_rpm", DisplayMode.fan_icon_rpm, 0, 0, "Lüfter", size=16, suffix=" RPM")),
-    _WidgetDef("ip_adresse", "IP-Adresse", "Adresse im Heimnetz", "Netzwerk",
-               lambda: _w("net.ip", DisplayMode.text, 0, 0, "IP")),
+    _WidgetDef("temp_digital", "Temperatur digital", "Siebensegmentanzeige mit einer Nachkommastelle", "System",
+               lambda: _w("cpu.temp", DisplayMode.sieben_segment, 0, 0, "Temperatur", height=16, decimals=1)),
+    _WidgetDef("temp_symbol", "Temperatur mit Thermometer", "Thermometersymbol und Temperatur", "System",
+               lambda: _symbolwert("cpu.temp", "Temperatur", "thermometer", suffix=" C", decimals=1)),
+    _WidgetDef("temp_verlauf", "Temperaturverlauf", "Verlauf der letzten Minute als Fläche", "System",
+               lambda: _w("cpu.temp", DisplayMode.sparkline, 0, 0, "Temperaturverlauf", width=64, height=20, filled=True)),
+    _WidgetDef("temp_spanne", "Temperaturspanne", "Minimum und Maximum seit dem Start", "System",
+               lambda: _w("cpu.temp_range", DisplayMode.text, 0, 0, "Spanne", prefix="min/max ")),
+    _WidgetDef("last", "Last mit Tacho", "Tachosymbol und Systemlast", "System",
+               lambda: _symbolwert("cpu.load", "Last", "tacho")),
+    # Laufwerke
     _WidgetDef("laufwerk_balken", "Laufwerk mit Belegung", "Belegung des ersten Laufwerks als Balken mit Wert", "Laufwerke",
                lambda: _w("disk.percent.0", DisplayMode.balken_label, 0, 0, "Laufwerk", width=70, height=7, suffix="%")),
+    _WidgetDef("laufwerk_symbol", "Laufwerk mit Symbol", "Laufwerksymbol und Belegung", "Laufwerke",
+               lambda: _symbolwert("disk.percent.0", "Laufwerk", "laufwerk", suffix="%", decimals=0)),
+    _WidgetDef("laufwerk_frei", "Laufwerk frei", "Freier Platz des ersten Laufwerks", "Laufwerke",
+               lambda: _w("disk.available.0", DisplayMode.text, 0, 0, "Frei", suffix=" GB frei", decimals=0)),
+    _WidgetDef("laufwerk_stufen", "Laufwerk in Stufen", "Belegung in zehn Feldern", "Laufwerke",
+               lambda: _w("disk.percent.0", DisplayMode.stufen, 0, 0, "Laufwerk", steps=10, width=62, height=6)),
+    _WidgetDef("laufwerk_ring", "Laufwerk-Ring", "Belegung als Ring", "Laufwerke",
+               lambda: _w("disk.percent.0", DisplayMode.ring, 0, 0, "Laufwerk", radius=14, suffix="%", decimals=0)),
+    # Netzwerk
+    _WidgetDef("ip_adresse", "IP-Adresse", "Adresse im Heimnetz", "Netzwerk",
+               lambda: _w("net.ip", DisplayMode.text, 0, 0, "IP")),
+    _WidgetDef("ip_symbol", "IP mit Symbol", "Kleines Netzwerksymbol und Adresse", "Netzwerk",
+               lambda: _symbolwert("net.ip", "IP", "netzwerk", size=8)),
+    _WidgetDef("rechnername", "Rechnername", "Serversymbol und Name des Rechners", "Netzwerk",
+               lambda: _symbolwert("net.hostname", "Rechnername", "server")),
+    _WidgetDef("download", "Download", "Pfeil nach unten und Empfangsrate", "Netzwerk",
+               lambda: _symbolwert("net.rx", "Download", "download")),
+    _WidgetDef("upload", "Upload", "Pfeil nach oben und Senderate", "Netzwerk",
+               lambda: _symbolwert("net.tx", "Upload", "upload")),
+    _WidgetDef("netz_verlauf", "Netzwerkverlauf", "Empfangsrate der letzten Minute als Fläche", "Netzwerk",
+               lambda: _w("net.rx", DisplayMode.sparkline, 0, 0, "Netzwerk", width=64, height=20, filled=True)),
+    _WidgetDef("schnittstelle", "Schnittstelle", "Steckersymbol und Name der Schnittstelle", "Netzwerk",
+               lambda: _symbolwert("net.interface", "Schnittstelle", "ethernet", size=8)),
+    # Lüfter
+    _WidgetDef("luefter_symbol", "Lüfter dreht", "Symbol, das sich mit der Drehzahl dreht", "Lüfter",
+               lambda: _w("fan.symbol", DisplayMode.fan_icon, 0, 0, "Lüfter", size=16)),
+    _WidgetDef("luefter_gross", "Lüfter groß", "Drehendes Symbol in 32 Pixeln", "Lüfter",
+               lambda: _w("fan.symbol", DisplayMode.fan_icon, 0, 0, "Lüfter", size=32)),
+    _WidgetDef("luefter_drehzahl", "Lüfter mit Drehzahl", "Drehendes Symbol und Drehzahl", "Lüfter",
+               lambda: _w("fan.symbol_rpm", DisplayMode.fan_icon_rpm, 0, 0, "Lüfter", size=16, suffix=" RPM")),
+    _WidgetDef("luefter_leistung", "Lüfterleistung", "Leistung als Balken mit Prozentwert", "Lüfter",
+               lambda: _w("fan.duty", DisplayMode.balken_label, 0, 0, "Leistung", width=60, height=7, suffix="%", decimals=0)),
+    _WidgetDef("luefter_stufe", "Lüfterstufe", "Name der aktuellen Stufe", "Lüfter",
+               lambda: _w("fan.level", DisplayMode.text, 0, 0, "Stufe", prefix="Stufe ")),
+    _WidgetDef("luefter_ring", "Drehzahl-Ring", "Drehzahl bezogen auf das Maximum als Ring", "Lüfter",
+               lambda: _w("fan.rpm_pct", DisplayMode.ring, 0, 0, "Drehzahl", radius=14, suffix="%", decimals=0)),
+    _WidgetDef("luefter_saeule", "Drehzahl-Säule", "Drehzahl als senkrechter Balken", "Lüfter",
+               lambda: _w("fan.rpm_pct", DisplayMode.balken_v, 0, 0, "Drehzahl", width=8, height=32)),
+    # Wetter
     _WidgetDef("wetter_temp", "Außentemperatur", "Temperatur des Vorgabeorts, dreifach", "Wetter",
                lambda: _w("wetter.temp", DisplayMode.text, 0, 0, "Außen", scale_x=3, scale_y=3, suffix="°", decimals=0)),
     _WidgetDef("wetter_kombi", "Temperatur und Zustand", "Zum Beispiel 14° Bewölkt", "Wetter",
                lambda: _w("wetter.kombi", DisplayMode.text, 0, 0, "Wetter")),
+    _WidgetDef("wetter_thermometer", "Außentemperatur mit Symbol", "Thermometer und Temperatur in doppelter Größe", "Wetter",
+               lambda: _symbolwert("wetter.temp", "Außen", "thermometer", scale_x=2, scale_y=2, suffix="°", decimals=0)),
+    _WidgetDef("wetter_gefuehlt", "Gefühlte Temperatur", "Gefühlt, in Grad", "Wetter",
+               lambda: _w("wetter.gefuehlt", DisplayMode.text, 0, 0, "Gefühlt", prefix="gef. ", suffix="°", decimals=0)),
+    _WidgetDef("wetter_wind", "Wind", "Windsymbol und Geschwindigkeit", "Wetter",
+               lambda: _symbolwert("wetter.wind", "Wind", "wind", suffix=" km/h", decimals=0)),
+    _WidgetDef("wetter_feuchte", "Luftfeuchte", "Tropfen und Feuchte in Prozent", "Wetter",
+               lambda: _symbolwert("wetter.feuchte", "Feuchte", "tropfen", suffix="%", decimals=0)),
+    _WidgetDef("wetter_regen", "Niederschlag", "Regensymbol und Menge in Millimetern", "Wetter",
+               lambda: _symbolwert("wetter.niederschlag", "Regen", "regen", suffix=" mm", decimals=1)),
+    _WidgetDef("wetter_druck", "Luftdruck", "Tacho und Druck in Hektopascal", "Wetter",
+               lambda: _symbolwert("wetter.druck", "Druck", "tacho", suffix=" hPa", decimals=0)),
+    _WidgetDef("wetter_sonne", "Sonnenaufgang", "Sonne und Uhrzeit des Aufgangs", "Wetter",
+               lambda: _symbolwert("wetter.sunrise", "Sonnenaufgang", "sonne", size=8)),
+    _WidgetDef("wetter_mond", "Sonnenuntergang", "Mond und Uhrzeit des Untergangs", "Wetter",
+               lambda: _symbolwert("wetter.sunset", "Sonnenuntergang", "mond", size=8)),
+    _WidgetDef("wetter_ort", "Ort", "Standortsymbol und Name des Orts", "Wetter",
+               lambda: _symbolwert("wetter.ort", "Ort", "standort", size=8)),
+    _WidgetDef("wetter_zustand", "Wetterzustand", "Zustand als Text, zum Beispiel Bewölkt", "Wetter",
+               lambda: _w("wetter.zustand", DisplayMode.text, 0, 0, "Zustand")),
+    # Symbole
+    _WidgetDef("symbol_klein", "Symbol klein (8)", "Festes Symbol in 8 Pixeln, frei wählbar", "Symbole",
+               lambda: _w("layout.symbol", DisplayMode.symbol, 0, 0, "Symbol", size=8, icon="stern")),
+    _WidgetDef("symbol_mittel", "Symbol (16)", "Festes Symbol in 16 Pixeln, frei wählbar", "Symbole",
+               lambda: _w("layout.symbol", DisplayMode.symbol, 0, 0, "Symbol", size=16, icon="herz")),
+    _WidgetDef("symbol_gross", "Symbol groß (24)", "Festes Symbol in 24 Pixeln, frei wählbar", "Symbole",
+               lambda: _w("layout.symbol", DisplayMode.symbol, 0, 0, "Symbol", size=24, icon="haus")),
+    _WidgetDef("symbol_xl", "Symbol XL (32)", "Festes Symbol in 32 Pixeln, frei wählbar", "Symbole",
+               lambda: _w("layout.symbol", DisplayMode.symbol, 0, 0, "Symbol", size=32, icon="rakete")),
+    # Layout und Text
     _WidgetDef("titelzeile", "Titelzeile", "Heller Block über volle Breite mit zentriertem Text", "Layout",
                lambda: _w("text.frei", DisplayMode.text_invertiert, 0, 0, "Titel", text="TITEL", align=Align.center, box_w=126)),
     _WidgetDef("trennlinie", "Trennlinie mit Titel", "Linie mit Beschriftung in der Mitte", "Layout",
                lambda: _w("layout.section", DisplayMode.section, 0, 0, "Trennlinie", width=128, text="TITEL")),
     _WidgetDef("rahmen", "Rahmen", "Kasten um einen Bereich", "Layout",
                lambda: _w("layout.rahmen", DisplayMode.rahmen, 0, 0, "Rahmen", width=63, height=31)),
+    _WidgetDef("block", "Block", "Gefüllte Fläche", "Layout",
+               lambda: _w("layout.block", DisplayMode.block, 0, 0, "Block", width=40, height=20)),
+    _WidgetDef("linie_waagerecht", "Linie waagerecht", "Linie über die volle Breite", "Layout",
+               lambda: _w("layout.linie_h", DisplayMode.linie_h, 0, 0, "Linie", width=128)),
+    _WidgetDef("linie_senkrecht", "Linie senkrecht", "Linie über die volle Höhe", "Layout",
+               lambda: _w("layout.linie_v", DisplayMode.linie_v, 0, 0, "Linie", height=64)),
     _WidgetDef("laufschrift", "Laufschrift", "Eigener Text, der durchläuft", "Layout",
                lambda: _w("text.laufschrift", DisplayMode.laufschrift, 0, 0, "Laufschrift", scale_x=2, scale_y=2, text="Hallo Welt   ")),
+    _WidgetDef("text_zwei_zeilen", "Zwei Zeilen Text", "Eigener Text mit Zeilenumbruch", "Layout",
+               lambda: _w("text.mehrzeilig", DisplayMode.text, 0, 0, "Text", text="Zeile 1\nZeile 2")),
+    _WidgetDef("text_rahmen", "Text mit Rahmen", "Eigener Text in einem Kasten", "Layout",
+               lambda: _w("text.frei", DisplayMode.text_rahmen, 0, 0, "Text", text="INFO")),
+    _WidgetDef("pixelbild", "Leeres Pixelbild", "32 mal 16 Pixel zum Zeichnen", "Layout",
+               lambda: _w("layout.bitmap", DisplayMode.bitmap, 0, 0, "Pixelbild", width=32, height=16)),
 ]
 
 

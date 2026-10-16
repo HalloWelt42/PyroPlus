@@ -11,8 +11,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from oled.models import Catalog, DisplayModeInfo, SourceInfo, Tab, TabInfo, ValueType
+from oled.models import Catalog, DisplayModeInfo, SourceInfo, SymbolInfo, Tab, TabInfo, ValueType
 from oled.modes import all_modes
+from oled.symbole import GROESSEN, KATEGORIEN, alle_symbole
 from oled.values import StatsSnapshot, ValueContext, all_sources, resolve
 from oled.weather import WeatherReport
 
@@ -56,7 +57,9 @@ def build_catalog(stats: StatsSnapshot, now: datetime,
         for m in all_modes()
     ]
     reiter = [TabInfo(id=tab, label=TAB_LABELS[tab]) for tab in Tab]
-    return Catalog(tabs=reiter, sources=quellen, modes=arten)
+    symbole = [SymbolInfo(id=s.id, label=s.label, category=s.kategorie) for s in alle_symbole()]
+    return Catalog(tabs=reiter, sources=quellen, modes=arten, symbols=symbole,
+                   symbol_categories=list(KATEGORIEN), symbol_sizes=list(GROESSEN))
 
 
 def _beispiel(source_id: str, stats: StatsSnapshot, now: datetime,

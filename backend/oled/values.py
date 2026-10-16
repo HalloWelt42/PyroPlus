@@ -684,6 +684,11 @@ for _kennung, _label in (
     source(_kennung, Tab.layout, _label, ValueType.shape)(lambda ctx: Value())
 
 
+@source("layout.symbol", Tab.layout, "Symbol", ValueType.shape, description="Festes Symbol aus der Bibliothek")
+def _layout_symbol(ctx: ValueContext) -> Value:
+    return Value()
+
+
 @source("layout.bitmap", Tab.layout, "Pixelbild", ValueType.bitmap, description="Frei gezeichnetes Bild")
 def _layout_bitmap(ctx: ValueContext) -> Value:
     return Value()
@@ -695,5 +700,6 @@ LAYOUT_DEFAULT_DISPLAY: dict[str, str] = {
     "layout.rahmen": "rahmen",
     "layout.block": "block",
     "layout.section": "section",
+    "layout.symbol": "symbol",
     "layout.bitmap": "bitmap",
 }

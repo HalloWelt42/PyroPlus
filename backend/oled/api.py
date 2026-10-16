@@ -16,6 +16,7 @@ from oled.migrate import migrate_screen
 from oled.models import (
     Catalog, GeocodeHit, ImportResult, OledBundle, OledMode, OledSettings, OledSettingsPatch,
     OledState, Profile, ProfileCreate, RenderRequest, RenderResponse, Screen, ScreenOrder,
+    WidgetRenderRequest, WidgetRenderResponse,
     WeatherLocation, WeatherLocationCreate, WeatherLocationState, WeatherSettings, Widget, WidgetPreset,
 )
 from oled.templates import TemplateCatalog, screen_template, template_catalog, widget_template
@@ -62,6 +63,12 @@ def oled_catalog(request: Request) -> Catalog:
 @router.post("/render", response_model=RenderResponse, summary="Entwurf rendern (Bild + Rahmen)")
 def oled_render(req: RenderRequest, request: Request) -> RenderResponse:
     return _engine(request).render_draft(req.screen, req.simulate)
+
+
+@router.post("/render/widget", response_model=WidgetRenderResponse,
+             summary="Ein Widget als Vorschau rendern (Bild genau in Widgetgröße)")
+def oled_render_widget(req: WidgetRenderRequest, request: Request) -> WidgetRenderResponse:
+    return _engine(request).render_widget_preview(req.widget, req.simulate)
 
 
 # Bildschirme
