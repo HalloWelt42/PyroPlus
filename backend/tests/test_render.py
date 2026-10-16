@@ -35,11 +35,11 @@ def test_simulation_ersetzt_wert(stats_dict: dict) -> None:
 def test_wetter_ohne_bericht_und_mit(stats_dict: dict) -> None:
     stats = StatsSnapshot.model_validate(stats_dict)
     assert resolve("wetter.temp", ValueContext(stats=stats, now=datetime.now())).text == "--"
-    bericht = WeatherReport(location_id="a", location_name="Zeitz",
+    bericht = WeatherReport(location_id="a", location_name="Berlin",
                             current=WeatherCurrent(temperature=12.34, condition_text="Klar", humidity=70))
     ctx = ValueContext(stats=stats, now=datetime.now(), weather=bericht)
     assert resolve("wetter.temp", ctx).text == "12.3"
-    assert resolve("wetter.ort", ctx).text == "Zeitz"
+    assert resolve("wetter.ort", ctx).text == "Berlin"
     assert resolve("wetter.feuchte", ctx).percent == 70
 
 

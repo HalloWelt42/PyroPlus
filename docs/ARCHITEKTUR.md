@@ -77,10 +77,22 @@ zählt hoch und spiegelt nach `frontend/package.json`. Der Git-Hook unter
 `tools/git-hooks/pre-commit` erzwingt bei jedem Commit eine neue Version.
 Backend, Frontend und Hardware-Proxy lesen die Datei zur Laufzeit.
 
+## Oberfläche
+
+`frontend/src` in Svelte 5 mit TypeScript. `lib/api` hält Typen und Client,
+`lib/stores` den Live-Zustand (WebSocket) und den Display-Store (Entwurf,
+Auswahl, Verlauf, Rendern, Speichern), `lib/display` den Editor, `lib/luefter`
+und `lib/leds` die beiden anderen Bereiche, `lib/mobil` die eigenständige
+Telefonansicht, `lib/hilfe` das schwebende Hilfefenster. `app.css` ist das
+Design-System und entspricht `mockups/stil.css`.
+
+Die Oberfläche rendert nichts selbst: jedes Bild kommt über `POST /api/oled/render`
+vom Backend, zusammen mit den Rahmen der Widgets für Auswahl und Ziehen. Die
+LED-Farben in der Seitenleiste sind die Farben, die die Hardware meldet.
+
 ## Stufen
 
-1. Backend wird alleinige Wahrheit: Modell, Katalog, Render-Endpunkt, Migration,
-   Verträglichkeitsrouten für die alte Oberfläche.
-2. Mockups für den Editor, danach neuer dünner Editor in Svelte 5 mit TypeScript.
-3. Fehler in Lüfter und LEDs, Betrieb bereinigen (Hardware-Proxy aus dem Repo,
-   Dienstname, Compose).
+1. Backend wird alleinige Wahrheit: Modell, Katalog, Render-Endpunkt, Migration. Erledigt.
+2. Mockups, danach neuer Editor in Svelte 5 mit TypeScript, Lüfter und LEDs in derselben
+   Gestaltung, Telefonansicht. Erledigt.
+3. Betrieb bereinigen: Hardware-Proxy aus dem Repo, Dienstname, Compose, Anleitung.

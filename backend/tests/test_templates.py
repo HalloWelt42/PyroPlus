@@ -12,7 +12,7 @@ from oled.weather import WeatherCurrent, WeatherReport
 
 
 def _ctx(stats_dict: dict) -> RenderContext:
-    bericht = WeatherReport(location_id="x", location_name="Zeitz",
+    bericht = WeatherReport(location_id="x", location_name="Berlin",
                             current=WeatherCurrent(temperature=14.7, apparent_temperature=12.0, humidity=71,
                                                    wind_speed=18, wind_gusts=34, cloud_cover=65, pressure=1013,
                                                    precipitation=0.4, condition_text="Bewölkt", sunrise="07:21", sunset="18:04"))

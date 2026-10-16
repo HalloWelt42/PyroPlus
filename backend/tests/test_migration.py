@@ -68,12 +68,12 @@ def test_migration_bildschirme(tmp_path: Path) -> None:
 
 def test_migration_editor_sicherung(tmp_path: Path) -> None:
     sicherung = {
-        "weatherCities": [{"name": "Zeitz", "lat": 51.05, "lon": 12.13}, {"name": "Leipzig", "lat": 51.3, "lon": 12.4}],
+        "weatherCities": [{"name": "Berlin", "lat": 52.52, "lon": 13.41}, {"name": "Hamburg", "lat": 53.55, "lon": 9.99}],
         "widgetPresets": [{"source": "cpu.temp", "display": "gauge_gross", "name": "Temp", "opts": {"radius": 20}}],
         "profiles": [{"name": "Nacht", "screens": [{"type": "system", "widgets": []}], "rotationInterval": 20}],
     }
     ergebnis = migrate_v1({"screens": []}, _pixel_dir(tmp_path), sicherung)
-    assert [o.name for o in ergebnis.weather.locations] == ["Zeitz", "Leipzig"]
+    assert [o.name for o in ergebnis.weather.locations] == ["Berlin", "Hamburg"]
     assert ergebnis.weather.default_location_id == ergebnis.weather.locations[0].id
     assert ergebnis.presets[-1].display == DisplayMode.gauge and ergebnis.presets[-1].opts.radius == 20
     assert ergebnis.profiles[0].name == "Nacht" and ergebnis.profiles[0].rotation_interval == 20
@@ -82,18 +82,17 @@ def test_migration_editor_sicherung(tmp_path: Path) -> None:
 def test_store_migriert_genau_einmal(tmp_path: Path) -> None:
     (tmp_path / "oled_settings.json").write_text(json.dumps(ALT))
     _pixel_dir(tmp_path)
-    store = OledStore(tmp_path, {"name": "Zeitz", "lat": 51.05, "lon": 12.13})
+    store = OledStore(tmp_path)
     assert store.ensure_initialised() is not None
     assert (tmp_path / "oled.json").exists() and (tmp_path / "oled_settings.json").exists()
     assert store.ensure_initialised() is None
     settings = store.load_settings()
     assert len(settings.screens) == 5 and settings.schema_version == 2
-    wetter = store.load_weather()
-    assert wetter.locations[0].name == "Zeitz"
+    assert store.load_weather().locations == []
 
 
 def test_store_ohne_bestand_legt_vorgabe_an(tmp_path: Path) -> None:
-    store = OledStore(tmp_path, {"name": "Zeitz", "lat": 51.05, "lon": 12.13})
+    store = OledStore(tmp_path)
     store.ensure_initialised()
     settings = store.load_settings()
     assert len(settings.screens) == 1 and settings.screens[0].widgets

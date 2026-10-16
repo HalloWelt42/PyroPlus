@@ -25,11 +25,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import hw_client
 from config import (
     API_TOKEN, APP_NAME, DATA_DIR, HOST, OLED_RENDER_INTERVAL, PORT, TOKEN_FILE, VERSION,
-    VERSION_VOLL, WEATHER_DEFAULT_LOCATION, WEATHER_REFRESH_SECONDS, WS_STATS_INTERVAL,
+    VERSION_VOLL, WEATHER_REFRESH_SECONDS, WS_STATS_INTERVAL,
 )
 from effects.engine import LEDEngine
 from fan.controller import FanController
-from oled.api import legacy as oled_legacy_router
 from oled.api import router as oled_router
 from oled.engine import OledEngine
 from oled.store import OledStore
@@ -63,7 +62,7 @@ class TokenAuthMiddleware(BaseHTTPMiddleware):
 
 
 def build_oled_engine() -> OledEngine:
-    store = OledStore(DATA_DIR, WEATHER_DEFAULT_LOCATION)
+    store = OledStore(DATA_DIR)
     store.ensure_initialised()
     weather = WeatherService(OpenMeteoProvider(), store.load_weather(), WEATHER_REFRESH_SECONDS)
     return OledEngine(store, weather, collect_stats,
@@ -102,7 +101,6 @@ app = FastAPI(title=APP_NAME, version=VERSION, lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 app.add_middleware(TokenAuthMiddleware)
-app.include_router(oled_legacy_router)
 app.include_router(oled_router)
 
 
@@ -196,11 +194,17 @@ def get_full_state() -> dict[str, Any]:
 
 
 def _oled_payload() -> dict[str, Any]:
-    """OLED-Zustand für WebSocket und Gesamtstatus. Enthält noch die Bildschirme,
-    weil die alte Oberfläche sie erwartet; ab Stufe 2 nur der Live-Zustand."""
+    """Vollständiger OLED-Zustand für den Gesamtstatus."""
     if oled is None:
         return {}
     return oled.get_state().model_dump(mode="json", by_alias=True)
+
+
+def _oled_live() -> dict[str, Any]:
+    """Leichter Live-Zustand für den WebSocket; die Bildschirme holt die Oberfläche bei Versionswechsel."""
+    if oled is None:
+        return {}
+    return oled.get_live().model_dump(mode="json", by_alias=True)
 
 
 def _stats_with_simulation(stats: dict[str, Any]) -> dict[str, Any]:
@@ -454,7 +458,7 @@ async def _ws_push_loop() -> None:
                         "stats": stats,
                         "fan": fan.get_state() if fan else {},
                         "leds": leds.get_ws_state() if leds else {},
-                        "oled": _oled_payload(),
+                        "oled": _oled_live(),
                         "custom_data": _custom_data,
                     },
                 })

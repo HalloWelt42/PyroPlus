@@ -74,7 +74,7 @@ sudo systemctl start pironman5.service
 Vom Entwicklungsrechner (Mac/PC):
 
 ```bash
-scp ~/Downloads/pyroplus-v3.0.0.zip pi@192.168.178.49:/tmp/
+scp ~/Downloads/pyroplus-v3.0.0.zip pi@<PI-ADRESSE>:/tmp/
 ```
 
 Auf dem Pi:
@@ -150,7 +150,7 @@ curl -s http://localhost:8070 | head -1
 Im Browser öffnen:
 
 ```
-http://192.168.178.49:8070
+http://<PI-ADRESSE>:8070
 ```
 
 Das Frontend holt sich den API-Token automatisch beim Start.

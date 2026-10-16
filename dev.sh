@@ -27,8 +27,8 @@ else
 fi
 
 echo ""
-echo "  Dev-Server: http://192.168.178.49:5173"
-echo "  Produktion: http://192.168.178.49:8070"
+echo "  Dev-Server: http://<PI-ADRESSE>:5173"
+echo "  Produktion: http://<PI-ADRESSE>:8070"
 echo ""
 echo "  WebSocket verbindet direkt auf :8071"
 echo "  Docker-Rebuilds unterbrechen NICHT die Entwicklung"

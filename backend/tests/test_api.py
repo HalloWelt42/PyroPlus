@@ -141,30 +141,33 @@ def test_profile(client: TestClient) -> None:
 
 
 def test_wetterorte(client: TestClient) -> None:
-    orte = client.get("/api/oled/weather/locations").json()
-    assert len(orte) == 1 and orte[0]["isDefault"]
+    assert client.get("/api/oled/weather/locations").json() == [], "ohne Bestand gibt es keinen Vorgabeort"
     treffer = client.get("/api/oled/weather/search", params={"q": "Leip"}).json()
     assert treffer[0]["name"] == "Leipzig"
     r = client.post("/api/oled/weather/locations", json=treffer[0])
     assert r.status_code == 201
-    neu = r.json()
-    client.post("/api/oled/weather/refresh", params={"locationId": neu["id"]})
-    zustand = next(o for o in client.get("/api/oled/weather/locations").json() if o["location"]["id"] == neu["id"])
+    erster = r.json()
+    orte = client.get("/api/oled/weather/locations").json()
+    assert len(orte) == 1 and orte[0]["isDefault"], "der erste Ort wird Vorgabeort"
+    client.post("/api/oled/weather/refresh", params={"locationId": erster["id"]})
+    zustand = client.get("/api/oled/weather/locations").json()[0]
     assert zustand["ok"] and "9.5" in zustand["summary"]
-    assert client.post(f"/api/oled/weather/locations/{neu['id']}/default").json()["defaultLocationId"] == neu["id"]
 
+    r = client.post("/api/oled/weather/locations", json={"name": "Hamburg", "lat": 53.55, "lon": 9.99})
+    zweiter = r.json()
+    assert client.post(f"/api/oled/weather/locations/{zweiter['id']}/default").json()["defaultLocationId"] == zweiter["id"]
     entwurf = {"screen": {"widgets": [{"source": "wetter.temp", "display": "text", "x": 0, "y": 0,
-                                       "opts": {"locationId": neu["id"]}}]}}
+                                       "opts": {"locationId": erster["id"]}}]}}
     assert client.post("/api/oled/render", json=entwurf).json()["boxes"][0]["w"] > 0
-    assert client.delete(f"/api/oled/weather/locations/{neu['id']}").status_code == 200
+    assert client.delete(f"/api/oled/weather/locations/{zweiter['id']}").status_code == 200
     rest = client.get("/api/oled/weather/locations").json()
-    assert len(rest) == 1 and rest[0]["isDefault"]
+    assert len(rest) == 1 and rest[0]["isDefault"], "Vorgabe fällt auf den verbleibenden Ort zurück"
     assert client.delete(f"/api/oled/weather/locations/{rest[0]['location']['id']}").status_code == 409
 
 
 def test_export_import(client: TestClient) -> None:
     export = client.get("/api/oled/export").json()
-    assert export["settings"]["screens"] and export["weather"]["locations"]
+    assert export["settings"]["screens"] and len(export["weather"]["locations"]) == 1
     anzahl = len(client.get("/api/oled/screens").json())
     r = client.post("/api/oled/import", json=export)
     assert r.status_code == 200 and r.json()["screens"] >= 1
@@ -186,26 +189,6 @@ def test_import_alte_sicherung(client: TestClient) -> None:
     assert alt["widgets"][0]["display"] == "text" and alt["widgets"][0]["opts"]["scaleX"] == 3
     assert any(o["location"]["name"] == "Berlin" for o in client.get("/api/oled/weather/locations").json())
     assert any(p["name"] == "RAM" for p in client.get("/api/oled/presets").json())
-
-
-def test_veraltete_routen_der_alten_oberflaeche(client: TestClient) -> None:
-    vorher = len(client.get("/api/oled/screens").json())
-    r = client.post("/api/oled/screens", json={"type": "system", "name": "Alt-Editor", "widgets": [
-        {"source": "zeit.uhr", "display": "zahl_gross", "x": 0, "y": 0, "opts": {"scaleX": 2, "scaleY": 2, "_boxW": 9}}]})
-    assert r.status_code == 201 and r.json()["widgets"][0]["display"] == "text"
-    assert len(client.get("/api/oled/screens").json()) == vorher + 1
-
-    r = client.put(f"/api/oled/screens/{vorher}", json={"type": "system", "name": "Alt geändert", "widgets": []})
-    assert r.status_code == 200 and r.json()["screens"][vorher]["name"] == "Alt geändert"
-    assert client.post(f"/api/oled/screen/{vorher}").json()["current_screen"] == vorher
-    assert client.post("/api/oled/mode/manual").json()["mode"] == "manual"
-    assert client.post("/api/oled/brightness/120").json()["brightness"] == 120
-    assert client.post("/api/oled/rotation/15").json()["rotation_interval"] == 15
-    r = client.post("/api/oled/screens/reorder", json=list(range(vorher + 1))[::-1])
-    assert r.json()["screens"][0]["name"] == "Alt geändert"
-    assert client.delete("/api/oled/screens/0").status_code == 200
-    assert len(client.get("/api/oled/screens").json()) == vorher
-    assert client.post("/api/oled/screen/99").status_code == 404
 
 
 def test_gesamtstatus_enthaelt_oled(client: TestClient) -> None:

@@ -12,14 +12,12 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Optional, TypeVar
+from typing import Optional, TypeVar
 
 from pydantic import BaseModel, TypeAdapter
 
 from oled.migrate import MigrationResult, migrate_v1
-from oled.models import (
-    OledSettings, Profile, Screen, WeatherLocation, WeatherSettings, WidgetPreset, neue_id,
-)
+from oled.models import OledSettings, Profile, Screen, WeatherSettings, WidgetPreset
 
 logger = logging.getLogger("oled.store")
 
@@ -42,9 +40,8 @@ class OledStore:
     LEGACY_BACKUP = "frontend_backup.json"
     LEGACY_PIXEL_DIR = "pixel_screens"
 
-    def __init__(self, data_dir: Path, default_location: dict[str, Any]) -> None:
+    def __init__(self, data_dir: Path) -> None:
         self.data_dir = data_dir
-        self.default_location = default_location
 
     # Allgemein
 
@@ -99,8 +96,6 @@ class OledStore:
         self.save_presets(ergebnis.presets)
         self.save_profiles(ergebnis.profiles)
         wetter = ergebnis.weather
-        if not wetter.locations:
-            wetter = self._default_weather()
         self.save_weather(wetter)
         logger.info(f"Migration: {len(ergebnis.settings.screens)} Bildschirme, "
                     f"{len(ergebnis.presets)} Vorlagen, {len(ergebnis.profiles)} Profile, "
@@ -108,9 +103,8 @@ class OledStore:
         return ergebnis
 
     def _default_weather(self) -> WeatherSettings:
-        ort = WeatherLocation(id=neue_id(), name=str(self.default_location["name"]),
-                              lat=float(self.default_location["lat"]), lon=float(self.default_location["lon"]))
-        return WeatherSettings(locations=[ort], default_location_id=ort.id)
+        """Ohne gespeicherte Orte bleibt die Liste leer; Wetterwerte zeigen dann '--'."""
+        return WeatherSettings()
 
     def _ensure_weather(self) -> None:
         if not (self.data_dir / self.WEATHER).exists():
@@ -162,8 +156,6 @@ class OledStore:
             wetter = WeatherSettings.model_validate(roh)
         except Exception as fehler:
             logger.error(f"weather.json ungültig: {fehler}")
-            return self._default_weather()
-        if not wetter.locations:
             return self._default_weather()
         return wetter
 

@@ -1,8 +1,7 @@
 """
 PyroPlus: Schnittstelle des OLED-Bereichs unter /api/oled.
 
-Alle Antworten sind Modelle aus oled/models.py. Die veralteten, indexbasierten
-Routen der alten Oberfläche stehen am Ende und werden mit Stufe 2 entfernt.
+Alle Antworten sind Modelle aus oled/models.py.
 """
 
 from __future__ import annotations
@@ -22,7 +21,6 @@ from oled.models import (
 from oled.templates import TemplateCatalog, screen_template, template_catalog, widget_template
 
 router = APIRouter(prefix="/api/oled", tags=["OLED"])
-legacy = APIRouter(prefix="/api/oled", tags=["OLED (veraltet)"], deprecated=True)
 
 
 def _engine(request: Request) -> OledEngine:
@@ -81,21 +79,8 @@ def oled_replace_screens(screens: list[Screen], request: Request) -> list[Screen
 
 
 @router.post("/screens", response_model=Screen, status_code=201)
-def oled_add_screen(daten: dict[str, Any], request: Request) -> Screen:
-    """Nimmt einen Bildschirm im aktuellen Modell an; das alte Format wird übersetzt."""
-    engine = _engine(request)
-    screen = _screen_from_any(daten, engine, len(engine.list_screens()))
-    return engine.add_screen(screen)
-
-
-def _screen_from_any(daten: dict[str, Any], engine: OledEngine, index: int) -> Screen:
-    try:
-        return Screen.model_validate(daten)
-    except Exception:
-        screen = migrate_screen(daten, engine.store.data_dir / "pixel_screens", index)
-        if screen is None:
-            raise HTTPException(status_code=422, detail="Bildschirm nicht verständlich")
-        return screen
+def oled_add_screen(screen: Screen, request: Request) -> Screen:
+    return _engine(request).add_screen(screen)
 
 
 @router.post("/screens/order", response_model=list[Screen], summary="Reihenfolge setzen")
@@ -314,81 +299,4 @@ def oled_import_legacy(daten: LegacyImport, request: Request, replace: bool = Qu
     return engine.import_bundle(bundle, replace)
 
 
-# Veraltete Routen der alten Oberfläche (Index statt Kennung)
-
-def _index_to_id(engine: OledEngine, index: int) -> str:
-    screens = engine.list_screens()
-    if 0 <= index < len(screens):
-        return screens[index].id
-    raise HTTPException(status_code=404, detail=f"Kein Bildschirm mit Index {index}")
-
-
-def _legacy_state(engine: OledEngine) -> dict[str, Any]:
-    state = engine.get_state()
-    screens = engine.list_screens()
-    aktuell = next((i for i, s in enumerate(screens) if s.id == state.current_screen_id), 0)
-    return {"ok": True, "screens": [s.model_dump(mode="json", by_alias=True) for s in screens],
-            "current_screen": aktuell, "preview": state.preview}
-
-
-@legacy.post("/mode/{mode}")
-def legacy_mode(mode: str, request: Request) -> dict[str, Any]:
-    if mode not in ("auto", "manual", "off"):
-        return {"error": "Ungültiger Modus. Erlaubt: auto, manual, off"}
-    _engine(request).patch_settings(OledSettingsPatch(mode=OledMode(mode)))
-    return {"ok": True, "mode": mode}
-
-
-@legacy.post("/brightness/{value}")
-def legacy_brightness(value: int, request: Request) -> dict[str, Any]:
-    s = _engine(request).patch_settings(OledSettingsPatch(brightness=max(0, min(255, value))))
-    return {"ok": True, "brightness": s.brightness}
-
-
-@legacy.post("/rotation/{seconds}")
-def legacy_rotation(seconds: int, request: Request) -> dict[str, Any]:
-    s = _engine(request).patch_settings(OledSettingsPatch(rotation_interval=max(1, min(3600, seconds))))
-    return {"ok": True, "rotation_interval": s.rotation_interval}
-
-
-@legacy.post("/screen/{index:int}")
-def legacy_select(index: int, request: Request) -> dict[str, Any]:
-    engine = _engine(request)
-    engine.activate(_index_to_id(engine, index))
-    return _legacy_state(engine)
-
-
-@legacy.get("/preview")
-def legacy_preview(request: Request) -> dict[str, Any]:
-    return {"preview": _engine(request).preview}
-
-
-@legacy.post("/screens/reorder")
-def legacy_reorder(order: list[int], request: Request) -> dict[str, Any]:
-    engine = _engine(request)
-    screens = engine.list_screens()
-    ids = [screens[i].id for i in order if 0 <= i < len(screens)]
-    engine.reorder_screens(ids)
-    return _legacy_state(engine)
-
-
-@legacy.put("/screens/{index:int}")
-def legacy_update(index: int, daten: dict[str, Any], request: Request) -> dict[str, Any]:
-    engine = _engine(request)
-    screen_id = _index_to_id(engine, index)
-    screen = _screen_from_any(daten, engine, index)
-    engine.update_screen(screen_id, screen)
-    return _legacy_state(engine)
-
-
-@legacy.delete("/screens/{index:int}")
-def legacy_delete(index: int, request: Request) -> dict[str, Any]:
-    engine = _engine(request)
-    try:
-        engine.delete_screen(_index_to_id(engine, index))
-    except ValueError as fehler:
-        return {"error": str(fehler), **_legacy_state(engine)}
-    return _legacy_state(engine)
-
-
-__all__ = ["router", "legacy"]
+__all__ = ["router"]

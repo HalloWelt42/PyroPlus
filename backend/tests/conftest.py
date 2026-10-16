@@ -31,7 +31,7 @@ def stats_dict() -> dict:
             {"label": "Daten", "mount": "/mnt/data", "total_gb": 2000.0, "used_gb": 1500.0,
              "available_gb": 500.0, "percent": 75.0, "model": "USB", "fstype": "ext4"},
         ],
-        "network": {"ip": "192.168.178.49", "interface": "eth0", "hostname": "raspberrypi",
+        "network": {"ip": "192.168.0.42", "interface": "eth0", "hostname": "raspberrypi",
                     "rx_bytes_sec": 2048.0, "tx_bytes_sec": 512.0},
         "fan": {"rpm": 1200, "pwm_level": 1, "level_name": "Leise"},
         "uptime": {"seconds": 90061, "formatted": "1d 1h 1m"},

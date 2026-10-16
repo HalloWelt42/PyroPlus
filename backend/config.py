@@ -63,8 +63,7 @@ OLED_DEFAULT_BRIGHTNESS = 200
 OLED_ROTATION_INTERVAL = 10
 OLED_RENDER_INTERVAL = float(os.getenv("OLED_RENDER_INTERVAL", "0.2"))
 
-# Wetter: Vorgabeort, falls noch keiner gespeichert ist
-WEATHER_DEFAULT_LOCATION = {"name": "Zeitz", "lat": 51.05, "lon": 12.13}
+# Wetter
 WEATHER_REFRESH_SECONDS = int(os.getenv("WEATHER_REFRESH_SECONDS", "600"))
 
 # LEDs
