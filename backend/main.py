@@ -47,7 +47,8 @@ _sim_temp: float | None = None
 
 # Token-Prüfung
 
-OPEN_PATHS = {"/api/token", "/docs", "/openapi.json", "/redoc", "/health"}
+# /api/info ist offen: die Oberfläche vergleicht damit ihre eingebaute Fassung mit der des Servers (stores/fassung).
+OPEN_PATHS = {"/api/token", "/api/info", "/docs", "/openapi.json", "/redoc", "/health"}
 
 
 class TokenAuthMiddleware(BaseHTTPMiddleware):

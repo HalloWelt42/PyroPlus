@@ -6,11 +6,13 @@
   import MobilVorlagen from './MobilVorlagen.svelte';
   import MobilLuefter from './MobilLuefter.svelte';
   import MobilLeds from './MobilLeds.svelte';
+  import FassungBand from '$lib/bausteine/FassungBand.svelte';
 
   let seite = $state<'display' | 'vorlagen'>('display');
 </script>
 
 <div class="mobil">
+  <FassungBand />
   {#if ui.ansicht === 'display'}
     {#if seite === 'vorlagen'}
       <MobilVorlagen onzurueck={() => (seite = 'display')} />

@@ -38,6 +38,13 @@ def test_token_pflicht(client: TestClient) -> None:
     assert offen.get("/health").status_code == 200
 
 
+def test_fassung_ohne_token(client: TestClient) -> None:
+    """Die Oberfläche fragt die Fassung des Servers ohne Token ab (Neuladen bei neuer Fassung)."""
+    r = TestClient(main.app).get("/api/info")
+    assert r.status_code == 200
+    assert r.json()["voll"] == client.get("/health").json()["voll"]
+
+
 def test_zustand_und_version(client: TestClient) -> None:
     r = client.get("/api/oled")
     assert r.status_code == 200

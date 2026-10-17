@@ -107,6 +107,10 @@ img { display: block; }
 .status-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--green); margin-right: 6px; box-shadow: 0 0 8px rgba(0,232,138,0.5); }
 
 /* Hauptbereich: fester Kopf, darunter der Editor */
+/* Hauptbereich rechts der Seitenleiste: oben das Band bei neuer Fassung (bausteine/FassungBand.svelte), darunter die
+   Ansicht. Ohne eigenes Abschneiden: die schwebenden Fenster der Ansichten liegen darin und decken die ganze Seite. */
+.hauptbereich { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.hauptbereich > .main { flex: 1; min-height: 0; }
 .main { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 .kopf { display: flex; flex-direction: column; gap: 10px; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--bg-base); flex-shrink: 0; }
 .kopf-zeile { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; min-height: 44px; }
