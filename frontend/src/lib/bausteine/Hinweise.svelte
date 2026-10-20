@@ -11,7 +11,7 @@
 </div>
 
 <style>
-  .hinweise { position: fixed; top: 16px; right: 16px; z-index: 90; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .hinweise { position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); right: 16px; z-index: 90; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
   .toast { position: static; }
   .toast-fehler { border-color: rgba(255,64,96,0.3); background: rgba(255,64,96,0.14); color: var(--red); }
   .toast-info { border-color: var(--border-accent); background: var(--accent-dim); color: var(--accent); }
