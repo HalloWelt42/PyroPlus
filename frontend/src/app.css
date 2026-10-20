@@ -343,7 +343,8 @@ img { display: block; }
 
 /* Mobilansicht: eigenständiger Aufbau, nur für schmale Geräte gedacht */
 .mobil { display: flex; flex-direction: column; height: 100vh; width: 100vw; overflow: hidden; background: #000; color: var(--text-primary); max-width: 430px; margin: 0 auto; }
-.mobil-kopf { display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px; flex-shrink: 0; }
+/* Abstand oben: iOS sperrt in Startbildschirm-Apps die Zone unter Statusleiste und Kamera-Insel für Berührungen */
+.mobil-kopf { display: flex; align-items: center; gap: 12px; padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 10px; flex-shrink: 0; }
 .mobil-kopf h1 { font-size: 24px; font-weight: 700; flex: 1; }
 .mobil-kopf .temp { font: 700 22px var(--mono); color: #ffb020; }
 .mobil-inhalt { flex: 1; min-height: 0; overflow-y: auto; overflow-x: clip; padding: 0 16px 16px; display: flex; flex-direction: column; gap: 14px; }
