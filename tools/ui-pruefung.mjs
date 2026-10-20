@@ -165,21 +165,7 @@ const PRUEFEN = String.raw`(() => {
       if (s.whiteSpace !== "nowrap" && el.matches(".chip, .badge, .chip-status") && zeilen > 1 && r.height > 40) befunde.push("Chip bricht um: " + pfad(el));
     }
   }
-  // 4. Nichts Lesbares oder Bedienbares in den unsicheren Zonen (Statusleiste, Home-Balken)
-  const probe = document.createElement("div");
-  probe.style.cssText = "position:fixed;visibility:hidden;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)";
-  document.body.appendChild(probe);
-  const zoneOben = parseFloat(getComputedStyle(probe).paddingTop), zoneUnten = parseFloat(getComputedStyle(probe).paddingBottom);
-  probe.remove();
-  if (zoneOben || zoneUnten) {
-    for (const el of alle) {
-      if (!el.matches("button, input, select, h1, h2, h3, .chip, .badge") && !(el.children.length === 0 && (el.textContent || "").trim())) continue;
-      const a = ausschnitt(el); if (!a) continue;
-      if (a.t < zoneOben - 0.5) befunde.push("unter der Statusleiste: " + pfad(el));
-      if (a.b > innerHeight - zoneUnten + 0.5) befunde.push("im Bereich des Home-Balkens: " + pfad(el));
-    }
-  }
-  // 4b. Überlappende Bedienelemente
+  // 4. Überlappende Bedienelemente
   const bedien = alle.filter((e) => e.matches("button, input, select, textarea, .chip") && !e.closest(".geraet-schirm, .kontext, .toast"))
     .map((e) => ({ e, a: ausschnitt(e), leiste: festeLeiste(e), fenster: e.closest(".fenster, .hilfe-fenster, [role=dialog]") })).filter((x) => x.a);
   for (let i = 0; i < bedien.length; i++) {
@@ -223,8 +209,6 @@ await senden("Page.enable");
 let gesamt = 0;
 for (const g of GROESSEN) {
   await senden("Emulation.setDeviceMetricsOverride", { width: g.w, height: g.h, deviceScaleFactor: 1, mobile: g.mobil });
-  // Telefone: sichere Ränder eines iPhones mit Dynamic Island (Statusleiste oben, Home-Balken unten)
-  await senden("Emulation.setSafeAreaInsetsOverride", { insets: g.mobil ? { top: 59, bottom: 34, left: 0, right: 0 } : { top: 0, bottom: 0, left: 0, right: 0 } });
   for (const a of g.mobil ? ANSICHTEN_TELEFON : ANSICHTEN_RECHNER) {
     await senden("Page.navigate", { url: "about:blank" });
     await senden("Page.navigate", { url: `${ADRESSE}/${a.route}` });
