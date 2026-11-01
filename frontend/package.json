@@ -1,11 +1,11 @@
 {
   "name": "pyroplus-frontend",
-  "version": "5.2.19",
+  "version": "5.2.20",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node symbol-einbetten.mjs dist",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json --threshold error"
   },
