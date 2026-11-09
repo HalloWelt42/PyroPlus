@@ -31,6 +31,9 @@ logging.basicConfig(
 logger = logging.getLogger("hw-proxy")
 
 PORT = 8072
+# Nur dort lauschen, wo das Backend aus seinem Container ankommt (host.docker.internal, die Adresse des Docker-Hosts),
+# nie im Heimnetz: GPIO, I2C und SPI haben keine Anmeldung (HELF-169). Der Installer setzt die Adresse im Dienst.
+ADRESSE = os.environ.get("PYROPLUS_HW_ADRESSE", "127.0.0.1")
 
 
 def _lese_version() -> str:
@@ -523,4 +526,4 @@ def leds_off_legacy():
 # ─── Startup ────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="info")
+    uvicorn.run(app, host=ADRESSE, port=PORT, log_level="info")

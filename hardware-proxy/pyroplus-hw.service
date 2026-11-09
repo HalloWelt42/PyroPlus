@@ -1,6 +1,7 @@
 [Unit]
 Description=PyroPlus Hardware-Proxy (GPIO, I2C, SPI)
-After=network.target
+# lauscht an der Adresse des Docker-Hosts (docker0), die es erst mit Docker gibt
+After=network.target docker.service
 Wants=network.target
 
 [Service]
@@ -11,6 +12,8 @@ ExecStart=/opt/pyroplus-hw/venv/bin/python main.py
 Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
+# Adresse des Docker-Hosts, vom Installer eingesetzt (HELF-169: nicht im Heimnetz)
+Environment=PYROPLUS_HW_ADRESSE=@ADRESSE@
 
 [Install]
 WantedBy=multi-user.target

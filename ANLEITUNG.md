@@ -8,7 +8,7 @@ läuft im Browser, auch am Telefon.
 
 | Teil | Art | Port | Aufgabe |
 |------|-----|------|---------|
-| Hardware-Proxy | nativer systemd-Dienst | 8072 | Zugriff auf GPIO, I2C und SPI; LED-Animation läuft hier |
+| Hardware-Proxy | nativer systemd-Dienst | 8072, nur an der Adresse des Docker-Hosts | Zugriff auf GPIO, I2C und SPI; LED-Animation läuft hier |
 | Backend | Docker-Container | 8071 | Schnittstelle, WebSocket, Lüfterregelung, Display-Rendering |
 | Oberfläche | Docker-Container | 8070 | Weboberfläche |
 
@@ -149,7 +149,7 @@ nach `.github/bilder`. `tools/bilder/qa-shot.mjs` macht eine einzelne Prüfaufna
 - `journalctl -u pyroplus-hw -n 50` zeigt das Protokoll des Hardware-Proxys.
 - `docker compose logs -f backend` zeigt das Backend.
 - Meldet die Oberfläche "Kein Display" oder "Keine LEDs", antwortet der Proxy nicht:
-  `curl http://localhost:8072/health` auf dem Pi prüfen.
+  `curl http://172.17.0.1:8072/health` auf dem Pi prüfen (die Adresse des Docker-Hosts, `ip -4 addr show docker0`).
 - Läuft noch ein anderer Dienst für dasselbe Gehäuse, kollidieren beide am Bus;
   der Installer deaktiviert bekannte Dienste.
 

@@ -69,7 +69,7 @@
 | Hardware-Dienst | Python, nativer systemd-Dienst: GPIO, I2C, SPI; die LED-Animation läuft hier |
 | Backend | Python 3.12, FastAPI, Pydantic, Pillow; rendert jedes Displaybild, WebSocket für den Live-Zustand |
 | Oberfläche | Svelte 5 (Runes), TypeScript, Vite, Nginx |
-| Betrieb | Docker Compose, Ports 8070 (Oberfläche), 8071 (Schnittstelle), 8072 (Hardware-Dienst) |
+| Betrieb | Docker Compose, Ports 8070 (Oberfläche), 8071 (Schnittstelle), 8072 (Hardware-Dienst, nur für das Backend erreichbar) |
 | Hardware | Raspberry Pi 5, Display mit 128 mal 64 Pixeln über I2C, vier adressierbare LEDs über SPI, Lüfter über PWM |
 
 Das Backend besitzt alle Daten und rendert alle Bilder; die Oberfläche bearbeitet das Modell über die Schnittstelle und zeigt, was das Backend gerendert hat. Es gibt keinen zweiten Renderer und keinen zweiten Datenkatalog.

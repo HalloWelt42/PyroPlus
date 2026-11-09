@@ -49,7 +49,11 @@ fi
 "$INSTALL_DIR/venv/bin/python" -m pip install --upgrade pip -q
 "$INSTALL_DIR/venv/bin/python" -m pip install -r "$INSTALL_DIR/requirements.txt" -q
 
-cp "$HIER/pyroplus-hw.service" /etc/systemd/system/
+# Gelauscht wird nur an der Adresse des Docker-Hosts (dort kommt das Backend über host.docker.internal an), nie im
+# Heimnetz (HELF-169); ohne Docker nur am Rechner selbst
+ADRESSE="$(ip -4 -o addr show docker0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)"
+ADRESSE="${ADRESSE:-127.0.0.1}"
+sed "s/@ADRESSE@/$ADRESSE/" "$HIER/pyroplus-hw.service" > /etc/systemd/system/pyroplus-hw.service
 rm -f /etc/systemd/system/pironman-deluxe-hw.service
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME" >/dev/null
@@ -57,7 +61,7 @@ systemctl restart "$SERVICE_NAME"
 
 sleep 3
 if systemctl is-active --quiet "$SERVICE_NAME"; then
-    echo "Hardware-Proxy läuft: $(curl -s http://localhost:8072/health)"
+    echo "Hardware-Proxy läuft an $ADRESSE: $(curl -s "http://$ADRESSE:8072/health")"
 else
     echo "Dienst gestartet, aber nicht aktiv. Protokoll: journalctl -u $SERVICE_NAME -n 30"
     exit 1
